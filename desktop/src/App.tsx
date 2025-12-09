@@ -17,6 +17,7 @@ import {
 } from "./crypto";
 import "./App.css";
 import "./KeyStyles.css";
+import "./Fingerprint.css";
 
 const { apiUrl: API_URL, wsUrl: WS_URL } = config;
 
@@ -367,9 +368,26 @@ export default function App() {
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
       if (!deviceIdRef.current) return;
 
-      const payload = state.encryptionKey
-        ? { ...encrypt(text, state.encryptionKey), device_id: deviceIdRef.current }
-        : { content: text, device_id: deviceIdRef.current };
+      let payload;
+      const timestamp = Date.now();
+
+      if (state.encryptionKey) {
+        const { ciphertext, nonce } = encrypt(text, state.encryptionKey);
+        payload = {
+          device_id: deviceIdRef.current,
+          content: ciphertext, // Store ciphertext in content field
+          nonce: nonce,
+          encrypted: true,
+          timestamp: timestamp
+        };
+      } else {
+        payload = {
+          device_id: deviceIdRef.current,
+          content: text,
+          encrypted: false,
+          timestamp: timestamp
+        };
+      }
 
       wsRef.current.send(JSON.stringify(payload));
     },
@@ -415,7 +433,10 @@ export default function App() {
         if (event.data === "pong") return;
         try {
           const msg = JSON.parse(event.data);
-          if (msg.device_id === deviceIdRef.current) return;
+          
+          if (msg.device_id === deviceIdRef.current) {
+            return;
+          }
 
           // Handle presence updates
           if (msg.content === "__PRESENCE__") {
@@ -436,16 +457,37 @@ export default function App() {
             });
             return;
           }
+          
+          let text;
+          if (msg.nonce) {
+             // Message is encrypted
+             if (!state.encryptionKey) {
+                console.warn("Received encrypted message but no key is set.");
+                showToast("Received encrypted message but no key set", "error");
+                return;
+             }
+             
+             try {
+                // Backend sends ciphertext in the 'content' field
+                text = decrypt(msg.content, msg.nonce, state.encryptionKey);
+             } catch (e) {
+                console.error("Decryption failed:", e);
+                showToast("Decryption failed: Keys might not match", "error");
+                return;
+             }
+          } else {
+             // Message is plain text
+             text = msg.content;
+          }
 
-          const text =
-            state.encryptionKey && msg.nonce
-              ? decrypt(msg.ciphertext, msg.nonce, state.encryptionKey)
-              : msg.content;
+          if (!text) {
+             return;
+          }
 
           await invoke("set_clipboard", { text });
           addToHistory(text, "remote", msg.device_name || "Remote Device");
-        } catch {
-          // Ignore malformed messages
+        } catch (e) {
+          console.error("Error processing message:", e);
         }
       };
 
@@ -713,6 +755,14 @@ export default function App() {
             <span>{state.history.length} items</span>
             <span className="divider">•</span>
             <span>{state.devices.length} device{state.devices.length !== 1 ? "s" : ""}</span>
+            {state.keyFingerprint && (
+              <>
+                <span className="divider">•</span>
+                <span className="fingerprint" title="Encryption Key Fingerprint">
+                   Key: {state.keyFingerprint}
+                </span>
+              </>
+            )}
           </div>
         </div>
 
