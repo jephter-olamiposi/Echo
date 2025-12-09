@@ -1,3 +1,5 @@
+mod auth;
+mod db;
 mod error;
 mod handler;
 mod middleware;

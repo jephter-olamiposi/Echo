@@ -1,12 +1,13 @@
 use crate::{
+    auth,
+    db::UserRepository,
     error::AppError,
     middleware::AuthUser,
-    models::{AuthResponse, Claims, ClipboardMessage, LoginRequest, RegisterRequest, WsQuery},
+    models::{
+        AuthResponse, ClipboardMessage, LoginRequest, RegisterRequest, WsQuery, MSG_HANDSHAKE,
+        MSG_PRESENCE,
+    },
     state::AppState,
-};
-use argon2::{
-    password_hash::{rand_core::OsRng, SaltString},
-    Argon2, PasswordHasher, PasswordVerifier,
 };
 use axum::{
     extract::{
@@ -18,46 +19,33 @@ use axum::{
     Json,
 };
 use futures::{SinkExt, StreamExt};
-use jsonwebtoken::{encode, EncodingKey, Header};
 use std::{sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-const JWT_EXPIRY_HOURS: u64 = 24;
 const PING_INTERVAL_SECS: u64 = 30;
 
 pub async fn login(
     State(state): State<AppState>,
     Json(payload): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let user = sqlx::query!(
-        "SELECT id, password_hash FROM users WHERE email = $1",
-        payload.email
-    )
-    .fetch_optional(&state.pool)
-    .await?
-    .ok_or_else(|| AppError::Auth("Invalid credentials".into()))?;
+    let repo = UserRepository::new(state.pool.clone());
 
-    let hash = user.password_hash.clone();
+    let (user_id, hash) = repo
+        .find_by_email(&payload.email)
+        .await?
+        .ok_or_else(|| AppError::Auth("Invalid credentials".into()))?;
+
     let password = payload.password;
-
-    let valid = tokio::task::spawn_blocking(move || {
-        argon2::PasswordHash::new(&hash)
-            .ok()
-            .map(|h| {
-                Argon2::default()
-                    .verify_password(password.as_bytes(), &h)
-                    .is_ok()
-            })
-            .unwrap_or(false)
-    })
-    .await?;
+    let valid =
+        tokio::task::spawn_blocking(move || auth::verify_password(password, hash).unwrap_or(false))
+            .await?;
 
     if !valid {
         return Err(AppError::Auth("Invalid credentials".into()));
     }
 
-    let token = generate_jwt(user.id, &state.jwt_secret)?;
+    let token = auth::generate_jwt(user_id, &state.jwt_secret)?;
     Ok((StatusCode::OK, Json(AuthResponse { token })))
 }
 
@@ -65,57 +53,22 @@ pub async fn register(
     State(state): State<AppState>,
     Json(payload): Json<RegisterRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    let salt = SaltString::generate(&mut OsRng);
     let password = payload.password;
 
-    let hash = tokio::task::spawn_blocking(move || {
-        Argon2::default()
-            .hash_password(password.as_bytes(), &salt)
-            .map(|h| h.to_string())
-    })
-    .await?
-    .map_err(|e| AppError::Internal(format!("Hash failed: {e}")))?;
+    let hash = tokio::task::spawn_blocking(move || auth::hash_password(password)).await??;
 
-    let result = sqlx::query!(
-        "INSERT INTO users (first_name, last_name, email, password_hash) VALUES ($1, $2, $3, $4) RETURNING id",
-        payload.first_name,
-        payload.last_name,
-        payload.email,
-        hash
-    )
-    .fetch_one(&state.pool)
-    .await;
+    let repo = UserRepository::new(state.pool.clone());
+    let user_id = repo
+        .create_user(
+            &payload.first_name,
+            &payload.last_name,
+            &payload.email,
+            &hash,
+        )
+        .await?;
 
-    let user_id = match result {
-        Ok(r) => r.id,
-        Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
-            return Err(AppError::Conflict("Email already exists".into()));
-        }
-        Err(e) => return Err(e.into()),
-    };
-
-    let token = generate_jwt(user_id, &state.jwt_secret)?;
+    let token = auth::generate_jwt(user_id, &state.jwt_secret)?;
     Ok((StatusCode::CREATED, Json(AuthResponse { token })))
-}
-
-fn generate_jwt(user_id: Uuid, secret: &str) -> Result<String, AppError> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_secs() as usize;
-
-    let claims = Claims {
-        sub: user_id.to_string(),
-        iat: now,
-        exp: now + (JWT_EXPIRY_HOURS as usize * 3600),
-    };
-
-    encode(
-        &Header::default(),
-        &claims,
-        &EncodingKey::from_secret(secret.as_bytes()),
-    )
-    .map_err(|e| AppError::Internal(e.to_string()))
 }
 
 pub async fn protected(AuthUser { user_id }: AuthUser) -> impl IntoResponse {
@@ -134,11 +87,8 @@ pub async fn ws_handler(
     Query(params): Query<WsQuery>,
     State(state): State<AppState>,
 ) -> impl IntoResponse {
-    let validation = jsonwebtoken::Validation::default();
-    let key = jsonwebtoken::DecodingKey::from_secret(state.jwt_secret.as_bytes());
-
-    let claims = match jsonwebtoken::decode::<Claims>(&params.token, &key, &validation) {
-        Ok(data) => data.claims,
+    let claims = match auth::decode_jwt(&params.token, &state.jwt_secret) {
+        Ok(claims) => claims,
         Err(_) => return (StatusCode::UNAUTHORIZED, "Invalid token").into_response(),
     };
 
@@ -151,13 +101,56 @@ pub async fn ws_handler(
 }
 
 async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
-    let device_id = Uuid::new_v4().to_string();
-    tracing::info!(user = %user_id, device = %device_id, "device connected");
+    let (sender, mut receiver) = socket.split();
 
-    let (sender, receiver) = socket.split();
+    // Wait for first message to extract device_id
+    let device_id = loop {
+        match receiver.next().await {
+            Some(Ok(Message::Text(text))) if text != "ping" => {
+                if let Ok(msg) = serde_json::from_str::<ClipboardMessage>(&text) {
+                    tracing::info!(user = %user_id, device = %msg.device_id, "device connected");
+
+                    // If it's a handshake, just establish connection without broadcasting
+                    if msg.content == MSG_HANDSHAKE {
+                        break msg.device_id;
+                    }
+
+                    // Process this first message
+                    if state.check_rate_limit(&msg.device_id) {
+                        state.add_to_history(user_id, msg.clone());
+                        let tx = state.get_or_create_channel(user_id);
+                        let _ = tx.send(msg.clone());
+                    }
+                    break msg.device_id;
+                }
+            }
+            Some(Ok(Message::Close(_))) => return,
+            None => return,
+            _ => continue,
+        }
+    };
+
     let sender = Arc::new(Mutex::new(sender));
 
+    // Register session and broadcast presence
+    state.add_session(user_id, device_id.clone());
+
+    // 1. Broadcast my presence to others
+    let presence_msg = ClipboardMessage::new(device_id.clone(), MSG_PRESENCE);
     let tx = state.get_or_create_channel(user_id);
+    let _ = tx.send(presence_msg);
+
+    // 2. Send existing devices to me
+    let existing_devices = state.get_sessions(&user_id);
+    for dev in existing_devices {
+        if dev != device_id {
+            let msg = ClipboardMessage::new(dev, MSG_PRESENCE);
+            if let Ok(json) = serde_json::to_string(&msg) {
+                let _ = sender.lock().await.send(Message::Text(json.into())).await;
+            }
+        }
+    }
+
     let mut rx = tx.subscribe();
 
     let ping_sender = Arc::clone(&sender);
@@ -180,20 +173,29 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
     let my_device = device_id.clone();
     let broadcast_sender = Arc::clone(&sender);
     let send_task = tokio::spawn(async move {
-        while let Ok(msg) = rx.recv().await {
-            if msg.device_id == my_device {
-                continue;
-            }
-            if let Ok(json) = serde_json::to_string(&msg) {
-                if broadcast_sender
-                    .lock()
-                    .await
-                    .send(Message::Text(json.into()))
-                    .await
-                    .is_err()
-                {
-                    break;
+        loop {
+            match rx.recv().await {
+                Ok(msg) => {
+                    if msg.device_id == my_device {
+                        continue;
+                    }
+                    if let Ok(json) = serde_json::to_string(&msg) {
+                        if broadcast_sender
+                            .lock()
+                            .await
+                            .send(Message::Text(json.into()))
+                            .await
+                            .is_err()
+                        {
+                            break;
+                        }
+                    }
                 }
+                Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
+                    tracing::warn!("Client lagged, skipped {} messages", skipped);
+                    continue;
+                }
+                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
             }
         }
     });
@@ -201,7 +203,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
     let recv_task = tokio::spawn(handle_incoming(
         receiver,
         tx.clone(),
-        device_id,
+        device_id.clone(),
         state.clone(),
         user_id,
     ));
@@ -213,6 +215,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
     }
 
     state.cleanup_channel_if_empty(&user_id, &tx);
+    state.remove_session(user_id, &device_id);
 }
 
 async fn handle_incoming(
@@ -225,20 +228,20 @@ async fn handle_incoming(
     while let Some(Ok(msg)) = receiver.next().await {
         match msg {
             Message::Text(text) => {
-                // Ignore keep-alive pings from frontend
                 if text == "ping" {
                     continue;
                 }
+
+                let clipboard_msg = match serde_json::from_str::<ClipboardMessage>(&text) {
+                    Ok(msg) => msg,
+                    Err(_) => continue,
+                };
 
                 if !state.check_rate_limit(&device_id) {
                     tracing::warn!(device = %device_id, "rate limited");
                     continue;
                 }
 
-                let mut clipboard_msg = serde_json::from_str::<ClipboardMessage>(&text)
-                    .unwrap_or_else(|_| ClipboardMessage::new(&device_id, text.to_string()));
-
-                clipboard_msg.device_id = device_id.clone();
                 state.add_to_history(user_id, clipboard_msg.clone());
                 let _ = tx.send(clipboard_msg);
             }

@@ -1,6 +1,7 @@
 use crate::models::ClipboardMessage;
 use dashmap::DashMap;
 use sqlx::PgPool;
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::broadcast;
@@ -21,6 +22,7 @@ pub struct RateLimitState {
 type Hub = Arc<DashMap<Uuid, broadcast::Sender<ClipboardMessage>>>;
 type RateLimits = Arc<DashMap<String, RateLimitState>>;
 type History = Arc<DashMap<Uuid, Vec<ClipboardMessage>>>;
+type Sessions = Arc<DashMap<Uuid, HashSet<String>>>;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -29,6 +31,7 @@ pub struct AppState {
     hub: Hub,
     rate_limits: RateLimits,
     history: History,
+    sessions: Sessions,
 }
 
 impl AppState {
@@ -39,7 +42,25 @@ impl AppState {
             hub: Arc::default(),
             rate_limits: Arc::default(),
             history: Arc::default(),
+            sessions: Arc::default(),
         }
+    }
+
+    pub fn add_session(&self, user_id: Uuid, device_id: String) {
+        self.sessions.entry(user_id).or_default().insert(device_id);
+    }
+
+    pub fn remove_session(&self, user_id: Uuid, device_id: &str) {
+        if let Some(mut sessions) = self.sessions.get_mut(&user_id) {
+            sessions.remove(device_id);
+        }
+    }
+
+    pub fn get_sessions(&self, user_id: &Uuid) -> Vec<String> {
+        self.sessions
+            .get(user_id)
+            .map(|s| s.iter().cloned().collect())
+            .unwrap_or_default()
     }
 
     pub fn check_rate_limit(&self, device_id: &str) -> bool {

@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+pub const MSG_HANDSHAKE: &str = "handshake";
+pub const MSG_PRESENCE: &str = "__PRESENCE__";
+
 #[derive(Debug, Deserialize)]
 pub struct RegisterRequest {
     pub first_name: String,

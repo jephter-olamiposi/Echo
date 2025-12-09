@@ -377,6 +377,16 @@ export default function App() {
 
       socket.onopen = () => {
         update("connected", true);
+        
+        // Send handshake to establish device_id
+        if (deviceIdRef.current) {
+          socket.send(JSON.stringify({
+            device_id: deviceIdRef.current,
+            content: "handshake",
+            timestamp: Date.now()
+          }));
+        }
+
         setState((prev) => ({
           ...prev,
           devices: [
@@ -400,6 +410,26 @@ export default function App() {
           const msg = JSON.parse(event.data);
           if (msg.device_id === deviceIdRef.current) return;
 
+          // Handle presence updates
+          if (msg.content === "__PRESENCE__") {
+            setState((prev) => {
+              if (prev.devices.some((d) => d.id === msg.device_id)) return prev;
+              return {
+                ...prev,
+                devices: [
+                  ...prev.devices,
+                  {
+                    id: msg.device_id,
+                    name: "Remote Device",
+                    lastSeen: Date.now(),
+                    isCurrentDevice: false,
+                  },
+                ],
+              };
+            });
+            return;
+          }
+
           const text =
             state.encryptionKey && msg.nonce
               ? decrypt(msg.ciphertext, msg.nonce, state.encryptionKey)
@@ -415,11 +445,20 @@ export default function App() {
       socket.onclose = () => {
         update("connected", false);
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
+        
+        // Auto-reconnect with exponential backoff
+        const reconnectDelay = Math.min(config.reconnectMs * 2, 30000);
+        setTimeout(() => {
+          const currentToken = loadToken();
+          if (currentToken && state.view === "home") {
+            connectWebSocket(currentToken);
+          }
+        }, reconnectDelay);
       };
 
       wsRef.current = socket;
     },
-    [state.encryptionKey, update, addToHistory]
+    [update, addToHistory]
   );
 
   useEffect(() => {
