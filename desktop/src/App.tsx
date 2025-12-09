@@ -278,6 +278,12 @@ export default function App() {
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reconnectAttemptsRef = useRef(0);
+  const encryptionKeyRef = useRef<Uint8Array | null>(null);
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    encryptionKeyRef.current = state.encryptionKey;
+  }, [state.encryptionKey]);
 
   const update = useCallback(
     <K extends keyof AppState>(key: K, value: AppState[K]) =>
@@ -371,9 +377,10 @@ export default function App() {
 
       let payload;
       const timestamp = Date.now();
+      const key = encryptionKeyRef.current;
 
-      if (state.encryptionKey) {
-        const { ciphertext, nonce } = encrypt(text, state.encryptionKey);
+      if (key) {
+        const { ciphertext, nonce } = encrypt(text, key);
         payload = {
           device_id: deviceIdRef.current,
           content: ciphertext, // Store ciphertext in content field
@@ -392,7 +399,7 @@ export default function App() {
 
       wsRef.current.send(JSON.stringify(payload));
     },
-    [state.encryptionKey]
+    []
   );
 
   const connectWebSocket = useCallback(
@@ -463,7 +470,8 @@ export default function App() {
           let text;
           if (msg.nonce) {
              // Message is encrypted
-             if (!state.encryptionKey) {
+             const key = encryptionKeyRef.current;
+             if (!key) {
                 console.warn("Received encrypted message but no key is set.");
                 showToast("Received encrypted message but no key set", "error");
                 return;
@@ -471,7 +479,7 @@ export default function App() {
              
              try {
                 // Backend sends ciphertext in the 'content' field
-                text = decrypt(msg.content, msg.nonce, state.encryptionKey);
+                text = decrypt(msg.content, msg.nonce, key);
              } catch (e) {
                 console.error("Decryption failed:", e);
                 showToast("Decryption failed: Keys might not match", "error");
