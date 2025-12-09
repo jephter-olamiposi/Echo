@@ -277,6 +277,7 @@ export default function App() {
   const deviceIdRef = useRef<string>("");
   const heartbeatRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const toastTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reconnectAttemptsRef = useRef(0);
 
   const update = useCallback(
     <K extends keyof AppState>(key: K, value: AppState[K]) =>
@@ -402,6 +403,7 @@ export default function App() {
 
       socket.onopen = () => {
         update("connected", true);
+        reconnectAttemptsRef.current = 0;
         
         // Send handshake to establish device_id
         if (deviceIdRef.current) {
@@ -496,13 +498,22 @@ export default function App() {
         if (heartbeatRef.current) clearInterval(heartbeatRef.current);
         
         // Auto-reconnect with exponential backoff
-        const reconnectDelay = Math.min(config.reconnectMs * 2, 30000);
+        const attempts = reconnectAttemptsRef.current;
+        const delay = Math.min(1000 * Math.pow(2, attempts), 30000);
+        reconnectAttemptsRef.current = attempts + 1;
+
+        console.log(`WebSocket closed. Reconnecting in ${delay}ms (Attempt ${attempts + 1})`);
+
         setTimeout(() => {
           const currentToken = loadToken();
           if (currentToken && state.view === "home") {
             connectWebSocket(currentToken);
           }
-        }, reconnectDelay);
+        }, delay);
+      };
+
+      socket.onerror = (error) => {
+        console.error("WebSocket error:", error);
       };
 
       wsRef.current = socket;
