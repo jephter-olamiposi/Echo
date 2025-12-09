@@ -89,6 +89,9 @@ export async function getOrCreateDeviceId(): Promise<string> {
   }
 }
 
+export const exportKey = (key: Uint8Array) => toBase64Url(key);
+export const importKey = (str: string) => fromBase64Url(str);
+
 const toBase64 = (b: Uint8Array) => btoa(String.fromCharCode(...b));
 const fromBase64 = (s: string) =>
   Uint8Array.from(atob(s), (c) => c.charCodeAt(0));

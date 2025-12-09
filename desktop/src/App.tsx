@@ -12,8 +12,11 @@ import {
   generateLinkUri,
   getKeyFingerprint,
   getOrCreateDeviceId,
+  exportKey,
+  importKey,
 } from "./crypto";
 import "./App.css";
+import "./KeyStyles.css";
 
 const { apiUrl: API_URL, wsUrl: WS_URL } = config;
 
@@ -169,6 +172,8 @@ interface AppState {
   keyFingerprint: string | null;
   showQR: boolean;
   showDevices: boolean;
+  showKeyInput: boolean;
+  manualKey: string;
   linkUri: string | null;
   history: ClipboardEntry[];
   searchQuery: string;
@@ -190,6 +195,8 @@ const initialState: AppState = {
   keyFingerprint: null,
   showQR: false,
   showDevices: false,
+  showKeyInput: false,
+  manualKey: "",
   linkUri: null,
   history: [],
   searchQuery: "",
@@ -557,6 +564,21 @@ export default function App() {
     if (!state.encryptionKey) return;
     const uri = generateLinkUri(deviceIdRef.current, state.encryptionKey, WS_URL);
     setState((prev) => ({ ...prev, showQR: true, linkUri: uri }));
+  };
+
+  const handleManualKeySync = async () => {
+    try {
+      if (!state.manualKey) return;
+      const key = importKey(state.manualKey);
+      await saveEncryptionKey(key);
+      update("encryptionKey", key);
+      update("keyFingerprint", await getKeyFingerprint(key));
+      update("showKeyInput", false);
+      update("manualKey", "");
+      showToast("Encryption key updated successfully");
+    } catch {
+      showToast("Invalid key format", "error");
+    }
   };
 
   const filteredHistory = state.history
@@ -934,6 +956,10 @@ export default function App() {
                   {Icons.link}
                   Link New Device
                 </button>
+                <button className="btn btn-ghost" onClick={() => update("showKeyInput", true)}>
+                  {Icons.shield}
+                  Enter Sync Key
+                </button>
                 <button className="btn btn-ghost" onClick={() => update("showDevices", true)}>
                   {Icons.devices}
                   Manage Devices
@@ -943,6 +969,33 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {state.showKeyInput && (
+        <div className="modal-backdrop" onClick={() => update("showKeyInput", false)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h2>Enter Sync Key</h2>
+              <p>Paste the encryption key from your other device to sync clipboard history.</p>
+            </div>
+            <div className="modal-body">
+              <input
+                className="input"
+                placeholder="Paste key here..."
+                value={state.manualKey}
+                onChange={(e) => update("manualKey", e.target.value)}
+              />
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-ghost" onClick={() => update("showKeyInput", false)}>
+                Cancel
+              </button>
+              <button className="btn btn-primary" onClick={handleManualKeySync}>
+                Save Key
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {state.showQR && state.linkUri && (
         <div className="modal-backdrop" onClick={() => update("showQR", false)}>
@@ -960,9 +1013,23 @@ export default function App() {
                   height={200}
                 />
               </div>
-              <p className="modal-hint">
-                Your encryption key will be securely transferred to the new device.
-              </p>
+              <div className="key-display-wrapper">
+                <p className="modal-hint">Or copy this key to your other device:</p>
+                <div className="key-display">
+                  <code>{state.encryptionKey ? exportKey(state.encryptionKey) : ""}</code>
+                  <button 
+                    className="btn btn-sm btn-secondary"
+                    onClick={() => {
+                      if (state.encryptionKey) {
+                        copyToClipboard(exportKey(state.encryptionKey));
+                        showToast("Key copied!");
+                      }
+                    }}
+                  >
+                    {Icons.copy}
+                  </button>
+                </div>
+              </div>
             </div>
             <div className="modal-footer">
               <button className="btn btn-primary" onClick={() => update("showQR", false)}>
