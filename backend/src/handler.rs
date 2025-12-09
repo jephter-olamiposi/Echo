@@ -225,6 +225,11 @@ async fn handle_incoming(
     while let Some(Ok(msg)) = receiver.next().await {
         match msg {
             Message::Text(text) => {
+                // Ignore keep-alive pings from frontend
+                if text == "ping" {
+                    continue;
+                }
+
                 if !state.check_rate_limit(&device_id) {
                     tracing::warn!(device = %device_id, "rate limited");
                     continue;

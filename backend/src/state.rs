@@ -6,9 +6,9 @@ use std::time::Instant;
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
-const MAX_MESSAGES_PER_WINDOW: u32 = 30;
+const MAX_MESSAGES_PER_WINDOW: u32 = 300;
 const WINDOW_DURATION_SECS: u64 = 60;
-const MIN_INTERVAL_MS: u128 = 100;
+const MIN_INTERVAL_MS: u128 = 50;
 const MAX_HISTORY_SIZE: usize = 50;
 
 #[derive(Clone, Default)]

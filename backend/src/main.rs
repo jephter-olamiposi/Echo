@@ -14,6 +14,7 @@ use axum::{
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
 use tower_http::cors::CorsLayer;
+use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
 #[tokio::main]
@@ -46,10 +47,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/ws", get(handler::ws_handler))
         .route("/protected", get(handler::protected))
         .route("/history", get(handler::get_history))
+        .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state);
 
-    let addr = SocketAddr::from(([0, 0, 0, 0], 3000));
+    let port = std::env::var("PORT")
+        .unwrap_or_else(|_| "3000".to_string())
+        .parse::<u16>()
+        .expect("Invalid PORT");
+
+    let host = std::env::var("HOST").unwrap_or_else(|_| "0.0.0.0".to_string());
+    let addr: SocketAddr = format!("{}:{}", host, port)
+        .parse()
+        .expect("Invalid HOST:PORT combination");
+
     tracing::info!("Server listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;

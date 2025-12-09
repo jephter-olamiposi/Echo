@@ -1,10 +1,14 @@
 use arboard::Clipboard;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 use tauri::{AppHandle, Emitter};
 
 const POLL_INTERVAL_MS: u64 = 500;
 const INIT_RETRY_SECS: u64 = 5;
+
+static IGNORE_NEXT_CHANGE: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
 pub fn get_clipboard() -> Result<String, String> {
@@ -16,6 +20,7 @@ pub fn get_clipboard() -> Result<String, String> {
 
 #[tauri::command]
 pub fn set_clipboard(text: String) -> Result<(), String> {
+    IGNORE_NEXT_CHANGE.store(true, Ordering::Relaxed);
     Clipboard::new()
         .map_err(|e| e.to_string())?
         .set_text(text)
@@ -35,6 +40,10 @@ pub fn start_clipboard_listener(app: AppHandle) {
                     match clipboard.get_text() {
                         Ok(current) if current != last_text && !current.is_empty() => {
                             last_text = current.clone();
+                            // Skip if this change was from set_clipboard (remote)
+                            if IGNORE_NEXT_CHANGE.swap(false, Ordering::Relaxed) {
+                                continue;
+                            }
                             if let Err(e) = app.emit("clipboard-change", current) {
                                 eprintln!("[clipboard] emit error: {e}");
                             }
