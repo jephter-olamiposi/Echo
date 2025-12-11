@@ -40,6 +40,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     tracing::info!("Database connected");
 
+    // Run migrations automatically
+    tracing::info!("Running migrations...");
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to run migrations");
+    tracing::info!("Migrations ran successfully");
+
     let state = AppState::new(pool, jwt_secret);
 
     let app = Router::new()
