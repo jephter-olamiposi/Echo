@@ -18,18 +18,18 @@ impl UserRepository {
         email: &str,
         password_hash: &str,
     ) -> Result<Uuid, AppError> {
-        let result = sqlx::query_as::<_, (Uuid,)>(
+        let result = sqlx::query!(
             "INSERT INTO users (first_name, last_name, email, password_hash) VALUES ($1, $2, $3, $4) RETURNING id",
+            first_name,
+            last_name,
+            email,
+            password_hash
         )
-        .bind(first_name)
-        .bind(last_name)
-        .bind(email)
-        .bind(password_hash)
         .fetch_one(&self.pool)
         .await;
 
         match result {
-            Ok((id,)) => Ok(id),
+            Ok(r) => Ok(r.id),
             Err(sqlx::Error::Database(e)) if e.is_unique_violation() => {
                 Err(AppError::Conflict("Email already exists".into()))
             }
@@ -38,13 +38,13 @@ impl UserRepository {
     }
 
     pub async fn find_by_email(&self, email: &str) -> Result<Option<(Uuid, String)>, AppError> {
-        let user = sqlx::query_as::<_, (Uuid, String)>(
+        let user = sqlx::query!(
             "SELECT id, password_hash FROM users WHERE email = $1",
+            email
         )
-        .bind(email)
         .fetch_optional(&self.pool)
         .await?;
 
-        Ok(user)
+        Ok(user.map(|u| (u.id, u.password_hash)))
     }
 }
