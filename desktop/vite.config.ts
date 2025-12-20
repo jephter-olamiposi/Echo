@@ -30,3 +30,4 @@ export default defineConfig(async () => ({
     },
   },
 }));
+// Trigger restart for Tailwind config

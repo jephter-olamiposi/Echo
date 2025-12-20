@@ -3,6 +3,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const MSG_HANDSHAKE: &str = "handshake";
 pub const MSG_PRESENCE: &str = "__PRESENCE__";
+pub const MSG_PRESENCE_JOIN: &str = "__JOIN__";
+pub const MSG_PRESENCE_LEAVE: &str = "__LEAVE__";
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterRequest {
@@ -38,22 +40,28 @@ pub struct WsQuery {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ClipboardMessage {
     pub device_id: String,
+    #[serde(default)]
+    pub device_name: Option<String>,
     pub content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub nonce: Option<String>,
     #[serde(default)]
     pub encrypted: bool,
     pub timestamp: u64,
+    #[serde(default)]
+    pub is_history: bool,
 }
 
 impl ClipboardMessage {
     pub fn new(device_id: impl Into<String>, content: impl Into<String>) -> Self {
         Self {
             device_id: device_id.into(),
+            device_name: None,
             content: content.into(),
             nonce: None,
             encrypted: false,
             timestamp: now_millis(),
+            is_history: false,
         }
     }
 }

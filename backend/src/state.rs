@@ -1,7 +1,7 @@
 use crate::models::ClipboardMessage;
 use dashmap::DashMap;
 use sqlx::PgPool;
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::broadcast;
@@ -22,7 +22,7 @@ pub struct RateLimitState {
 type Hub = Arc<DashMap<Uuid, broadcast::Sender<ClipboardMessage>>>;
 type RateLimits = Arc<DashMap<String, RateLimitState>>;
 type History = Arc<DashMap<Uuid, Vec<ClipboardMessage>>>;
-type Sessions = Arc<DashMap<Uuid, HashSet<String>>>;
+type Sessions = Arc<DashMap<Uuid, HashMap<String, String>>>;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -46,8 +46,11 @@ impl AppState {
         }
     }
 
-    pub fn add_session(&self, user_id: Uuid, device_id: String) {
-        self.sessions.entry(user_id).or_default().insert(device_id);
+    pub fn add_session(&self, user_id: Uuid, device_id: String, device_name: String) {
+        self.sessions
+            .entry(user_id)
+            .or_default()
+            .insert(device_id, device_name);
     }
 
     pub fn remove_session(&self, user_id: Uuid, device_id: &str) {
@@ -56,10 +59,10 @@ impl AppState {
         }
     }
 
-    pub fn get_sessions(&self, user_id: &Uuid) -> Vec<String> {
+    pub fn get_sessions(&self, user_id: &Uuid) -> Vec<(String, String)> {
         self.sessions
             .get(user_id)
-            .map(|s| s.iter().cloned().collect())
+            .map(|s| s.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
             .unwrap_or_default()
     }
 

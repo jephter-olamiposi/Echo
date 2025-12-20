@@ -34,7 +34,8 @@ mod rate_limit_tests {
         let engine = SyncEngine::default();
         let device = "spam_device";
 
-        for i in 0..30 {
+        // MAX_MESSAGES_PER_WINDOW = 300
+        for i in 0..300 {
             {
                 let mut entry = engine.rate_limits.entry(device.to_string()).or_default();
                 entry.value_mut().last_message = None;
@@ -52,7 +53,7 @@ mod rate_limit_tests {
         }
         assert!(
             !engine.check_rate_limit(device),
-            "Message 31 should be blocked"
+            "Message 301 should be blocked"
         );
     }
 
