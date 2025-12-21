@@ -24,9 +24,9 @@ export const SettingsItem: React.FC<SettingsItemProps> = ({
   
   return (
     <Component 
-      className={`w-full flex items-center gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/5 transition-all outline-none ${
+      className={`w-full flex items-center gap-4 p-4 rounded-2xl bg-white/3 border border-white/5 transition-all outline-none ${
         onClick 
-          ? 'hover:bg-white/[0.06] active:scale-[0.98] cursor-pointer' 
+          ? 'hover:bg-white/6 active:scale-[0.98] cursor-pointer' 
           : 'cursor-default'
       } ${className}`} 
       onClick={onClick}

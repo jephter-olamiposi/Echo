@@ -38,7 +38,7 @@ export const Register: React.FC<RegisterProps> = ({ onSuccess, onSwitchToLogin }
   };
 
   return (
-    <div className="flex flex-col gap-8 w-full max-w-sm mx-auto animate-in fade-in slide-in-from-bottom-8 duration-1000 ease-[var(--spring-easing)]">
+    <div className="flex flex-col gap-8 w-full max-w-sm mx-auto animate-in fade-in slide-in-from-bottom-8 duration-1000 ease-(--spring-easing)">
       <div className="text-center space-y-3">
         <h1 className="text-4xl font-black tracking-tight text-white">Join Echo</h1>
         <p className="text-zinc-500 font-medium">Start your real-time sync journey</p>

@@ -172,8 +172,8 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
             continue;
         }
 
-        // Skip presence messages
-        if msg.content == MSG_PRESENCE || msg.content == MSG_HANDSHAKE {
+        // Skip presence messages and pings
+        if msg.content == MSG_PRESENCE || msg.content == MSG_HANDSHAKE || msg.content == "ping" {
             continue;
         }
 

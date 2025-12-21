@@ -52,6 +52,26 @@ function App() {
   const [selectedEntry, setSelectedEntry] = useState<ClipboardEntry | null>(null);
   
   // WebSocket Hook
+  const showToastMsg = (message: string, type: "success" | "error" | "info" = "info") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleDeviceJoin = (device: LinkedDevice) => {
+      setDevices(prev => {
+        const exists = prev.find(d => d.id === device.id);
+        if (exists) {
+          return prev.map(d => d.id === device.id ? { ...d, lastSeen: Date.now() } : d);
+        }
+        return [...prev, device];
+      });
+      
+      // Suppress toast if it's a zombie session of "me" or generic name
+      if (device.name !== deviceName && device.name !== "This Device" && device.name !== "Unknown Device") {
+         showToastMsg(`${device.name} joined`, "info");
+      }
+  };
+
   const ws = useWebSocket({
     token,
     deviceId,
@@ -65,16 +85,7 @@ function App() {
         clipboard.copyToClipboard(entry.content);
       }
     },
-    onDeviceJoin: (device) => {
-      setDevices(prev => {
-        const exists = prev.find(d => d.id === device.id);
-        if (exists) {
-          return prev.map(d => d.id === device.id ? { ...d, lastSeen: Date.now() } : d);
-        }
-        return [...prev, device];
-      });
-      showToastMsg(`${device.name} joined`, "info");
-    },
+    onDeviceJoin: handleDeviceJoin,
     onDeviceLeave: (id) => {
       setDevices(prev => prev.filter(d => d.id !== id || d.isCurrentDevice));
     }
@@ -105,7 +116,21 @@ function App() {
       }
 
       setDeviceId(id);
-      setDeviceName(name); // Now setDeviceName is used
+      
+      // Improve default naming
+      if (name === "This Device") {
+         try {
+           const { type } = await import("@tauri-apps/plugin-os");
+           const platform = type();
+           name = platform === 'android' ? 'Android Device' : 
+                  platform === 'ios' ? 'iPhone' : 
+                  platform === 'macos' ? 'Mac' : 
+                  platform === 'windows' ? 'Windows' : 'Device';
+         } catch (e) {
+           // ignore
+         }
+      }
+      setDeviceName(name);
       setDevices([{ id, name, lastSeen: Date.now(), isCurrentDevice: true }]);
       setIsLoading(false);
     };
@@ -132,11 +157,6 @@ function App() {
   }, []);
 
   // --- Helper Functions ---
-
-  const showToastMsg = (message: string, type: "success" | "error" | "info" = "info") => {
-    setToast({ message, type });
-    setTimeout(() => setToast(null), 3000);
-  };
 
   const handleAuthSuccess = (newToken: string, newEmail: string) => {
     localStorage.setItem("echo_token", newToken);

@@ -113,7 +113,7 @@ export const History: React.FC<MobileHistoryProps> = ({
         </div>
       </div>
 
-      <div className="p-4">
+      <div className="p-4 mt-14">
         {isLoading ? (
           <div className="flex flex-col gap-3">
              {[1, 2, 3, 4, 5].map((i) => (

@@ -51,10 +51,16 @@ export function useClipboard() {
       source: "local" | "remote" = "local",
       deviceName?: string
     ) => {
-      // Hardened check for duplicates (ignore whitespace diffs)
+      // Reject system messages
+      const systemMessages = ["ping", "handshake", "__JOIN__", "__LEAVE__"];
+      if (systemMessages.includes(text) || systemMessages.includes(text.trim()))
+        return;
+
+      // Hardened check for duplicates (ignore whitespace diffs and line endings)
+      const normalize = (s: string) => s.replace(/\r\n/g, "\n").trim();
       if (
         text === lastSentRef.current ||
-        text.trim() === lastSentRef.current.trim()
+        normalize(text) === normalize(lastSentRef.current)
       )
         return;
 

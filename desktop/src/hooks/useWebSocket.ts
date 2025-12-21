@@ -50,6 +50,16 @@ export function useWebSocket({
           timestamp: Date.now(),
         })
       );
+
+      // Start client-side heartbeat (keep-alive)
+      const pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send("ping");
+        }
+      }, 15000);
+
+      // Store interval to clear it on close
+      (ws as any)._pingInterval = pingInterval;
     };
 
     ws.onmessage = (event) => {
@@ -68,6 +78,10 @@ export function useWebSocket({
         } else {
           // Regular clipboard sync
           let content = msg.content;
+
+          // Ignore ping messages that might have slipped through
+          if (content === "ping") return;
+
           if (msg.encrypted && encryptionKey && msg.nonce) {
             try {
               content = decrypt(msg.content, msg.nonce, encryptionKey);
@@ -97,6 +111,9 @@ export function useWebSocket({
 
     ws.onclose = () => {
       onConnectionChange(false);
+      // Clear heartbeat
+      if ((ws as any)._pingInterval) clearInterval((ws as any)._pingInterval);
+
       wsRef.current = null;
       // Simple exponential backoff or fixed retry
       reconnectTimeoutRef.current = setTimeout(connect, 3000);
