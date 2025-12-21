@@ -39,7 +39,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onSwitchToRegister }) =
       <div className="glass rounded-4xl p-8 space-y-6">
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-2.5">
-            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1">Identity</label>
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1">Email</label>
             <input
               type="email"
               required
@@ -51,7 +51,7 @@ export const Login: React.FC<LoginProps> = ({ onSuccess, onSwitchToRegister }) =
           </div>
 
           <div className="space-y-2.5">
-            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1">Passcode</label>
+            <label className="text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em] ml-1">Passworde</label>
             <input
               type="password"
               required

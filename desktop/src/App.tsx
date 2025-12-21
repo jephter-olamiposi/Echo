@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { hostname } from "@tauri-apps/plugin-os";
 import "./App.css"; 
@@ -57,7 +57,7 @@ function App() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleDeviceJoin = (device: LinkedDevice) => {
+  const handleDeviceJoin = useCallback((device: LinkedDevice) => {
       setDevices(prev => {
         const exists = prev.find(d => d.id === device.id);
         if (exists) {
@@ -66,11 +66,25 @@ function App() {
         return [...prev, device];
       });
       
-      // Suppress toast if it's a zombie session of "me" or generic name
-      if (device.name !== deviceName && device.name !== "This Device" && device.name !== "Unknown Device") {
+      // Suppress toast if it's THIS device (by ID) or a generic/zombie session
+      const isMe = device.id === deviceId || device.isCurrentDevice;
+      const isGenericName = device.name === "This Device" || device.name === "Unknown Device";
+      if (!isMe && !isGenericName) {
          showToastMsg(`${device.name} joined`, "info");
       }
-  };
+  }, [deviceId]);
+
+  const handleIncomingCopy = useCallback((entry: ClipboardEntry, isHistory?: boolean) => {
+    clipboard.addEntry(entry.content, 'remote', entry.deviceName);
+    // If it's a live sync or the latest history item, update system clipboard
+    if (!isHistory) {
+      clipboard.copyToClipboard(entry.content);
+    }
+  }, [clipboard]);
+
+  const handleDeviceLeave = useCallback((id: string) => {
+    setDevices(prev => prev.filter(d => d.id !== id || d.isCurrentDevice));
+  }, []);
 
   const ws = useWebSocket({
     token,
@@ -78,17 +92,9 @@ function App() {
     deviceName,
     encryptionKey: keys.encryptionKey,
     onConnectionChange: setConnected,
-    onIncomingCopy: (entry, isHistory) => {
-      clipboard.addEntry(entry.content, 'remote', entry.deviceName);
-      // If it's a live sync or the latest history item, update system clipboard
-      if (!isHistory) {
-        clipboard.copyToClipboard(entry.content);
-      }
-    },
+    onIncomingCopy: handleIncomingCopy,
     onDeviceJoin: handleDeviceJoin,
-    onDeviceLeave: (id) => {
-      setDevices(prev => prev.filter(d => d.id !== id || d.isCurrentDevice));
-    }
+    onDeviceLeave: handleDeviceLeave,
   });
 
   // Modal States
@@ -144,7 +150,8 @@ function App() {
     } else {
       ws.disconnect();
     }
-  }, [keys.encryptionKey, ws]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keys.encryptionKey]);
 
   // Clipboard Listener
   useEffect(() => {

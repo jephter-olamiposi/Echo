@@ -32,14 +32,20 @@ export function useWebSocket({
   const reconnectTimeoutRef = useRef<any>(null);
 
   const connect = useCallback(() => {
+    console.log("[WS] Attempting connect", {
+      token: !!token,
+      isOpen: wsRef.current?.readyState === WebSocket.OPEN,
+    });
     if (!token || wsRef.current?.readyState === WebSocket.OPEN) return;
 
     // Use environment variable for backend connection
     const wsUrl = `${config.wsUrl}/ws?token=${token}`;
+    console.log("[WS] Connecting to:", wsUrl);
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
+      console.log("[WS] Connected!");
       onConnectionChange(true);
       // Send handshake
       ws.send(
@@ -99,18 +105,16 @@ export function useWebSocket({
       }
     };
 
-    ws.onclose = () => {
+    ws.onclose = (e) => {
+      console.log("[WS] Closed", e.code, e.reason);
       onConnectionChange(false);
-      // Clear heartbeat
-      if ((ws as any)._pingInterval) clearInterval((ws as any)._pingInterval);
-
       wsRef.current = null;
       // Simple exponential backoff or fixed retry
       reconnectTimeoutRef.current = setTimeout(connect, 3000);
     };
 
     ws.onerror = (e) => {
-      console.error("WS Error", e);
+      console.error("[WS] Error", e);
     };
   }, [
     token,
