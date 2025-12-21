@@ -50,16 +50,6 @@ export function useWebSocket({
           timestamp: Date.now(),
         })
       );
-
-      // Start client-side heartbeat (keep-alive)
-      const pingInterval = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send("ping");
-        }
-      }, 15000);
-
-      // Store interval to clear it on close
-      (ws as any)._pingInterval = pingInterval;
     };
 
     ws.onmessage = (event) => {
