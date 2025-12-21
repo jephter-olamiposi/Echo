@@ -1,7 +1,9 @@
-import React from 'react';
 import { Icons } from '../Icons';
 import { MobileHeader } from './Header';
 import { ClipboardEntry, LinkedDevice } from '../../types';
+import { haptic } from '../../utils/haptics';
+import { Skeleton } from '../shared/Skeleton';
+import { CopyButton } from '../shared/CopyButton';
 
 interface MobileDashboardProps {
   isLoading?: boolean;
@@ -30,7 +32,7 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
   const latestItem = history[0];
 
   return (
-    <div className="min-h-screen w-full bg-black text-white pt-14">
+    <div className="h-full overflow-y-auto custom-scrollbar w-full bg-black text-white pt-14 pb-24">
       <MobileHeader 
         centerAction={
           <span className="text-lg font-bold tracking-tight text-white">Echo</span>
@@ -40,10 +42,10 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
         {/* Status Section - Hero Style */}
         <div className="flex justify-center py-4">
           {isLoading ? (
-            <div className="flex flex-col items-center gap-3 animate-pulse">
-              <div className="w-16 h-16 rounded-2xl bg-white/5"></div>
-              <div className="w-32 h-5 rounded-md bg-white/5"></div>
-              <div className="w-24 h-7 rounded-full bg-white/5 mt-1"></div>
+            <div className="flex flex-col items-center gap-3">
+              <Skeleton variant="rectangular" className="w-16 h-16 rounded-2xl!" />
+              <Skeleton variant="text" className="w-32 h-5" />
+              <Skeleton variant="circular" className="w-24 h-7 mt-1" />
             </div>
           ) : (
             <div className="flex flex-col items-center gap-3">
@@ -72,9 +74,9 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
         {/* Contextual Info Bar - Minimal or Loading */}
         {isLoading ? (
           <div className="flex items-center justify-center gap-5 px-5 py-4 bg-zinc-900/40 border border-white/5 rounded-2xl">
-            <div className="w-12 h-10 bg-white/5 rounded-lg animate-pulse"></div>
-            <div className="w-12 h-10 bg-white/5 rounded-lg animate-pulse"></div>
-            <div className="w-12 h-10 bg-white/5 rounded-lg animate-pulse"></div>
+            <Skeleton variant="rectangular" className="w-12 h-10 rounded-lg!" />
+            <Skeleton variant="rectangular" className="w-12 h-10 rounded-lg!" />
+            <Skeleton variant="rectangular" className="w-12 h-10 rounded-lg!" />
           </div>
         ) : (
           <div className="flex items-center justify-between px-6 py-5 bg-zinc-900/80 border border-white/5 rounded-2xl backdrop-blur-md shadow-lg">
@@ -83,7 +85,7 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
               <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Items</span>
             </div>
             <div className="w-px h-8 bg-white/10"></div>
-            <div className="flex flex-col items-center gap-1 flex-1 cursor-pointer active:opacity-70" onClick={onShowDevices}>
+            <div className="flex flex-col items-center gap-1 flex-1 cursor-pointer active:opacity-70" onClick={() => { haptic.light(); onShowDevices(); }}>
               <span className="text-xl font-bold text-white tabular-nums">{devices.length}</span>
               <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Devices</span>
             </div>
@@ -110,13 +112,15 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
               {latestItem.content.length > 100 ? '...' : ''}
             </p>
             <div className="flex gap-3 mt-4 pt-4 border-t border-white/5">
-              <button 
+
+              <CopyButton 
+                content={latestItem.content}
+                onCopy={onCopy}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold bg-white/5 text-white hover:bg-white/10 active:scale-95 transition-all"
-                onClick={() => onCopy(latestItem.content)}
+                iconClassName="w-4 h-4"
               >
-                <span className="w-4 h-4">{Icons.copy}</span>
-                <span>Copy</span>
-              </button>
+                Copy
+              </CopyButton>
               <button 
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-red-500 border border-red-500/20 active:bg-red-500/10 active:scale-95 transition-all"
                 onClick={() => onDelete(latestItem.id)}
@@ -130,10 +134,10 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
         
         {/* Loading State for Latest Item */}
         {isLoading && (
-           <div className="bg-zinc-800/30 border border-white/5 rounded-2xl p-5 flex flex-col gap-3 min-h-[140px]">
-             <div className="w-1/3 h-4 bg-white/5 rounded animate-pulse mb-2"></div>
-              <div className="w-full h-4 bg-white/5 rounded animate-pulse"></div>
-              <div className="w-2/3 h-4 bg-white/5 rounded animate-pulse"></div>
+           <div className="bg-zinc-800/30 border border-white/5 rounded-2xl p-5 flex flex-col gap-3 min-h-35">
+             <Skeleton variant="text" className="w-1/3 h-4 mb-2" />
+             <Skeleton variant="text" className="w-full h-4" />
+             <Skeleton variant="text" className="w-2/3 h-4" />
            </div>
         )}
 
@@ -141,19 +145,19 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
         <div className="flex flex-col gap-3 mt-2">
           <h3 className="text-xs font-semibold text-white/60 uppercase tracking-widest pl-1">Quick Actions</h3>
           <div className="grid grid-cols-3 gap-3">
-            <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={onScanQR}>
+            <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={() => { haptic.light(); onScanQR(); }}>
               <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-green-400/10 text-green-400">
                 <div className="w-5 h-5">{Icons.qr}</div>
               </div>
               <span className="text-[11px] font-medium text-zinc-300">Scan QR</span>
             </button>
-            <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={onShowPairingCode}>
+            <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={() => { haptic.light(); onShowPairingCode(); }}>
               <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-blue-400/10 text-blue-400">
                 <div className="w-5 h-5">{Icons.code}</div>
               </div>
               <span className="text-[11px] font-medium text-zinc-300">Pairing Code</span>
             </button>
-            <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={onShowDevices}>
+            <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={() => { haptic.light(); onShowDevices(); }}>
               <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-violet-400/10 text-violet-400">
                 <div className="w-5 h-5">{Icons.devices}</div>
               </div>

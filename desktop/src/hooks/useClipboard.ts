@@ -1,11 +1,49 @@
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
+import { Store } from "@tauri-apps/plugin-store";
 import { ClipboardEntry } from "../types";
 import { detectContentType } from "../utils";
 import { haptic } from "../utils/haptics";
 
+const HISTORY_STORAGE_KEY = "echo_clipboard_history";
+let storeInstance: Store | null = null;
+
+const getStore = async () => {
+  if (!storeInstance) {
+    storeInstance = await Store.load("store.json");
+  }
+  return storeInstance;
+};
+
 export function useClipboard() {
   const [history, setHistory] = useState<ClipboardEntry[]>([]);
   const lastSentRef = useRef<string>("");
+
+  // Load history on mount
+  useEffect(() => {
+    const init = async () => {
+      try {
+        const store = await getStore();
+        const saved = await store.get<ClipboardEntry[]>(HISTORY_STORAGE_KEY);
+        if (saved && Array.isArray(saved)) {
+          setHistory(saved);
+          if (saved[0]) lastSentRef.current = saved[0].content;
+        }
+      } catch (e) {
+        console.error("Failed to load history", e);
+      }
+    };
+    init();
+  }, []);
+
+  const saveToStore = async (newHistory: ClipboardEntry[]) => {
+    try {
+      const store = await getStore();
+      await store.set(HISTORY_STORAGE_KEY, newHistory);
+      await store.save();
+    } catch (e) {
+      console.error("Failed to save history", e);
+    }
+  };
 
   const addEntry = useCallback(
     (
@@ -13,7 +51,12 @@ export function useClipboard() {
       source: "local" | "remote" = "local",
       deviceName?: string
     ) => {
-      if (text === lastSentRef.current) return;
+      // Hardened check for duplicates (ignore whitespace diffs)
+      if (
+        text === lastSentRef.current ||
+        text.trim() === lastSentRef.current.trim()
+      )
+        return;
 
       const contentType = detectContentType(text);
       const newEntry: ClipboardEntry = {
@@ -26,7 +69,11 @@ export function useClipboard() {
       };
 
       lastSentRef.current = text;
-      setHistory((prev) => [newEntry, ...prev].slice(0, 50));
+      setHistory((prev) => {
+        const updated = [newEntry, ...prev].slice(0, 50);
+        saveToStore(updated);
+        return updated;
+      });
       return newEntry;
     },
     []
@@ -49,19 +96,28 @@ export function useClipboard() {
   }, []);
 
   const deleteEntry = useCallback((id: string) => {
-    setHistory((prev) => prev.filter((h) => h.id !== id));
+    setHistory((prev) => {
+      const updated = prev.filter((h) => h.id !== id);
+      saveToStore(updated);
+      return updated;
+    });
     haptic.light();
   }, []);
 
   const togglePin = useCallback((id: string) => {
-    setHistory((prev) =>
-      prev.map((h) => (h.id === id ? { ...h, pinned: !h.pinned } : h))
-    );
+    setHistory((prev) => {
+      const updated = prev.map((h) =>
+        h.id === id ? { ...h, pinned: !h.pinned } : h
+      );
+      saveToStore(updated);
+      return updated;
+    });
     haptic.selection();
   }, []);
 
   const clearHistory = useCallback(() => {
     setHistory([]);
+    saveToStore([]);
     haptic.medium();
   }, []);
 

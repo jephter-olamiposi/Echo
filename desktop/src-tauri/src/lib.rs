@@ -9,7 +9,13 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_clipboard_manager::init())
-        .plugin(tauri_plugin_haptics::init());
+        .plugin(tauri_plugin_haptics::init())
+        .plugin(tauri_plugin_os::init());
+
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        builder = builder.plugin(tauri_plugin_barcode_scanner::init());
+    }
 
     builder
         .setup(|_app| {

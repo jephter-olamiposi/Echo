@@ -1,5 +1,7 @@
 import { useRef, useCallback } from "react";
 import { ClipboardEntry, LinkedDevice } from "../types";
+import { config } from "../config";
+import { encrypt, decrypt } from "../crypto";
 
 const MSG_HANDSHAKE = "handshake";
 const MSG_PRESENCE_JOIN = "__JOIN__";
@@ -10,9 +12,10 @@ interface UseWebSocketOptions {
   deviceId: string;
   deviceName: string;
   onConnectionChange: (connected: boolean) => void;
-  onIncomingCopy: (entry: ClipboardEntry) => void;
+  onIncomingCopy: (entry: ClipboardEntry, isHistory?: boolean) => void;
   onDeviceJoin: (device: LinkedDevice) => void;
   onDeviceLeave: (deviceId: string) => void;
+  encryptionKey?: Uint8Array | null;
 }
 
 export function useWebSocket({
@@ -23,6 +26,7 @@ export function useWebSocket({
   onIncomingCopy,
   onDeviceJoin,
   onDeviceLeave,
+  encryptionKey,
 }: UseWebSocketOptions) {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<any>(null);
@@ -30,8 +34,8 @@ export function useWebSocket({
   const connect = useCallback(() => {
     if (!token || wsRef.current?.readyState === WebSocket.OPEN) return;
 
-    // Use environment variable or fallback to localhost
-    const wsUrl = `ws://localhost:3000/ws?token=${token}`;
+    // Use environment variable for backend connection
+    const wsUrl = `${config.wsUrl}/ws?token=${token}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -63,15 +67,28 @@ export function useWebSocket({
           onDeviceLeave(msg.device_id);
         } else {
           // Regular clipboard sync
-          onIncomingCopy({
-            id: Math.random().toString(36).substring(2, 11),
-            content: msg.content,
-            timestamp: msg.timestamp,
-            contentType: "text",
-            source: "remote",
-            deviceName: msg.device_name || "Remote Device",
-            pinned: false,
-          });
+          let content = msg.content;
+          if (msg.encrypted && encryptionKey && msg.nonce) {
+            try {
+              content = decrypt(msg.content, msg.nonce, encryptionKey);
+            } catch (e) {
+              console.error("Decryption failed", e);
+              return;
+            }
+          }
+
+          onIncomingCopy(
+            {
+              id: Math.random().toString(36).substring(2, 11),
+              content,
+              timestamp: msg.timestamp,
+              contentType: "text",
+              source: "remote",
+              deviceName: msg.device_name || "Remote Device",
+              pinned: false,
+            },
+            msg.is_history
+          );
         }
       } catch (e) {
         console.error("Failed to parse WS message", e);
@@ -81,7 +98,7 @@ export function useWebSocket({
     ws.onclose = () => {
       onConnectionChange(false);
       wsRef.current = null;
-      // Simple exponential backoff or fixed retry could go here
+      // Simple exponential backoff or fixed retry
       reconnectTimeoutRef.current = setTimeout(connect, 3000);
     };
 
@@ -96,6 +113,7 @@ export function useWebSocket({
     onIncomingCopy,
     onDeviceJoin,
     onDeviceLeave,
+    encryptionKey,
   ]);
 
   const disconnect = useCallback(() => {
@@ -110,17 +128,30 @@ export function useWebSocket({
   const send = useCallback(
     (text: string) => {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
+        let finalContent = text;
+        let nonce: string | undefined;
+        let encrypted = false;
+
+        if (encryptionKey) {
+          const result = encrypt(text, encryptionKey);
+          finalContent = result.ciphertext;
+          nonce = result.nonce;
+          encrypted = true;
+        }
+
         wsRef.current.send(
           JSON.stringify({
             device_id: deviceId,
             device_name: deviceName,
-            content: text,
+            content: finalContent,
+            nonce,
+            encrypted,
             timestamp: Date.now(),
           })
         );
       }
     },
-    [deviceId, deviceName]
+    [deviceId, deviceName, encryptionKey]
   );
 
   return {

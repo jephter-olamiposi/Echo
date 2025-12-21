@@ -5,6 +5,7 @@ import {
   getContentTypeIcon 
 } from '../../utils';
 import { ClipboardEntry } from '../../types';
+import { CopyButton } from '../shared/CopyButton';
 
 interface MobileDetailModalProps {
   entry: ClipboardEntry;
@@ -22,7 +23,7 @@ export const DetailModal: React.FC<MobileDetailModalProps> = ({
   onDelete
 }) => {
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center">
+    <div className="fixed inset-0 z-100 flex items-end justify-center">
       {/* Backdrop */}
       <div 
         className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300"
@@ -30,7 +31,7 @@ export const DetailModal: React.FC<MobileDetailModalProps> = ({
       />
       
       {/* Bottom Sheet wrapper */}
-      <div className="relative w-full max-w-lg bg-zinc-900 border-t border-white/10 rounded-t-[32px] shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-lg bg-zinc-900 border-t border-white/10 rounded-t-4xl shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col max-h-[90vh]">
         {/* Grabber Handle */}
         <div className="flex justify-center p-3" onClick={onClose}>
           <div className="w-10 h-1 bg-zinc-700 rounded-full" />
@@ -78,9 +79,9 @@ export const DetailModal: React.FC<MobileDetailModalProps> = ({
 
           {/* Content Body */}
           <div className="relative group">
-            <div className="absolute -inset-px bg-gradient-to-r from-purple-500/20 to-blue-500/20 rounded-2xl opacity-50 blur-sm" />
+            <div className="absolute -inset-px bg-linear-to-r from-purple-500/20 to-blue-500/20 rounded-2xl opacity-50 blur-sm" />
             <div className="relative bg-black/40 border border-white/10 rounded-2xl p-4 overflow-hidden">
-               <pre className="text-sm text-zinc-300 font-mono leading-relaxed whitespace-pre-wrap break-all max-h-[300px] overflow-y-auto custom-scrollbar">
+               <pre className="text-sm text-zinc-300 font-mono leading-relaxed whitespace-pre-wrap break-all max-h-75 overflow-y-auto custom-scrollbar">
                  {entry.content}
                </pre>
             </div>
@@ -89,13 +90,15 @@ export const DetailModal: React.FC<MobileDetailModalProps> = ({
 
         {/* Actions Bar */}
         <div className="sticky bottom-0 bg-zinc-900/80 backdrop-blur-xl border-t border-white/5 p-6 flex gap-3 pb-10">
-          <button 
+
+          <CopyButton 
+            content={entry.content}
+            onCopy={onCopy}
             className="flex-1 flex items-center justify-center gap-2 py-4 rounded-2xl bg-white text-black font-bold text-sm hover:bg-zinc-200 active:scale-[0.98] transition-all shadow-lg shadow-white/5"
-            onClick={() => onCopy(entry.content)}
+            iconClassName="w-5 h-5"
           >
-            <div className="w-5 h-5">{Icons.copy}</div>
-            <span>Copy Content</span>
-          </button>
+            Copy Content
+          </CopyButton>
           
           <button 
             className={`w-14 h-14 flex items-center justify-center rounded-2xl border transition-all active:scale-90 ${entry.pinned ? 'bg-purple-500/20 border-purple-500/50 text-purple-400' : 'bg-zinc-800 border-white/5 text-zinc-400'}`}

@@ -25,13 +25,13 @@ export const Settings: React.FC<MobileSettingsProps> = ({
   onShowPairingCode
 }) => {
   return (
-    <div className="min-h-screen w-full bg-black pt-14 pb-24">
+    <div className="h-full overflow-y-auto custom-scrollbar w-full bg-black pt-14 pb-24">
       <MobileHeader title="Settings" />
 
       <div className="p-4 flex flex-col gap-6">
         {/* Profile Section - Hero Style */}
         <div className="flex flex-col items-center py-6 pb-2">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-3xl font-bold text-white shadow-lg mb-3 border-2 border-white/10">
+          <div className="w-20 h-20 rounded-full bg-linear-to-br from-purple-500 to-blue-500 flex items-center justify-center text-3xl font-bold text-white shadow-lg mb-3 border-2 border-white/10">
             {email.charAt(0).toUpperCase()}
           </div>
           <h2 className="text-xl font-bold text-white">{email.split('@')[0]}</h2>

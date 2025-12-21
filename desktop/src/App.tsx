@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { hostname } from "@tauri-apps/plugin-os";
 import "./App.css"; 
 // import "./KeyStyles.css";
 // import "./Fingerprint.css";
@@ -9,10 +10,16 @@ import { Modal } from "./components/shared/Modal";
 import { MobileLayout } from "./components/mobile/Layout";
 import { Sidebar } from "./components/desktop/Sidebar";
 import { Main } from "./components/desktop/Main";
+import { Login } from "./components/auth/Login";
+import { Register } from "./components/auth/Register";
+import { AuthLayout } from "./components/auth/AuthLayout";
 import { 
   importKey, 
-  exportKey
+  exportKey,
+  getOrCreateDeviceId,
+  generateLinkUri
 } from "./crypto";
+import { config } from "./config";
 import { formatTime } from "./utils";
 import { AppState, MobileView, LinkedDevice, ClipboardEntry } from "./types";
 import { useClipboard } from "./hooks/useClipboard";
@@ -20,18 +27,7 @@ import { useKeys } from "./hooks/useKeys";
 
 import { useWebSocket } from "./hooks/useWebSocket";
 
-// Helper to get or create a device ID
-const getDeviceId = () => {
-  let id = localStorage.getItem("echo_device_id");
-  if (!id) {
-    id = Math.random().toString(36).substr(2, 9);
-    localStorage.setItem("echo_device_id", id);
-  }
-  return id;
-};
-
-const DEVICE_ID = getDeviceId();
-const DEVICE_NAME = "My Laptop"; // In real prod, would use platform info
+// Initial values shifted to state
 
 function App() {
   // --- Hooks ---
@@ -40,25 +36,34 @@ function App() {
   
   // --- Local UI State ---
   // We keep UI state here that coordinates between Mobile/Desktop or Modals
-  const [view] = useState<"onboarding" | "login" | "register" | "main">("main");
+  const [token, setToken] = useState<string | null>(localStorage.getItem("echo_token"));
+  const [email, setEmail] = useState<string | null>(localStorage.getItem("echo_email"));
+  const [view, setViewState] = useState<"login" | "register" | "main">(token ? "main" : "login");
+  
   const [mobileView, setMobileView] = useState<MobileView>("dashboard");
   const [isLoading, setIsLoading] = useState(true);
   const [connected, setConnected] = useState(false);
-  const [devices, setDevices] = useState<LinkedDevice[]>([
-    { id: DEVICE_ID, name: DEVICE_NAME, lastSeen: Date.now(), isCurrentDevice: true }
-  ]);
+  const [deviceId, setDeviceId] = useState<string>("unknown");
+  const [deviceName, setDeviceName] = useState<string>("This Device");
+  
+  const [devices, setDevices] = useState<LinkedDevice[]>([]);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedEntry, setSelectedEntry] = useState<ClipboardEntry | null>(null);
   
   // WebSocket Hook
   const ws = useWebSocket({
-    token: "mock-token", // In real impl, would come from auth view
-    deviceId: DEVICE_ID,
-    deviceName: DEVICE_NAME,
+    token,
+    deviceId,
+    deviceName,
+    encryptionKey: keys.encryptionKey,
     onConnectionChange: setConnected,
-    onIncomingCopy: (entry) => {
+    onIncomingCopy: (entry, isHistory) => {
       clipboard.addEntry(entry.content, 'remote', entry.deviceName);
+      // If it's a live sync or the latest history item, update system clipboard
+      if (!isHistory) {
+        clipboard.copyToClipboard(entry.content);
+      }
     },
     onDeviceJoin: (device) => {
       setDevices(prev => {
@@ -86,10 +91,25 @@ function App() {
 
   // --- Effects ---
 
-  // Initial Loading Simulation
+  // Initial Loading Simulation & Device Init
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 1500);
-    return () => clearTimeout(timer);
+    const init = async () => {
+      const id = await getOrCreateDeviceId();
+      let name = "This Device";
+      
+      try {
+        const host = await hostname();
+        if (host) name = host;
+      } catch (e) {
+        console.warn("Failed to get hostname", e);
+      }
+
+      setDeviceId(id);
+      setDeviceName(name); // Now setDeviceName is used
+      setDevices([{ id, name, lastSeen: Date.now(), isCurrentDevice: true }]);
+      setIsLoading(false);
+    };
+    init();
   }, []);
 
   // Sync WebSocket with Clipboard
@@ -116,6 +136,23 @@ function App() {
   const showToastMsg = (message: string, type: "success" | "error" | "info" = "info") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleAuthSuccess = (newToken: string, newEmail: string) => {
+    localStorage.setItem("echo_token", newToken);
+    localStorage.setItem("echo_email", newEmail);
+    setToken(newToken);
+    setEmail(newEmail);
+    setViewState("main");
+    showToastMsg("Welcome to Echo!", "success");
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("echo_token");
+    localStorage.removeItem("echo_email");
+    setToken(null);
+    setEmail(null);
+    setViewState("login");
   };
 
   const sendToWebSocket = (text: string) => {
@@ -165,25 +202,65 @@ function App() {
        const { scan, Format } = await import("@tauri-apps/plugin-barcode-scanner");
        const result = await scan({ windowed: true, formats: [Format.QRCode] });
        
-       if (result.content && result.content.startsWith("echo://")) {
-          const keyBase64 = result.content.replace("echo://", "");
-          const key = importKey(keyBase64);
-          await keys.saveKey(key);
-          showToastMsg("Device linked successfully!", "success");
-       } else {
-          showToastMsg("Invalid QR Code", "error");
-       }
+        if (result.content && result.content.startsWith("echo://")) {
+           const uri = result.content;
+           let keyBase64 = "";
+           
+           if (uri.startsWith("echo://connect?")) {
+             try {
+               const params = new URLSearchParams(uri.split("?")[1]);
+               keyBase64 = params.get("key") || "";
+             } catch (e) {
+               console.error("Failed to parse QR params", e);
+             }
+           } else {
+             keyBase64 = uri.replace("echo://", "");
+           }
+
+           if (keyBase64) {
+             const key = importKey(keyBase64);
+             await keys.saveKey(key);
+             showToastMsg("Device linked successfully!", "success");
+           } else {
+             showToastMsg("Invalid QR Code content", "error");
+           }
+        } else {
+           showToastMsg("Invalid QR Code", "error");
+        }
     } catch (e) {
        console.error(e);
        showToastMsg("Failed to scan QR", "error");
     }
   };
 
+  const removeDevice = (id: string) => {
+    setDevices(prev => prev.filter(d => d.id !== id));
+    showToastMsg("Device unlinked locally", "info");
+  };
+
+  const getDeviceIcon = (name: string) => {
+    const n = name.toLowerCase();
+    if (n.includes("phone") || n.includes("android") || n.includes("pixel") || n.includes("galaxy") || n.includes("ios") || n.includes("mobile")) return Icons.phone;
+    if (n.includes("mac") || n.includes("win") || n.includes("desktop") || n.includes("laptop") || n.includes("book")) return Icons.desktop;
+    return Icons.devices;
+  };
+
   // --- Render ---
 
-  if (view === "login" || view === "register") {
-    // Auth screens (omitted for brevity, can be refactored to component later)
-    return null; // TODO: restore auth layout if needed
+  if (view === "login") {
+    return (
+      <AuthLayout>
+        <Login onSuccess={handleAuthSuccess} onSwitchToRegister={() => setViewState("register")} />
+      </AuthLayout>
+    );
+  }
+
+  if (view === "register") {
+    return (
+      <AuthLayout>
+        <Register onSuccess={handleAuthSuccess} onSwitchToLogin={() => setViewState("login")} />
+      </AuthLayout>
+    );
   }
 
   // Mobile Actions Bundle - Memoized for senior performance
@@ -192,9 +269,7 @@ function App() {
     onDelete: clipboard.deleteEntry,
     onPin: clipboard.togglePin,
     onClearHistory: () => setShowClearConfirm(true),
-    onLogout: () => {
-       if(confirm("Are you sure?")) location.reload();
-    },
+    onLogout: handleLogout,
     onScanQR: handleScanQR,
     onShowPairingCode: () => setShowQR(true),
     onShowDevices: () => setShowDevices(true),
@@ -217,20 +292,20 @@ function App() {
     filterType: "all",
     devices,
     showQR,
-    linkUri: keys.linkUri,
+    linkUri: keys.encryptionKey ? generateLinkUri(deviceId, keys.encryptionKey, config.wsUrl) : keys.linkUri,
     showDevices,
     showKeyInput,
     manualKey,
     mobileView,
     isLoading,
-    email: "user@example.com",
+    email: email || "",
     showClearConfirm
   }), [clipboard.history, connected, searchQuery, selectedEntry, keys.encryptionKey, keys.fingerprint, toast, view, devices, showQR, keys.linkUri, showDevices, showKeyInput, manualKey, mobileView, isLoading, showClearConfirm]);
 
   return (
     <>
       {/* Mobile-only Layout */}
-      <div className="block md:hidden">
+      <div className="block md:hidden h-dvh w-full">
         <MobileLayout 
           state={derivedState} 
           actions={mobileActions} 
@@ -359,18 +434,27 @@ function App() {
       >
         <div className="flex flex-col gap-3">
           {devices.map((device: LinkedDevice) => (
-            <div key={device.id} className="flex items-center justify-between p-4 bg-white/3 rounded-2xl border border-white/5">
+            <div key={device.id} className="flex items-center justify-between p-4 bg-white/3 rounded-2xl border border-white/5 group hover:bg-white/5 transition-colors">
               <div className="flex items-center gap-4">
-                <div className={`w-2 h-2 rounded-full ${device.isCurrentDevice ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-zinc-600'}`} />
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${device.isCurrentDevice ? 'bg-purple-500/20 text-purple-400' : 'bg-zinc-800 text-zinc-500'}`}>
+                  <div className="w-5 h-5">{getDeviceIcon(device.name)}</div>
+                </div>
                 <div>
                   <p className="text-sm font-bold text-white leading-none">{device.name}</p>
-                  <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest mt-2 px-1.5 py-0.5 bg-white/5 rounded-md inline-block">
-                    {device.isCurrentDevice ? "Current Device" : `Last seen ${formatTime(device.lastSeen)}`}
-                  </p>
+                  <div className="flex items-center gap-2 mt-2">
+                     <span className={`w-1.5 h-1.5 rounded-full ${device.isCurrentDevice ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-zinc-600'}`} />
+                     <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">
+                       {device.isCurrentDevice ? "This Device" : `Last seen ${formatTime(device.lastSeen)}`}
+                     </p>
+                  </div>
                 </div>
               </div>
               {!device.isCurrentDevice && (
-                <button className="p-2.5 rounded-xl text-zinc-600 hover:text-red-400 hover:bg-red-400/10 transition-all">
+                <button 
+                  className="p-2.5 rounded-xl text-zinc-600 hover:text-red-400 hover:bg-red-400/10 transition-all active:scale-95"
+                  onClick={() => removeDevice(device.id)}
+                  title="Unlink device"
+                >
                   <div className="w-4 h-4">{Icons.trash}</div>
                 </button>
               )}

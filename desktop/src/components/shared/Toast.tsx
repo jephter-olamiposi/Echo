@@ -9,27 +9,56 @@ interface ToastProps {
 export const Toast: React.FC<ToastProps> = ({ message, type }) => {
   const getStyles = () => {
     switch(type) {
-      case 'success': return 'bg-green-500/10 border-green-500/20 text-green-400';
-      case 'error': return 'bg-red-500/10 border-red-500/20 text-red-400';
-      default: return 'bg-purple-500/10 border-purple-500/20 text-purple-400';
+      case 'success': 
+        return {
+          bg: 'bg-zinc-900/95',
+          border: 'border-green-500/20',
+          iconBg: 'bg-green-500/20 text-green-400',
+          shadow: 'shadow-[0_8px_30px_rgb(0,0,0,0.4)] shadow-green-500/10'
+        };
+      case 'error': 
+        return {
+          bg: 'bg-zinc-900/95',
+          border: 'border-red-500/20',
+          iconBg: 'bg-red-500/20 text-red-400',
+          shadow: 'shadow-[0_8px_30px_rgb(0,0,0,0.4)] shadow-red-500/10'
+        };
+      default: 
+        return {
+          bg: 'bg-zinc-900/95',
+          border: 'border-white/10',
+          iconBg: 'bg-white/10 text-white',
+          shadow: 'shadow-[0_8px_30px_rgb(0,0,0,0.4)]'
+        };
     }
   };
 
   const getIcon = () => {
     switch(type) {
-      case 'success': return Icons.check || Icons.sync; // Fallback if check missing
+      case 'success': return Icons.check;
       case 'error': return Icons.close;
-      default: return Icons.shield;
+      default: return Icons.info || Icons.shield; 
     }
   };
 
+  const styles = getStyles();
+
   return (
-    <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-200 max-w-sm w-[calc(100%-2rem)]">
-      <div className={`flex items-center gap-3 p-4 rounded-2xl border backdrop-blur-xl shadow-2xl animate-in slide-in-from-bottom duration-300 ${getStyles()}`}>
-        <div className="w-5 h-5 shrink-0 opacity-80">
-          {getIcon()}
+    <div className="fixed top-6 left-1/2 -translate-x-1/2 z-200 max-w-sm w-full px-4 pointer-events-none flex justify-center">
+      <div className={`
+        flex items-center gap-3 pl-2 pr-5 py-2 rounded-full border backdrop-blur-2xl
+        animate-in slide-in-from-top-8 fade-in zoom-in-95 duration-500 ease-(--spring-easing)
+        ${styles.bg} ${styles.border} ${styles.shadow}
+      `}>
+        {/* Condensed Icon Circle */}
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${styles.iconBg}`}>
+          <div className="w-4 h-4">
+            {getIcon()}
+          </div>
         </div>
-        <p className="text-sm font-semibold tracking-tight leading-tight">
+        
+        {/* Message */}
+        <p className="text-[13px] font-bold tracking-tight text-white leading-tight">
           {message}
         </p>
       </div>

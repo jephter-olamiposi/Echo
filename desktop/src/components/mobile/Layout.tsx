@@ -31,7 +31,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ state, actions }) =>
   const slideOffset = `-${viewIndex * 100}%`;
 
   return (
-    <div className="relative h-screen w-full bg-black overflow-hidden font-sans">
+    <div className="relative h-dvh w-full bg-black overflow-hidden font-sans">
        {/* Background decoration */}
        <div className="absolute -top-25 -left-25 w-125 h-125 rounded-full bg-purple-600/20 blur-[100px] pointer-events-none" />
        <div className="absolute -bottom-25 -right-25 w-125 h-125 rounded-full bg-blue-600/20 blur-[100px] pointer-events-none" />
@@ -42,7 +42,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ state, actions }) =>
          style={{ transform: `translateX(${slideOffset})` }}
        >
          {/* View Containers - each takes full width and height with its own scroll */}
-         <div className="w-full h-full shrink-0 overflow-y-auto pt-0 pb-24 max-w-2xl mx-auto custom-scrollbar">
+         <div className="w-full h-full shrink-0 pt-0 pb-0 max-w-2xl mx-auto">
            <Dashboard 
              isLoading={state.isLoading}
              connected={state.connected}
@@ -57,8 +57,9 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ state, actions }) =>
            />
          </div>
 
-         <div className="w-full h-full shrink-0 overflow-y-auto pt-0 pb-24 max-w-2xl mx-auto custom-scrollbar">
+         <div className="w-full h-full shrink-0 pt-0 pb-0 max-w-2xl mx-auto">
            <History 
+             isLoading={state.isLoading}
              history={state.history}
              isRefreshing={state.isRefreshing}
              searchQuery={state.searchQuery}
@@ -67,10 +68,11 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ state, actions }) =>
              onBack={() => actions.onViewChange('dashboard')}
              onItemClick={actions.onSelectEntry}
              onCopy={actions.onCopy}
+             deviceCount={state.devices.length}
            />
          </div>
 
-         <div className="w-full h-full shrink-0 overflow-y-auto pt-0 pb-24 max-w-2xl mx-auto custom-scrollbar">
+         <div className="w-full h-full shrink-0 pt-0 pb-0 max-w-2xl mx-auto">
            <Settings 
              email={state.email || ""}
              devices={state.devices}

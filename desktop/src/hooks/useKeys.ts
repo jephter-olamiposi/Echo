@@ -35,6 +35,8 @@ export function useKeys() {
   // Generate Link URI
   const generateLink = (key: Uint8Array) => {
     const keyB64 = exportKey(key);
+    // Simple fallback if we don't have device info here
+    // In App.tsx we override this with full info
     setLinkUri(`echo://${keyB64}`);
   };
 

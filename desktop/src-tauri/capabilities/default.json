@@ -19,6 +19,8 @@
       ]
     },
     "haptics:default",
+    "os:default",
+    "barcode-scanner:default",
     "clipboard-manager:allow-read-text",
     "clipboard-manager:allow-write-text"
   ]
