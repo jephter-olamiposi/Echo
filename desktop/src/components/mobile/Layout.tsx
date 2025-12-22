@@ -12,6 +12,7 @@ interface MobileActions {
   onClearHistory: () => void;
   onLogout: () => void;
   onScanQR: () => void;
+  onEnterKey: () => void;
   onShowPairingCode: () => void;
   onShowDevices: () => void;
   onViewChange: (view: MobileView) => void;
@@ -52,6 +53,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ state, actions }) =>
              onViewAllHistory={() => actions.onViewChange('history')}
              onShowDevices={actions.onShowDevices}
              onScanQR={actions.onScanQR}
+             onEnterKey={actions.onEnterKey}
              onShowPairingCode={actions.onShowPairingCode}
              onDelete={actions.onDelete}
            />
@@ -81,6 +83,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ state, actions }) =>
              onLogout={actions.onLogout}
              onShowDevices={actions.onShowDevices}
              onScanQR={actions.onScanQR}
+             onEnterKey={actions.onEnterKey}
              onShowPairingCode={actions.onShowPairingCode}
            />
          </div>

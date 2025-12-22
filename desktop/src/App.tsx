@@ -133,20 +133,21 @@ function App() {
       setDeviceId(id);
       
       // Improve default naming
-      if (name === "This Device") {
+      let finalName = name;
+      if (name === "This Device" || name === "localhost" || name.includes("localhost")) {
          try {
            const { type } = await import("@tauri-apps/plugin-os");
            const platform = type();
-           name = platform === 'android' ? 'Android Device' : 
-                  platform === 'ios' ? 'iPhone' : 
-                  platform === 'macos' ? 'Mac' : 
-                  platform === 'windows' ? 'Windows' : 'Device';
+           finalName = platform === 'android' ? 'Echo Mobile (Android)' : 
+                  platform === 'ios' ? 'Echo Mobile (iOS)' : 
+                  platform === 'macos' ? 'Echo Desktop (Mac)' : 
+                  platform === 'windows' ? 'Echo Desktop (Windows)' : 'Echo Device';
          } catch (e) {
-           // ignore
+           finalName = "Echo Device";
          }
       }
-      setDeviceName(name);
-      setDevices([{ id, name, lastSeen: Date.now(), isCurrentDevice: true }]);
+      setDeviceName(finalName);
+      setDevices([{ id, name: finalName, lastSeen: Date.now(), isCurrentDevice: true }]);
       setIsLoading(false);
     };
     init();
@@ -289,6 +290,7 @@ function App() {
     onClearHistory: () => setShowClearConfirm(true),
     onLogout: handleLogout,
     onScanQR: handleScanQR,
+    onEnterKey: () => setShowKeyInput(true),
     onShowPairingCode: () => setShowQR(true),
     onShowDevices: () => setShowDevices(true),
     onViewChange: setMobileView,

@@ -11,6 +11,7 @@ interface MobileSettingsProps {
   onLogout: () => void;
   onShowDevices: () => void;
   onScanQR: () => void;
+  onEnterKey: () => void;
   onShowPairingCode: () => void;
 }
 
@@ -22,6 +23,7 @@ export const Settings: React.FC<MobileSettingsProps> = ({
   onLogout,
   onShowDevices,
   onScanQR,
+  onEnterKey,
   onShowPairingCode
 }) => {
   return (
@@ -63,6 +65,17 @@ export const Settings: React.FC<MobileSettingsProps> = ({
               </div>
               <div className="flex-1 min-w-0">
                 <span className="block text-sm font-medium text-white">Scan QR Code</span>
+              </div>
+              <div className="text-zinc-700">
+                <div className="w-4 h-4">{Icons.chevron}</div>
+              </div>
+            </button>
+            <button className="flex items-center gap-3 p-4 w-full text-left active:bg-white/5 transition-colors" onClick={onEnterKey}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center text-pink-400 bg-pink-400/15">
+                <div className="w-5 h-5">{Icons.shield}</div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-white">Enter Key Manually</span>
               </div>
               <div className="text-zinc-700">
                 <div className="w-4 h-4">{Icons.chevron}</div>

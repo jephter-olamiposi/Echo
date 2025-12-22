@@ -14,6 +14,7 @@ interface MobileDashboardProps {
   onViewAllHistory: () => void;
   onShowDevices: () => void;
   onScanQR: () => void;
+  onEnterKey: () => void;
   onShowPairingCode: () => void;
   onDelete: (id: string) => void;
 }
@@ -25,6 +26,7 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
   devices,
   onShowDevices,
   onScanQR,
+  onEnterKey,
   onShowPairingCode,
   onCopy,
   onDelete
@@ -144,12 +146,18 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
         {/* Quick Actions - Primary Tasks */}
         <div className="flex flex-col gap-3 mt-2">
           <h3 className="text-xs font-semibold text-white/60 uppercase tracking-widest pl-1">Quick Actions</h3>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={() => { haptic.light(); onScanQR(); }}>
               <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-green-400/10 text-green-400">
                 <div className="w-5 h-5">{Icons.qr}</div>
               </div>
               <span className="text-[11px] font-medium text-zinc-300">Scan QR</span>
+            </button>
+            <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={() => { haptic.light(); onEnterKey(); }}>
+              <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-pink-400/10 text-pink-400">
+                <div className="w-5 h-5">{Icons.shield}</div>
+              </div>
+              <span className="text-[11px] font-medium text-zinc-300">Enter Key</span>
             </button>
             <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={() => { haptic.light(); onShowPairingCode(); }}>
               <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-blue-400/10 text-blue-400">
