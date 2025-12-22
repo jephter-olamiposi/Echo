@@ -40,3 +40,9 @@ tracing = "0.1.43"
 tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 anyhow = "1.0.100"
 futures = "0.3.31"
+
+# HTTP Client for FCM Push Notifications
+reqwest = { version = "0.12", features = ["json"] }
+ring = "0.17"
+pem = "3.0"
+base64 = "0.22"

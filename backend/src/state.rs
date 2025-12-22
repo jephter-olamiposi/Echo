@@ -1,4 +1,5 @@
 use crate::models::ClipboardMessage;
+use crate::push::PushClient;
 use dashmap::DashMap;
 use sqlx::PgPool;
 use std::collections::HashMap;
@@ -23,6 +24,8 @@ type Hub = Arc<DashMap<Uuid, broadcast::Sender<ClipboardMessage>>>;
 type RateLimits = Arc<DashMap<String, RateLimitState>>;
 type History = Arc<DashMap<Uuid, Vec<ClipboardMessage>>>;
 type Sessions = Arc<DashMap<Uuid, HashMap<String, String>>>;
+// Push tokens: user_id -> { device_id -> fcm_token }
+type PushTokens = Arc<DashMap<Uuid, HashMap<String, String>>>;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -32,10 +35,37 @@ pub struct AppState {
     rate_limits: RateLimits,
     history: History,
     sessions: Sessions,
+    push_tokens: PushTokens,
+    push_client: Option<Arc<PushClient>>,
 }
 
 impl AppState {
-    pub fn new(pool: PgPool, jwt_secret: String) -> Self {
+    pub fn new(
+        pool: PgPool,
+        jwt_secret: String,
+        fcm_json: Option<String>,
+        fcm_path: Option<String>,
+    ) -> Self {
+        let push_client = fcm_json
+            .and_then(|json| {
+                PushClient::from_json(&json)
+                    .map(Arc::new)
+                    .map_err(|e| tracing::warn!("FCM init from JSON failed: {}", e))
+                    .ok()
+            })
+            .or_else(|| {
+                fcm_path.and_then(|path| {
+                    PushClient::from_file(&path)
+                        .map(Arc::new)
+                        .map_err(|e| tracing::warn!("FCM init from file failed: {}", e))
+                        .ok()
+                })
+            });
+
+        if push_client.is_some() {
+            tracing::info!("FCM push notifications enabled");
+        }
+
         Self {
             pool,
             jwt_secret,
@@ -43,7 +73,45 @@ impl AppState {
             rate_limits: Arc::default(),
             history: Arc::default(),
             sessions: Arc::default(),
+            push_tokens: Arc::default(),
+            push_client,
         }
+    }
+
+    /// Store a push token for a user's device
+    pub fn store_push_token(&self, user_id: Uuid, device_id: &str, token: &str) {
+        self.push_tokens
+            .entry(user_id)
+            .or_default()
+            .insert(device_id.to_string(), token.to_string());
+        tracing::info!(user = %user_id, device = %device_id, "Push token registered");
+    }
+
+    /// Get push tokens for offline devices (devices not in active sessions)
+    pub fn get_offline_push_tokens(&self, user_id: &Uuid, exclude_device: &str) -> Vec<String> {
+        let active_devices: std::collections::HashSet<String> = self
+            .sessions
+            .get(user_id)
+            .map(|s| s.keys().cloned().collect())
+            .unwrap_or_default();
+
+        self.push_tokens
+            .get(user_id)
+            .map(|tokens| {
+                tokens
+                    .iter()
+                    .filter(|(dev_id, _)| {
+                        *dev_id != exclude_device && !active_devices.contains(*dev_id)
+                    })
+                    .map(|(_, token)| token.clone())
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// Get the push client if configured
+    pub fn push_client(&self) -> Option<&Arc<PushClient>> {
+        self.push_client.as_ref()
     }
 
     pub fn add_session(&self, user_id: Uuid, device_id: String, device_name: String) {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Icons } from '../Icons';
 
 interface ModalProps {
@@ -20,6 +20,15 @@ export const Modal: React.FC<ModalProps> = ({
   footer,
   className = ''
 }) => {
+  // Escape key handler
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && isOpen) onClose();
+    };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   return (
@@ -32,7 +41,7 @@ export const Modal: React.FC<ModalProps> = ({
       
       {/* Container */}
       <div 
-        className={`relative w-full max-w-md bg-zinc-900 border border-white/10 rounded-3xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${className}`}
+        className={`relative w-full max-w-md bg-zinc-900/90 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 ${className}`}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="p-6">

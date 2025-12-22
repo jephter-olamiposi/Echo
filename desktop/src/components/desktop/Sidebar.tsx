@@ -59,11 +59,68 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
   }, {} as Record<string, ClipboardEntry[]>);
 
   return (
-    <aside className="w-80 h-screen bg-zinc-950 border-r border-white/5 flex flex-col overflow-hidden">
+    <aside className="w-80 h-screen bg-[#1a1b1e] border-r border-white/5 flex flex-col overflow-hidden relative">
+      {/* App Branding - Draggable */}
+      <div className="p-5 border-b border-white/5" data-tauri-drag-region>
+        <div className="flex items-center justify-between" data-tauri-drag-region>
+          {/* Traffic Lights (macOS style window controls) */}
+          <div className="flex items-center gap-2 mr-4">
+            <button 
+              onClick={async () => {
+                const { getCurrentWindow } = await import('@tauri-apps/api/window');
+                getCurrentWindow().close();
+              }}
+              className="w-3 h-3 rounded-full bg-red-500 hover:bg-red-400 transition-colors group flex items-center justify-center"
+              title="Close"
+            >
+              <span className="opacity-0 group-hover:opacity-100 text-[8px] font-bold text-red-900">×</span>
+            </button>
+            <button 
+              onClick={async () => {
+                const { getCurrentWindow } = await import('@tauri-apps/api/window');
+                getCurrentWindow().minimize();
+              }}
+              className="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-400 transition-colors group flex items-center justify-center"
+              title="Minimize"
+            >
+              <span className="opacity-0 group-hover:opacity-100 text-[8px] font-bold text-yellow-900">−</span>
+            </button>
+            <button 
+              onClick={async () => {
+                const { getCurrentWindow } = await import('@tauri-apps/api/window');
+                const win = getCurrentWindow();
+                const isMaximized = await win.isMaximized();
+                isMaximized ? win.unmaximize() : win.maximize();
+              }}
+              className="w-3 h-3 rounded-full bg-green-500 hover:bg-green-400 transition-colors group flex items-center justify-center"
+              title="Maximize"
+            >
+              <span className="opacity-0 group-hover:opacity-100 text-[8px] font-bold text-green-900">+</span>
+            </button>
+          </div>
+          
+          <div className="flex items-center gap-3 flex-1" data-tauri-drag-region>
+            <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 flex items-center justify-center border border-indigo-500/20">
+              <div className="w-5 h-5 text-indigo-400">{Icons.logo}</div>
+            </div>
+            <div data-tauri-drag-region>
+              <h1 className="text-lg font-bold text-white tracking-tight">Echo</h1>
+              <p className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">Synced</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* History Header */}
       <div className="p-5 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-zinc-100 font-bold text-lg">
-          <div className="w-5 h-5 text-purple-500">{Icons.history}</div>
+        <div className="flex items-center gap-2 text-zinc-400 font-medium text-sm">
+          <div className="w-4 h-4 text-indigo-400">{Icons.history}</div>
           <span>History</span>
+          {history.length > 0 && (
+            <span className="px-2 py-0.5 rounded-full bg-[#25262b] text-zinc-400 text-[10px] font-medium border border-white/5">
+              {history.length}
+            </span>
+          )}
         </div>
         {history.length > 0 && (
           <button
@@ -78,12 +135,12 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
 
       <div className="px-5 mb-4">
         <div className="relative group">
-          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-purple-500 transition-colors">
+          <div className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-indigo-400 transition-colors">
             <div className="w-4 h-4">{Icons.search}</div>
           </div>
           <input
             type="text"
-            className="w-full bg-zinc-900 border border-white/5 rounded-xl py-2.5 pl-10 pr-10 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all"
+            className="w-full bg-[#25262b] border border-white/5 rounded-xl py-2.5 pl-10 pr-10 text-sm text-zinc-200 placeholder:text-zinc-600 focus:outline-none focus:ring-1 focus:ring-indigo-500/50 focus:border-indigo-500/50 transition-all"
             placeholder="Search clipboard..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -105,8 +162,8 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
             key={type}
             className={`px-3 py-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider whitespace-nowrap transition-all ${
               filterType === type 
-                ? "bg-purple-500/10 text-purple-400 border border-purple-500/20" 
-                : "text-zinc-500 hover:text-zinc-300 bg-transparent border border-transparent"
+                ? "bg-indigo-500/10 text-indigo-400 border border-indigo-500/20" 
+                : "text-zinc-500 hover:text-zinc-300 bg-transparent border border-transparent hover:bg-[#25262b]"
             }`}
             onClick={() => onFilterChange(type)}
           >
@@ -117,52 +174,63 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
 
       <div className="flex-1 overflow-y-auto px-2 custom-scrollbar pb-10">
         {Object.keys(groupedHistory).length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center p-6 opacity-40">
+          <div className="h-full flex flex-col items-center justify-center text-center px-6 py-12">
             {searchQuery ? (
-              <>
-                <p className="text-zinc-300 font-medium mb-1">No results found</p>
-                <span className="text-xs text-zinc-500">Try a different search term</span>
-              </>
+              <div className="flex flex-col items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-[#25262b] flex items-center justify-center text-zinc-600 mb-2">
+                  <div className="w-6 h-6">{Icons.search}</div>
+                </div>
+                <p className="text-sm font-medium text-zinc-400">No results found</p>
+                <span className="text-xs text-zinc-600">Try a different search term</span>
+              </div>
             ) : (
-              <>
-                <div className="w-12 h-12 text-zinc-500 mb-4">{Icons.clipboard}</div>
-                <p className="text-zinc-300 font-medium mb-1">No history</p>
-                <span className="text-xs text-zinc-500">Items you copy will appear here</span>
-              </>
+              <div className="flex flex-col items-center gap-3">
+                {/* Animated clipboard illustration */}
+                <div className="relative mb-2">
+                  <div className="absolute inset-0 bg-indigo-500/10 blur-2xl rounded-full animate-pulse" />
+                  <div className="relative w-16 h-16 rounded-2xl bg-[#25262b] border border-white/5 flex items-center justify-center text-zinc-600">
+                    <div className="w-8 h-8">{Icons.clipboard}</div>
+                  </div>
+                </div>
+                <p className="text-sm font-medium text-zinc-400">No clipboard history</p>
+                <span className="text-xs text-zinc-600 max-w-50">
+                  Copy something to see it appear here
+                </span>
+              </div>
             )}
           </div>
         ) : (
           Object.entries(groupedHistory).map(([date, entries]) => (
             <div key={date} className="mb-6 last:mb-0">
               <div className="px-3 mb-2 flex items-center gap-2">
-                <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[2px]">{date}</span>
+                <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-[2px]">{date}</span>
                 <div className="h-px flex-1 bg-zinc-900"></div>
               </div>
               <div className="flex flex-col gap-1">
                 {entries.map((entry) => (
                   <button
                     key={entry.id}
-                    className={`group flex items-start gap-3 p-3 rounded-xl transition-all relative ${
+                    className={`group flex items-start gap-3 p-3 rounded-2xl transition-all relative ${
                       selectedEntryId === entry.id 
-                        ? "bg-purple-500/10 border border-purple-500/20 shadow-sm" 
+                        ? "bg-zinc-800/80 border border-white/10" 
                         : "bg-transparent border border-transparent hover:bg-zinc-900/50"
                     }`}
                     onClick={() => onSelectEntry(entry)}
                   >
-                    <div className={`mt-0.5 w-8 h-8 rounded-lg flex items-center justify-center shrink-0 transition-colors ${
-                      selectedEntryId === entry.id ? "bg-purple-500/20 text-purple-400" : "bg-zinc-900 text-zinc-500 group-hover:bg-zinc-800"
+                    <div className={`mt-0.5 w-8 h-8 rounded-xl flex items-center justify-center shrink-0 transition-colors ${
+                      selectedEntryId === entry.id ? "bg-zinc-700 text-white" : "bg-zinc-900 text-zinc-500 group-hover:bg-zinc-800"
                     }`}>
                       <div className="w-4 h-4">{getContentTypeIcon(entry.contentType)}</div>
                     </div>
                     <div className="flex-1 min-w-0 pr-6">
                       <p className={`text-sm font-medium leading-normal truncate ${
-                        selectedEntryId === entry.id ? "text-purple-300" : "text-zinc-300"
+                        selectedEntryId === entry.id ? "text-white" : "text-zinc-300"
                       }`}>
                         {truncate(entry.content, 60)}
                       </p>
                       <div className="flex items-center gap-2 mt-1">
                         <div className={`w-1.5 h-1.5 rounded-full ${entry.source === 'local' ? 'bg-green-500/60' : 'bg-blue-500/60'}`}></div>
-                        <span className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider">{formatTime(entry.timestamp)}</span>
+                        <span className="text-[10px] font-medium text-zinc-600 uppercase tracking-wider">{formatTime(entry.timestamp)}</span>
                       </div>
                     </div>
                     {entry.pinned && (

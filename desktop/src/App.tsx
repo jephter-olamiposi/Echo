@@ -21,9 +21,10 @@ import {
 } from "./crypto";
 import { config } from "./config";
 import { formatTime } from "./utils";
-import { AppState, MobileView, LinkedDevice, ClipboardEntry } from "./types";
+import { AppState, MobileView, LinkedDevice, ClipboardEntry, ContentType } from "./types";
 import { useClipboard } from "./hooks/useClipboard";
 import { useKeys } from "./hooks/useKeys";
+import { usePushNotifications } from "./hooks/usePushNotifications";
 
 import { useWebSocket } from "./hooks/useWebSocket";
 
@@ -49,6 +50,7 @@ function App() {
   const [devices, setDevices] = useState<LinkedDevice[]>([]);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "info" } | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterType, setFilterType] = useState<ContentType | "all">("all");
   const [selectedEntry, setSelectedEntry] = useState<ClipboardEntry | null>(null);
   
   // WebSocket Hook
@@ -96,6 +98,13 @@ function App() {
     onDeviceJoin: handleDeviceJoin,
     onDeviceLeave: handleDeviceLeave,
   });
+
+  const handlePushSync = useCallback(() => {
+    ws.disconnect();
+    ws.connect();
+  }, [ws]);
+
+  usePushNotifications(token, deviceId, connected, handlePushSync);
 
   // Modal States
   const [showQR, setShowQR] = useState(false);
@@ -272,25 +281,7 @@ function App() {
     return Icons.devices;
   };
 
-  // --- Render ---
-
-  if (view === "login") {
-    return (
-      <AuthLayout>
-        <Login onSuccess={handleAuthSuccess} onSwitchToRegister={() => setViewState("register")} />
-      </AuthLayout>
-    );
-  }
-
-  if (view === "register") {
-    return (
-      <AuthLayout>
-        <Register onSuccess={handleAuthSuccess} onSwitchToLogin={() => setViewState("login")} />
-      </AuthLayout>
-    );
-  }
-
-  // Mobile Actions Bundle - Memoized for senior performance
+  // Mobile Actions Bundle - Memoized (MUST be before any early returns!)
   const mobileActions = useMemo(() => ({
     onCopy: clipboard.copyToClipboard,
     onDelete: clipboard.deleteEntry,
@@ -305,7 +296,7 @@ function App() {
     onSelectEntry: setSelectedEntry
   }), [clipboard, handleScanQR]);
 
-  // Derived AppState - Memoized for senior performance
+  // Derived AppState - Memoized (MUST be before any early returns!)
   const derivedState: AppState = useMemo(() => ({
     history: clipboard.history,
     connected,
@@ -327,7 +318,26 @@ function App() {
     isLoading,
     email: email || "",
     showClearConfirm
-  }), [clipboard.history, connected, searchQuery, selectedEntry, keys.encryptionKey, keys.fingerprint, toast, view, devices, showQR, keys.linkUri, showDevices, showKeyInput, manualKey, mobileView, isLoading, showClearConfirm]);
+  }), [clipboard.history, connected, searchQuery, selectedEntry, keys.encryptionKey, keys.fingerprint, toast, view, devices, showQR, keys.linkUri, showDevices, showKeyInput, manualKey, mobileView, isLoading, showClearConfirm, deviceId, email]);
+
+  // --- Render ---
+
+  if (view === "login") {
+    return (
+      <AuthLayout>
+        <Login onSuccess={handleAuthSuccess} onSwitchToRegister={() => setViewState("register")} />
+      </AuthLayout>
+    );
+  }
+
+  if (view === "register") {
+    return (
+      <AuthLayout>
+        <Register onSuccess={handleAuthSuccess} onSwitchToLogin={() => setViewState("login")} />
+      </AuthLayout>
+    );
+  }
+
 
   return (
     <>
@@ -344,10 +354,10 @@ function App() {
         <Sidebar 
           history={clipboard.history}
           searchQuery={searchQuery}
-          filterType={"all"}
+          filterType={filterType}
           selectedEntryId={selectedEntry?.id || null}
           onSearchChange={setSearchQuery}
-          onFilterChange={() => {}}
+          onFilterChange={setFilterType}
           onSelectEntry={setSelectedEntry}
           onClearHistory={() => setShowClearConfirm(true)}
           onCopyConstructor={clipboard.copyToClipboard}
@@ -368,6 +378,8 @@ function App() {
            onLinkDevice={() => setShowQR(true)}
            onEnterKey={() => setShowKeyInput(true)}
            onManageDevices={() => setShowDevices(true)}
+           onLogout={mobileActions.onLogout}
+           onBack={() => setSelectedEntry(null)}
         />
       </div>
 

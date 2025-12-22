@@ -1,19 +1,41 @@
 package com.mac.desktop
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
+import android.util.Log
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import com.google.firebase.messaging.FirebaseMessaging
 
 class MainActivity : TauriActivity() {
     
     companion object {
+        private const val TAG = "EchoMain"
+        private const val NOTIFICATION_PERMISSION_CODE = 1001
+        
         @JvmStatic
         var sharedText: String? = null
+        
+        @JvmStatic
+        var fcmToken: String? = null
+            private set
+        
+        @JvmStatic
+        var openedFromPush: Boolean = false
+            private set
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        requestNotificationPermission()
+        fetchFcmToken()
         handleIntent(intent)
     }
     
@@ -22,19 +44,81 @@ class MainActivity : TauriActivity() {
         handleIntent(intent)
     }
     
+    override fun onWebViewCreate(webView: WebView) {
+        super.onWebViewCreate(webView)
+        webView.addJavascriptInterface(EchoBridge(), "EchoBridge")
+    }
+    
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    NOTIFICATION_PERMISSION_CODE
+                )
+            }
+        }
+    }
+    
+    private fun fetchFcmToken() {
+        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
+            if (!task.isSuccessful) {
+                Log.w(TAG, "Fetching FCM token failed", task.exception)
+                return@addOnCompleteListener
+            }
+            fcmToken = task.result
+            Log.d(TAG, "FCM Token ready")
+        }
+    }
+    
     private fun handleIntent(intent: Intent) {
+        if (intent.getBooleanExtra("from_push", false)) {
+            openedFromPush = true
+            Log.d(TAG, "Opened from push notification")
+        }
+        
         if (intent.action == Intent.ACTION_SEND && intent.type == "text/plain") {
             intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
-
                 try {
                     val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
                     val clip = android.content.ClipData.newPlainText("Shared to Echo", text)
                     clipboard.setPrimaryClip(clip)
-                    android.widget.Toast.makeText(this, "Copied shared text to Echo", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(this, "Copied to Echo", android.widget.Toast.LENGTH_SHORT).show()
                 } catch (e: Exception) {
-                    android.util.Log.e("EchoShare", "Failed to write to clipboard", e)
+                    Log.e(TAG, "Failed to write to clipboard", e)
                 }
             }
         }
     }
+    
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == NOTIFICATION_PERMISSION_CODE) {
+            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "Notification permission granted")
+            }
+        }
+    }
+    
+    inner class EchoBridge {
+        @JavascriptInterface
+        fun getFcmToken(): String? = fcmToken
+        
+        @JavascriptInterface
+        fun wasOpenedFromPush(): Boolean {
+            val result = openedFromPush
+            openedFromPush = false
+            return result
+        }
+    }
 }
+

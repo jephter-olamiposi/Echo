@@ -19,6 +19,8 @@ interface DesktopMainProps {
   onLinkDevice: () => void;
   onEnterKey: () => void;
   onManageDevices: () => void;
+  onBack: () => void;
+  onLogout: () => void;
 }
 
 export const Main: React.FC<DesktopMainProps> = ({
@@ -32,156 +34,259 @@ export const Main: React.FC<DesktopMainProps> = ({
   onDelete,
   onLinkDevice,
   onEnterKey,
-  onManageDevices
+  onManageDevices,
+  onBack,
+  onLogout
 }) => {
   return (
-    <main className="flex-1 h-screen bg-black flex flex-col overflow-hidden relative">
-      {/* Big Tech: Dynamic Mesh Background */}
-      <div className="mesh-background" />
-      
+    <main className="flex-1 h-screen bg-black flex flex-col overflow-hidden">
       {selectedEntry ? (
-        <div className="flex-1 flex flex-col max-w-5xl mx-auto w-full p-12 overflow-hidden animate-in fade-in slide-in-from-right-8 duration-700 ease-(--spring-easing)">
-          {/* Preview Header */}
-          <div className="flex items-center justify-between mb-10">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center border border-purple-500/20 shadow-inner">
-                <div className="w-6 h-6">{getContentTypeIcon(selectedEntry.contentType)}</div>
+        /* ===== ENTRY DETAIL VIEW ===== */
+        <div className="flex-1 flex flex-col max-w-4xl mx-auto w-full p-8 overflow-hidden animate-in fade-in duration-300">
+          {/* Header with actions */}
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              {/* Back Button */}
+              <button
+                onClick={onBack}
+                className="p-2.5 rounded-xl bg-zinc-900/80 border border-white/5 text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all active:scale-95 mr-2"
+                title="Back to dashboard"
+              >
+                <div className="w-4 h-4">{Icons.back}</div>
+              </button>
+              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center border ${
+                selectedEntry.contentType === 'code' 
+                  ? 'bg-green-500/10 text-green-400 border-green-500/20'
+                  : selectedEntry.contentType === 'url'
+                  ? 'bg-blue-500/10 text-blue-400 border-blue-500/20'
+                  : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+              }`}>
+                <div className="w-5 h-5">{getContentTypeIcon(selectedEntry.contentType)}</div>
               </div>
               <div>
-                <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] block mb-1">Entry Type</span>
-                <span className="text-sm font-black text-white uppercase tracking-tight">{selectedEntry.contentType}</span>
+                <span className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Entry Type</span>
+                <p className="text-sm font-semibold text-white capitalize">{selectedEntry.contentType}</p>
               </div>
             </div>
             
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
-                className={`p-3 rounded-2xl border spring-transition active:scale-90 ${
+                className={`p-2.5 rounded-xl border transition-all active:scale-95 ${
                     selectedEntry.pinned 
-                    ? "bg-purple-500/10 border-purple-500/30 text-purple-400 shadow-lg shadow-purple-500/10" 
-                    : "bg-white/5 border-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-white/10"
+                    ? "bg-purple-500/10 border-purple-500/30 text-purple-400" 
+                    : "bg-zinc-900/80 border-white/5 text-zinc-500 hover:text-white hover:bg-zinc-800"
                 }`}
                 onClick={() => onPin(selectedEntry.id)}
                 title={selectedEntry.pinned ? "Unpin" : "Pin"}
               >
-                <div className="w-5 h-5">{Icons.pin}</div>
+                <div className="w-4 h-4">{Icons.pin}</div>
               </button>
 
               <CopyButton
                 content={selectedEntry.content}
                 onCopy={onCopy}
-                className="flex items-center gap-2 px-8 py-3 bg-white text-black rounded-2xl font-black text-sm hover:bg-zinc-200 active:scale-95 spring-transition shadow-2xl shadow-white/10"
+                className="flex items-center gap-2 px-5 py-2.5 bg-white text-black rounded-xl font-semibold text-sm hover:bg-zinc-200 active:scale-95 transition-all"
                 iconClassName="w-4 h-4"
               >
-                Copy Entry
+                Copy
               </CopyButton>
               
               <button
-                className="p-3 rounded-2xl bg-white/5 border border-white/5 text-zinc-500 hover:text-red-400 hover:bg-red-400/10 spring-transition active:scale-90"
+                className="p-2.5 rounded-xl bg-zinc-900/80 border border-white/5 text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-all active:scale-95"
                 onClick={() => onDelete(selectedEntry.id)}
-                title="Delete item"
+                title="Delete"
               >
-                <div className="w-5 h-5">{Icons.trash}</div>
+                <div className="w-4 h-4">{Icons.trash}</div>
               </button>
             </div>
           </div>
 
-          {/* Preview Meta */}
-          <div className={`grid gap-6 mb-10 ${devices.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}>
-             {devices.length > 1 && (
-               <div className="glass rounded-4xl p-6 flex flex-col gap-1.5 overflow-hidden relative">
-                 <div className="absolute top-0 right-0 p-4 opacity-10 font-black text-4xl italic tracking-tighter">SOURCE</div>
-                 <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em]">Origin Device</span>
-                 <div className="flex items-center gap-2.5 mt-1">
-                   <div className={`w-2.5 h-2.5 rounded-full ${selectedEntry.source === 'local' ? 'bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.6)]' : 'bg-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.6)]'}`} />
-                   <span className="text-base font-black text-white tracking-tight">{selectedEntry.deviceName || (selectedEntry.source === "local" ? "Primary Workstation" : "Remote Node")}</span>
-                 </div>
-               </div>
-             )}
-             <div className="glass rounded-4xl p-6 flex flex-col gap-1.5 overflow-hidden relative">
-               <div className="absolute top-0 right-0 p-4 opacity-10 font-black text-4xl italic tracking-tighter">TIME</div>
-               <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em]">Synchronization Epoch</span>
-               <span className="text-base font-black text-white mt-1 tracking-tight">{formatFullTime(selectedEntry.timestamp)}</span>
-             </div>
+          {/* Meta info bar */}
+          <div className="flex items-center gap-6 px-5 py-4 bg-zinc-900/60 border border-white/5 rounded-2xl mb-6">
+            {devices.length > 1 && (
+              <>
+                <div className="flex items-center gap-2">
+                  <div className={`w-2 h-2 rounded-full ${selectedEntry.source === 'local' ? 'bg-green-500' : 'bg-blue-500'}`} />
+                  <span className="text-sm font-medium text-zinc-300">
+                    {selectedEntry.deviceName || (selectedEntry.source === "local" ? "This Device" : "Remote")}
+                  </span>
+                </div>
+                <div className="w-px h-4 bg-white/10"></div>
+              </>
+            )}
+            <span className="text-sm text-zinc-500">{formatFullTime(selectedEntry.timestamp)}</span>
           </div>
 
-          {/* Content Body */}
-          <div className="flex-1 relative group mb-10 overflow-hidden">
-              <div className="absolute -inset-px bg-linear-to-br from-purple-500/30 via-transparent to-blue-500/30 rounded-[40px] opacity-40 blur-sm group-hover:opacity-60 spring-transition" />
-              <div className="relative h-full bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[40px] p-10 overflow-auto custom-scrollbar shadow-inner">
-                 <pre className="text-lg text-zinc-300 font-mono leading-relaxed whitespace-pre-wrap break-all selection:bg-purple-500/40">
-                   {selectedEntry.content}
-                 </pre>
-              </div>
+          {/* Content preview */}
+          <div className="flex-1 relative overflow-hidden mb-6">
+            <div className="h-full bg-zinc-900/40 border border-white/5 rounded-2xl p-6 overflow-auto custom-scrollbar">
+              <pre className="text-sm text-zinc-300 font-mono leading-relaxed whitespace-pre-wrap break-all selection:bg-purple-500/40">
+                {selectedEntry.content}
+              </pre>
+            </div>
           </div>
 
-          {/* Footer Stats */}
-          <div className="grid grid-cols-3 gap-1 px-10 py-6 glass rounded-4xl">
+          {/* Footer stats */}
+          <div className="flex items-center justify-center gap-8 px-6 py-4 bg-zinc-900/40 border border-white/5 rounded-2xl">
             <div className="flex flex-col items-center">
-              <span className="text-xl font-black text-white tabular-nums">{selectedEntry.content.length.toLocaleString()}</span>
-              <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em]">characters</span>
+              <span className="text-lg font-semibold text-white tabular-nums">{selectedEntry.content.length.toLocaleString()}</span>
+              <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">characters</span>
             </div>
-            <div className="flex flex-col items-center border-x border-white/10">
-              <span className="text-xl font-black text-white tabular-nums">{selectedEntry.content.split(/\s+/).filter(Boolean).length.toLocaleString()}</span>
-              <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em]">words</span>
-            </div>
+            <div className="w-px h-8 bg-white/10"></div>
             <div className="flex flex-col items-center">
-              <span className="text-xl font-black text-white tabular-nums">{selectedEntry.content.split(/\n/).length}</span>
-              <span className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em]">lines</span>
+              <span className="text-lg font-semibold text-white tabular-nums">{selectedEntry.content.split(/\s+/).filter(Boolean).length.toLocaleString()}</span>
+              <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">words</span>
+            </div>
+            <div className="w-px h-8 bg-white/10"></div>
+            <div className="flex flex-col items-center">
+              <span className="text-lg font-semibold text-white tabular-nums">{selectedEntry.content.split(/\n/).length}</span>
+              <span className="text-[10px] font-medium text-zinc-500 uppercase tracking-wider">lines</span>
             </div>
           </div>
         </div>
       ) : (
-        <div className="flex-1 flex flex-col items-center justify-center max-w-3xl mx-auto w-full text-center px-12 animate-in fade-in zoom-in-95 duration-1000 ease-(--spring-easing)">
-          <div className="mb-12 relative">
-             <div className="absolute inset-0 bg-purple-500/30 blur-[100px] rounded-full animate-pulse" />
-             <div className="relative w-32 h-32 rounded-[40px] bg-white text-black flex items-center justify-center shadow-[0_0_50px_rgba(255,255,255,0.2)] rotate-3 hover:rotate-0 spring-transition">
-                <div className="w-14 h-14">{Icons.logo}</div>
-             </div>
+        /* ===== EMPTY STATE / DASHBOARD HOME ===== */
+      <div className="flex-1 flex flex-col h-full bg-[#141517] min-w-0">
+        {/* Top Header Bar */}
+        <div className="h-16 border-b border-white/5 flex items-center justify-between px-4 md:px-8 bg-[#1a1b1e] shrink-0">
+          <div className="flex items-center gap-4 md:gap-6 overflow-hidden">
+            <div className="flex items-center gap-2 shrink-0">
+              <div className={`w-2 h-2 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+              <span className="text-sm font-medium text-zinc-300 hidden sm:inline">{connected ? 'Syncing' : 'Offline'}</span>
+            </div>
+            <div className="h-4 w-px bg-white/10 shrink-0" />
+            <div className="flex items-center gap-4 text-xs font-medium text-zinc-500 overflow-hidden whitespace-nowrap">
+              <span className="hidden sm:inline">{historyCount} items</span>
+              <span className="hidden sm:inline">{devices.length} device{devices.length !== 1 ? 's' : ''}</span>
+              <span className="font-mono bg-white/5 px-2 py-1 rounded text-zinc-400 truncate max-w-[120px] md:max-w-none">
+                Key: {keyFingerprint ? keyFingerprint.substring(0, 8) : '—'}
+              </span>
+            </div>
           </div>
           
-          <h2 className="text-5xl font-black text-white tracking-tighter mb-6">Security In Motion</h2>
-          <p className="text-zinc-500 text-lg leading-relaxed mb-16 max-w-lg mx-auto font-medium">
-             Your secure clipboard ecosystem is active. Copy anything on any device to see it appear here instantly.
-          </p>
-
-          <div className="grid grid-cols-4 gap-4 w-full mb-16 px-4">
-            {[
-              { label: 'Network', value: connected ? "Link Active" : "Offline", icon: Icons.sync, color: connected ? 'text-green-400' : 'text-orange-400', bg: connected ? 'bg-green-500/10' : 'bg-orange-500/10' },
-              { label: 'Encryption', value: keyFingerprint?.substring(0, 8) || "Secured", icon: Icons.shield, color: 'text-blue-400', bg: 'bg-blue-500/10' },
-              { label: 'Archive', value: `${historyCount} Entries`, icon: Icons.history, color: 'text-violet-400', bg: 'bg-violet-500/10' },
-              { label: 'Ecosystem', value: `${devices.length} Nodes`, icon: Icons.devices, color: 'text-zinc-400', bg: 'bg-white/5' }
-            ].map((stat, i) => (
-              <div key={i} className="glass p-6 rounded-4xl group hover:border-white/20 spring-transition">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-4 ${stat.bg} ${stat.color} group-hover:scale-110 spring-transition`}>
-                  <div className="w-5 h-5">{stat.icon}</div>
-                </div>
-                <p className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] mb-1.5">{stat.label}</p>
-                <p className={`font-black tracking-tight truncate ${stat.color === 'text-zinc-400' ? 'text-white' : stat.color}`}>{stat.value}</p>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-4">
-            <button 
-              className="flex items-center gap-3 px-10 py-4 bg-white text-black rounded-2xl font-black text-sm hover:bg-zinc-200 active:scale-95 spring-transition shadow-2xl shadow-white/10"
-              onClick={onLinkDevice}
-            >
-              <div className="w-5 h-5">{Icons.link}</div> Link New Node
-            </button>
-            <button 
-              className="px-8 py-4 bg-white/5 border border-white/5 text-zinc-300 rounded-2xl font-black text-sm hover:bg-white/10 active:scale-95 spring-transition backdrop-blur-xl"
-              onClick={onEnterKey}
-            >
-              Configure Identity
-            </button>
-            <button 
-              className="p-4 glass rounded-2xl text-zinc-500 hover:text-white spring-transition active:scale-90"
-              onClick={onManageDevices}
-            >
-               <div className="w-6 h-6">{Icons.devices}</div>
-            </button>
+          <div className="flex items-center gap-2 md:gap-3 shrink-0 ml-4">
+             <button className="p-2 text-zinc-400 hover:text-white transition-colors">
+               <div className="w-5 h-5">{Icons.info}</div>
+             </button>
+             <button className="p-2 text-zinc-400 hover:text-white transition-colors" onClick={onLinkDevice}>
+               <div className="w-5 h-5">{Icons.link}</div>
+             </button>
+             <button 
+               className="px-3 py-1.5 bg-red-500/10 text-red-400 text-xs font-bold rounded-lg border border-red-500/20 hover:bg-red-500/20 transition-all whitespace-nowrap"
+               onClick={onLogout}
+             >
+               Sign Out
+             </button>
           </div>
         </div>
+
+        {/* Main Center Content */}
+        <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 relative overflow-y-auto custom-scrollbar">
+          {/* Background Glow */}
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-purple-500/5 blur-[80px] md:blur-[120px] rounded-full pointer-events-none" />
+
+          <div className="relative z-10 max-w-2xl w-full flex flex-col items-center">
+            {/* Hero Icon */}
+            <div className="w-16 h-16 md:w-20 md:h-20 rounded-3xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center mb-6 shadow-2xl shadow-indigo-500/10">
+              <div className="w-8 h-8 md:w-10 md:h-10">{Icons.clipboard}</div>
+            </div>
+
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-3 text-center tracking-tight">Welcome to Echo</h1>
+            <p className="text-zinc-500 text-center mb-8 md:mb-12 max-w-md mx-auto leading-relaxed px-4 text-sm md:text-base">
+              Your clipboard syncs across all devices in real-time with end-to-end encryption.
+            </p>
+
+            {/* 2x2 Feature Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 w-full mb-8">
+              {/* Connection Card */}
+              <div className="bg-[#25262b] p-4 md:p-5 rounded-2xl border border-white/5 flex items-center gap-4 hover:bg-[#2c2d33] transition-colors group">
+                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center shrink-0 ${connected ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                  <div className="w-5 h-5 md:w-6 md:h-6">{Icons.sync}</div>
+                </div>
+                <div>
+                  <h3 className="text-zinc-500 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-0.5">Connection</h3>
+                  <p className={`font-semibold text-sm md:text-base ${connected ? 'text-green-400' : 'text-zinc-300'}`}>
+                    {connected ? 'Active' : 'Disconnected'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Encryption Card */}
+              <div className="bg-[#25262b] p-4 md:p-5 rounded-2xl border border-white/5 flex items-center gap-4 hover:bg-[#2c2d33] transition-colors group">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+                  <div className="w-5 h-5 md:w-6 md:h-6">{Icons.shield}</div>
+                </div>
+                <div>
+                  <h3 className="text-zinc-500 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-0.5">Encryption</h3>
+                  <p className="font-semibold text-sm md:text-base text-emerald-400">End-to-end</p>
+                </div>
+              </div>
+
+              {/* History Card */}
+              <div className="bg-[#25262b] p-4 md:p-5 rounded-2xl border border-white/5 flex items-center gap-4 hover:bg-[#2c2d33] transition-colors group">
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-zinc-700/50 text-zinc-400 flex items-center justify-center shrink-0">
+                  <div className="w-5 h-5 md:w-6 md:h-6">{Icons.history}</div>
+                </div>
+                <div>
+                  <h3 className="text-zinc-500 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-0.5">History</h3>
+                  <p className="font-semibold text-sm md:text-base text-white">{historyCount} items</p>
+                </div>
+              </div>
+
+              {/* Devices Card */}
+              <div 
+                className="bg-[#25262b] p-4 md:p-5 rounded-2xl border border-white/5 flex items-center gap-4 hover:bg-[#2c2d33] transition-colors group cursor-pointer"
+                onClick={onManageDevices}
+              >
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-zinc-700/50 text-zinc-400 flex items-center justify-center shrink-0">
+                  <div className="w-5 h-5 md:w-6 md:h-6">{Icons.devices}</div>
+                </div>
+                <div>
+                  <h3 className="text-zinc-500 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-0.5">Devices</h3>
+                  <p className="font-semibold text-sm md:text-base text-white">{devices.length} linked</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Encryption Key Banner */}
+            <div className="w-full bg-[#25262b] rounded-2xl border border-white/5 p-4 md:p-6 text-center mb-6 md:mb-10 relative overflow-hidden group">
+               <div className="absolute inset-0 bg-indigo-500/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+               <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[2px] mb-2">Encryption Key</h3>
+               <p className="font-mono text-base md:text-xl text-indigo-400 font-medium tracking-wide break-all selection:bg-indigo-500/30">
+                 {keyFingerprint || '—'}
+               </p>
+            </div>
+
+            {/* Bottom Actions */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 md:gap-8 w-full justify-center">
+              <button 
+                onClick={onLinkDevice}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 bg-[#2c2d33] hover:bg-[#35363c] text-zinc-200 rounded-xl font-medium transition-all active:scale-[0.98] border border-white/5"
+              >
+                <div className="w-4 h-4 text-indigo-400">{Icons.link}</div>
+                <span>Link New Device</span>
+              </button>
+
+               <button 
+                onClick={onEnterKey}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 text-zinc-500 hover:text-zinc-300 transition-colors text-sm font-medium p-2"
+              >
+                <div className="w-4 h-4">{Icons.shield}</div>
+                <span>Enter Sync Key</span>
+              </button>
+
+              <button 
+                onClick={onManageDevices}
+                className="w-full sm:w-auto flex items-center justify-center gap-2 text-zinc-500 hover:text-zinc-300 transition-colors text-sm font-medium p-2"
+              >
+                <div className="w-4 h-4">{Icons.settings || Icons.devices}</div>
+                <span>Manage Devices</span>
+              </button>
+            </div>
+
+          </div>
+        </div>
+      </div>
       )}
     </main>
   );

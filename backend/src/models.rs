@@ -72,3 +72,10 @@ fn now_millis() -> u64 {
         .map(|d| d.as_millis() as u64)
         .unwrap_or(0)
 }
+
+/// Request to register a push notification token
+#[derive(Debug, Deserialize)]
+pub struct PushTokenRequest {
+    pub device_id: String,
+    pub token: String,
+}

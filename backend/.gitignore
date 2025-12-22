@@ -6,6 +6,10 @@
 .env.local
 .env.*.local
 
+# Firebase (sensitive)
+firebase-service-account.json
+*-service-account.json
+
 # IDE/Editor
 .idea/
 .vscode/

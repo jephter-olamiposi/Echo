@@ -4,8 +4,8 @@ use crate::{
     error::AppError,
     middleware::AuthUser,
     models::{
-        AuthResponse, ClipboardMessage, LoginRequest, RegisterRequest, WsQuery, MSG_HANDSHAKE,
-        MSG_PRESENCE,
+        AuthResponse, ClipboardMessage, LoginRequest, PushTokenRequest, RegisterRequest, WsQuery,
+        MSG_HANDSHAKE, MSG_PRESENCE,
     },
     state::AppState,
 };
@@ -293,11 +293,35 @@ async fn handle_incoming(
                 }
 
                 state.add_to_history(user_id, clipboard_msg.clone());
-                let _ = tx.send(clipboard_msg);
+                let _ = tx.send(clipboard_msg.clone());
+
+                let offline_tokens = state.get_offline_push_tokens(&user_id, &device_id);
+                if !offline_tokens.is_empty() {
+                    if let Some(push_client) = state.push_client() {
+                        let push_client = push_client.clone();
+                        let device_name =
+                            clipboard_msg.device_name.unwrap_or_else(|| "device".into());
+                        tokio::spawn(async move {
+                            for token in offline_tokens {
+                                let _ = push_client.notify_sync(&token, &device_name).await;
+                            }
+                        });
+                    }
+                }
             }
             Message::Pong(_) => tracing::debug!(device = %device_id, "pong received"),
             Message::Close(_) => break,
             _ => {}
         }
     }
+}
+
+/// Register a push notification token for the authenticated user's device
+pub async fn register_push_token(
+    AuthUser { user_id }: AuthUser,
+    State(state): State<AppState>,
+    Json(payload): Json<PushTokenRequest>,
+) -> impl IntoResponse {
+    state.store_push_token(user_id, &payload.device_id, &payload.token);
+    StatusCode::OK
 }

@@ -4,6 +4,7 @@ mod error;
 mod handler;
 mod middleware;
 mod models;
+mod push;
 mod state;
 #[cfg(test)]
 mod tests;
@@ -32,6 +33,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL required");
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET required");
+    let fcm_json = std::env::var("FCM_SERVICE_ACCOUNT_JSON").ok();
+    let fcm_path = std::env::var("FCM_SERVICE_ACCOUNT_PATH").ok();
 
     tracing::info!("Connecting to database...");
     let pool = PgPoolOptions::new()
@@ -40,7 +43,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     tracing::info!("Database connected");
 
-    // Run migrations automatically
     tracing::info!("Running migrations...");
     sqlx::migrate!("./migrations")
         .run(&pool)
@@ -48,7 +50,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .expect("Failed to run migrations");
     tracing::info!("Migrations ran successfully");
 
-    let state = AppState::new(pool, jwt_secret);
+    let state = AppState::new(pool, jwt_secret, fcm_json, fcm_path);
 
     let app = Router::new()
         .route("/health", get(|| async { "OK" }))
@@ -57,6 +59,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/ws", get(handler::ws_handler))
         .route("/protected", get(handler::protected))
         .route("/history", get(handler::get_history))
+        .route("/push/register", post(handler::register_push_token))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state);
