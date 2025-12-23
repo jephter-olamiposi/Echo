@@ -284,7 +284,10 @@ async fn handle_incoming(
 
                 let clipboard_msg = match serde_json::from_str::<ClipboardMessage>(&text) {
                     Ok(msg) => msg,
-                    Err(_) => continue,
+                    Err(e) => {
+                        tracing::warn!(user = %user_id, device = %device_id, error = %e, "failed to parse clipboard message");
+                        continue;
+                    }
                 };
 
                 if !state.check_rate_limit(&device_id) {

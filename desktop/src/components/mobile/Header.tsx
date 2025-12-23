@@ -19,7 +19,13 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
   className = ''
 }) => {
   return (
-    <div className={`flex items-center justify-between h-14 px-4 sticky top-0 z-50 bg-black/80 backdrop-blur-lg border-b border-white/5 ${className}`}>
+    <div 
+      className={`flex items-center justify-between px-4 sticky top-0 z-50 bg-black border-b border-white/5 ${className}`}
+      style={{ 
+        height: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)',
+        paddingTop: 'env(safe-area-inset-top, 0px)' 
+      }}
+    >
       <div className="min-w-10 flex items-start">
         {showBack && (
           <button className="p-2 -ml-2 rounded-full hover:bg-white/10 active:scale-95 transition-all text-white" onClick={onBack}>

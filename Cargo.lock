@@ -346,15 +346,12 @@ dependencies = [
  "argon2",
  "axum",
  "axum-extra",
- "base64 0.22.1",
  "dashmap",
  "dotenvy",
  "futures",
  "jsonwebtoken",
- "pem",
  "rand 0.9.2",
  "reqwest",
- "ring",
  "serde",
  "serde_json",
  "sqlx",
@@ -969,6 +966,7 @@ dependencies = [
  "tauri-plugin-http",
  "tauri-plugin-opener",
  "tauri-plugin-os",
+ "tauri-plugin-single-instance",
  "tauri-plugin-store",
 ]
 
@@ -5322,6 +5320,21 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "thiserror 2.0.17",
+]
+
+[[package]]
+name = "tauri-plugin-single-instance"
+version = "2.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd707f8c86b4e3004e2c141fa24351f1909ba40ce1b8437e30d5ed5277dd3710"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "thiserror 2.0.17",
+ "tracing",
+ "windows-sys 0.60.2",
+ "zbus",
 ]
 
 [[package]]

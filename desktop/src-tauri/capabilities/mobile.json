@@ -8,7 +8,43 @@
     "main"
   ],
   "permissions": [
+    "core:default",
+    "core:window:allow-show",
+    "core:window:allow-hide",
+    "core:window:allow-close",
+    "core:event:default",
+    "clipboard-manager:default",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text",
+    "store:default",
+    "store:allow-get",
+    "store:allow-set",
+    "store:allow-save",
+    "store:allow-load",
+    "http:default",
+    {
+      "identifier": "http:allow-fetch",
+      "allow": [
+        { "url": "http://localhost:3000/*" },
+        { "url": "https://echo-production-784d.up.railway.app/*" },
+        { "url": "wss://echo-production-784d.up.railway.app/*" },
+        { "url": "https://api.qrserver.com/*" }
+      ]
+    },
     "barcode-scanner:default",
-    "os:default"
+    "barcode-scanner:allow-scan",
+    "barcode-scanner:allow-check-permissions",
+    "barcode-scanner:allow-request-permissions",
+    "barcode-scanner:allow-open-app-settings",
+    "barcode-scanner:allow-cancel",
+    "haptics:allow-vibrate",
+    "haptics:allow-impact-feedback",
+    "haptics:allow-notification-feedback",
+    "haptics:allow-selection-feedback",
+    "os:default",
+    "os:allow-platform",
+    "os:allow-version",
+    "os:allow-arch",
+    "os:allow-hostname"
   ]
 }

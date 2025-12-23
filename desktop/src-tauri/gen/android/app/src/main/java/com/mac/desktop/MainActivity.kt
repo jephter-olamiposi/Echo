@@ -66,13 +66,28 @@ class MainActivity : TauriActivity() {
     }
     
     private fun fetchFcmToken() {
+        // Try to get from SharedPreferences first (fastest)
+        val prefs = getSharedPreferences("EchoPrefs", android.content.Context.MODE_PRIVATE)
+        val cachedToken = prefs.getString("fcm_token", null)
+        
+        if (cachedToken != null) {
+            fcmToken = cachedToken
+            Log.d(TAG, "FCM Token loaded from cache")
+        }
+
         FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
             if (!task.isSuccessful) {
                 Log.w(TAG, "Fetching FCM token failed", task.exception)
                 return@addOnCompleteListener
             }
-            fcmToken = task.result
-            Log.d(TAG, "FCM Token ready")
+            val newToken = task.result
+            
+            // Update cache if changed
+            if (newToken != cachedToken) {
+                prefs.edit().putString("fcm_token", newToken).apply()
+                fcmToken = newToken
+                Log.d(TAG, "FCM Token updated from network")
+            }
         }
     }
     
@@ -111,7 +126,13 @@ class MainActivity : TauriActivity() {
     
     inner class EchoBridge {
         @JavascriptInterface
-        fun getFcmToken(): String? = fcmToken
+        fun getFcmToken(): String? {
+             if (fcmToken != null) return fcmToken
+             
+             // Fallback to SharedPreferences if memory variable is null (e.g. process death)
+             val prefs = getSharedPreferences("EchoPrefs", android.content.Context.MODE_PRIVATE)
+             return prefs.getString("fcm_token", null)
+        }
         
         @JavascriptInterface
         fun wasOpenedFromPush(): Boolean {

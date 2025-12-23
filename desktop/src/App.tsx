@@ -1,9 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { listen } from "@tauri-apps/api/event";
 import { hostname } from "@tauri-apps/plugin-os";
 import "./App.css"; 
-// import "./KeyStyles.css";
-// import "./Fingerprint.css";
+import "./KeyStyles.css";
+import "./Fingerprint.css";
 import { Icons } from "./components/Icons";
 import { Toast } from "./components/shared/Toast";
 import { Modal } from "./components/shared/Modal";
@@ -12,6 +11,7 @@ import { Sidebar } from "./components/desktop/Sidebar";
 import { Main } from "./components/desktop/Main";
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
+import { Onboarding } from "./components/auth/Onboarding";
 import { AuthLayout } from "./components/auth/AuthLayout";
 import { 
   importKey, 
@@ -20,12 +20,12 @@ import {
   generateLinkUri
 } from "./crypto";
 import { config } from "./config";
-import { formatTime } from "./utils";
+
 import { AppState, MobileView, LinkedDevice, ClipboardEntry, ContentType } from "./types";
+import { ScanningOverlay } from "./components/mobile/ScanningOverlay";
 import { useClipboard } from "./hooks/useClipboard";
 import { useKeys } from "./hooks/useKeys";
 import { usePushNotifications } from "./hooks/usePushNotifications";
-
 import { useWebSocket } from "./hooks/useWebSocket";
 
 // Initial values shifted to state
@@ -36,11 +36,16 @@ function App() {
   const keys = useKeys();
   
   // --- Local UI State ---
-  // We keep UI state here that coordinates between Mobile/Desktop or Modals
   const [token, setToken] = useState<string | null>(localStorage.getItem("echo_token"));
   const [email, setEmail] = useState<string | null>(localStorage.getItem("echo_email"));
-  const [view, setViewState] = useState<"login" | "register" | "main">(token ? "main" : "login");
   
+  const getInitialView = () => {
+    const onboardingComplete = localStorage.getItem("echo_onboarding_complete") === "true";
+    if (!onboardingComplete) return "onboarding";
+    return token ? "main" : "login";
+  };
+  
+  const [view, setViewState] = useState<"login" | "register" | "main" | "onboarding">(getInitialView());
   const [mobileView, setMobileView] = useState<MobileView>("dashboard");
   const [isLoading, setIsLoading] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -52,8 +57,17 @@ function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<ContentType | "all">("all");
   const [selectedEntry, setSelectedEntry] = useState<ClipboardEntry | null>(null);
-  
-  // WebSocket Hook
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [backgroundModeEnabled, setBackgroundModeEnabled] = useState(false);
+
+  // --- Modal States ---
+  const [showQR, setShowQR] = useState(false);
+  const [showDevices, setShowDevices] = useState(false);
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [manualKey, setManualKey] = useState("");
+
   const showToastMsg = (message: string, type: "success" | "error" | "info" = "info") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -68,7 +82,6 @@ function App() {
         return [...prev, device];
       });
       
-      // Suppress toast if it's THIS device (by ID) or a generic/zombie session
       const isMe = device.id === deviceId || device.isCurrentDevice;
       const isGenericName = device.name === "This Device" || device.name === "Unknown Device";
       if (!isMe && !isGenericName) {
@@ -78,7 +91,6 @@ function App() {
 
   const handleIncomingCopy = useCallback((entry: ClipboardEntry, isHistory?: boolean) => {
     clipboard.addEntry(entry.content, 'remote', entry.deviceName);
-    // If it's a live sync or the latest history item, update system clipboard
     if (!isHistory) {
       clipboard.copyToClipboard(entry.content);
     }
@@ -99,81 +111,179 @@ function App() {
     onDeviceLeave: handleDeviceLeave,
   });
 
-  const handlePushSync = useCallback(() => {
-    ws.disconnect();
-    ws.connect();
-  }, [ws]);
+  usePushNotifications({
+    token,
+    deviceId,
+    onSyncRequest: () => ws.connect()
+  });
 
-  usePushNotifications(token, deviceId, connected, handlePushSync);
-
-  // Modal States
-  const [showQR, setShowQR] = useState(false);
-  const [showDevices, setShowDevices] = useState(false);
-  const [showKeyInput, setShowKeyInput] = useState(false);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [manualKey, setManualKey] = useState("");
-  
-  // Removed manual wsRef as we use the ws hook
-
-  // --- Effects ---
-
-  // Initial Loading Simulation & Device Init
   useEffect(() => {
     const init = async () => {
-      const id = await getOrCreateDeviceId();
-      let name = "This Device";
-      
       try {
-        const host = await hostname();
-        if (host) name = host;
-      } catch (e) {
-        console.warn("Failed to get hostname", e);
-      }
-
-      setDeviceId(id);
-      
-      // Improve default naming
-      let finalName = name;
-      if (name === "This Device" || name === "localhost" || name.includes("localhost")) {
-         try {
+        const id = await getOrCreateDeviceId();
+        setDeviceId(id);
+        // Detect platform first to enforce OS-based naming rules
+        let platform = 'unknown';
+        try {
            const { type } = await import("@tauri-apps/plugin-os");
-           const platform = type();
-           finalName = platform === 'android' ? 'Echo Mobile (Android)' : 
-                  platform === 'ios' ? 'Echo Mobile (iOS)' : 
-                  platform === 'macos' ? 'Echo Desktop (Mac)' : 
-                  platform === 'windows' ? 'Echo Desktop (Windows)' : 'Echo Device';
-         } catch (e) {
-           finalName = "Echo Device";
-         }
+           platform = type();
+        } catch (e) {
+           console.warn("Failed to detect platform:", e);
+        }
+
+        let name = "Echo Device";
+        
+        // Mobile: Always use clean OS-based naming
+        if (platform === 'android') {
+          name = 'Echo Mobile (Android)';
+        } else if (platform === 'ios') {
+          name = 'Echo Mobile (iOS)';
+        } else {
+          // Desktop: Try hostname, fallback to OS-based name
+          try {
+            const sysName = await hostname();
+            if (sysName && !sysName.includes("localhost") && sysName !== "This Device") {
+              name = sysName;
+            } else {
+               // Fallback for desktop if hostname is generic
+               name = platform === 'macos' ? 'Echo Desktop (Mac)' : 
+                      platform === 'windows' ? 'Echo Desktop (Windows)' : 
+                      platform === 'linux' ? 'Echo Desktop (Linux)' : 'Echo Desktop';
+            }
+          } catch (e) {
+             name = platform === 'macos' ? 'Echo Desktop (Mac)' : 
+                    platform === 'windows' ? 'Echo Desktop (Windows)' : 'Echo Desktop';
+          }
+        }
+        
+        setDeviceName(name);
+        setDevices([{ id, name, lastSeen: Date.now(), isCurrentDevice: true }]);
+      } catch (e) {
+        console.error("Initialization error:", e);
+        // Fallback if everything critical fails
+        if (deviceId === "unknown") {
+             const fallbackId = crypto.randomUUID();
+             setDeviceId(fallbackId);
+             setDevices([{ id: fallbackId, name: "Echo Device", lastSeen: Date.now(), isCurrentDevice: true }]);
+        }
+      } finally {
+        setIsLoading(false);
       }
-      setDeviceName(finalName);
-      setDevices([{ id, name: finalName, lastSeen: Date.now(), isCurrentDevice: true }]);
-      setIsLoading(false);
     };
     init();
-  }, []);
 
-  // Sync WebSocket with Clipboard
+    let unlistenFocus: (() => void) | undefined;
+    let unlistenResume: (() => void) | undefined;
+    let unlistenClipboard: (() => void) | undefined;
+    
+    const setupListeners = async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        
+        const checkClipboard = async () => {
+          const text = await clipboard.readFromClipboard();
+          if (text) {
+             const wasAdded = clipboard.addEntry(text, 'local', deviceName);
+             if (wasAdded && keys.encryptionKey) {
+                ws.send(text);
+             }
+          }
+        };
+
+        unlistenFocus = await listen('tauri://window-focus', () => {
+          if (keys.encryptionKey) ws.connect();
+          checkClipboard();
+        });
+
+        unlistenResume = await listen('tauri://resume', () => {
+          if (keys.encryptionKey) ws.connect();
+          checkClipboard();
+        });
+
+        // Listen for local clipboard changes (Mainly Desktop Rust monitor)
+        unlistenClipboard = await listen<string>('clipboard-change', (event) => {
+          const content = event.payload;
+          if (content && typeof content === 'string') {
+            const wasAdded = clipboard.addEntry(content, 'local', deviceName);
+            if (wasAdded) {
+              ws.send(content);
+            }
+          }
+        });
+      } catch (e) {
+        console.error("Failed to setup lifecycle listeners", e);
+      }
+    };
+
+    setupListeners();
+
+    return () => {
+      if (unlistenFocus) unlistenFocus();
+      if (unlistenResume) unlistenResume();
+      if (unlistenClipboard) unlistenClipboard();
+    };
+  }, [keys.encryptionKey, ws, clipboard, deviceName]);
+
   useEffect(() => {
     if (keys.encryptionKey) {
       ws.connect();
     } else {
       ws.disconnect();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keys.encryptionKey]);
 
-  // Clipboard Listener
+  // Mobile clipboard polling (arboard doesn't work on mobile)
   useEffect(() => {
-    setupClipboardListener();
+    let interval: ReturnType<typeof setInterval> | null = null;
     
-    // Prevent context menu
+    const setupMobilePolling = async () => {
+      try {
+        const { type } = await import("@tauri-apps/plugin-os");
+        const platform = type();
+        const isMobile = platform === 'android' || platform === 'ios';
+        
+        if (isMobile && keys.encryptionKey) {
+          console.log("[Mobile] Starting clipboard polling");
+          interval = setInterval(async () => {
+            const text = await clipboard.readFromClipboard();
+            if (text) {
+              const wasAdded = clipboard.addEntry(text, 'local', deviceName);
+              if (wasAdded && keys.encryptionKey) {
+                ws.send(text);
+              }
+            }
+          }, 2000); // Poll every 2s (battery-friendly)
+        }
+      } catch (e) {
+        console.error("[Mobile] Polling setup failed:", e);
+      }
+    };
+
+    setupMobilePolling();
+    
+    return () => {
+      if (interval) {
+        console.log("[Mobile] Stopping clipboard polling");
+        clearInterval(interval);
+      }
+    };
+  }, [keys.encryptionKey, clipboard, deviceName, ws]);
+
+  // Toggle transparency for scanner
+  useEffect(() => {
+    if (isScanning) {
+      document.body.classList.add('scan-active');
+    } else {
+      document.body.classList.remove('scan-active');
+    }
+    return () => document.body.classList.remove('scan-active');
+  }, [isScanning]);
+
+  useEffect(() => {
     if (!import.meta.env.DEV) {
       document.addEventListener('contextmenu', event => event.preventDefault());
     }
   }, []);
-
-  // --- Helper Functions ---
 
   const handleAuthSuccess = (newToken: string, newEmail: string) => {
     localStorage.setItem("echo_token", newToken);
@@ -192,81 +302,95 @@ function App() {
     setViewState("login");
   };
 
-  const sendToWebSocket = (text: string) => {
-    ws.send(text);
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    ws.connect();
+    await new Promise(r => setTimeout(r, 1000));
+    setIsRefreshing(false);
   };
-
-  const setupClipboardListener = async () => {
-    // Mobile listener
-    const unlisten = await listen("app-resumed", checkClipboard);
-    const interval = setInterval(checkClipboard, 1000);
-    return () => {
-      unlisten();
-      clearInterval(interval);
-    };
-  };
-
-  const checkClipboard = async () => {
-    try {
-      const { readText } = await import("@tauri-apps/plugin-clipboard-manager");
-      const text = await readText();
-      if (text) {
-        const entry = clipboard.addEntry(text, 'local');
-        if (entry) sendToWebSocket(text);
-      }
-    } catch (err) {
-      // ignore
-    }
-  };
-
-  // Removed duplicate sendToWebSocket
 
   const handleManualKeySync = async () => {
+    if (!manualKey) return;
     try {
       const key = importKey(manualKey);
       await keys.saveKey(key);
+      showToastMsg("Sync key saved!", "success");
+      setManualKey("");
       setShowKeyInput(false);
-      showToastMsg("Key updated successfully", "success");
     } catch (e) {
       showToastMsg("Invalid key format", "error");
     }
   };
 
   const handleScanQR = async () => {
-    // Logic for QR scanning
     setMobileView("settings");
     try {
-       const { scan, Format } = await import("@tauri-apps/plugin-barcode-scanner");
-       const result = await scan({ windowed: true, formats: [Format.QRCode] });
-       
-        if (result.content && result.content.startsWith("echo://")) {
-           const uri = result.content;
-           let keyBase64 = "";
-           
-           if (uri.startsWith("echo://connect?")) {
-             try {
-               const params = new URLSearchParams(uri.split("?")[1]);
-               keyBase64 = params.get("key") || "";
-             } catch (e) {
-               console.error("Failed to parse QR params", e);
-             }
-           } else {
-             keyBase64 = uri.replace("echo://", "");
-           }
+      const { scan, Format, checkPermissions, requestPermissions } = await import("@tauri-apps/plugin-barcode-scanner");
+      
+      let permissions = await checkPermissions();
+      
+      // Request permission if not already granted
+      if (permissions !== 'granted') {
+        permissions = await requestPermissions();
+      }
 
-           if (keyBase64) {
-             const key = importKey(keyBase64);
-             await keys.saveKey(key);
-             showToastMsg("Device linked successfully!", "success");
-           } else {
-             showToastMsg("Invalid QR Code content", "error");
-           }
+      if (permissions !== 'granted') {
+        showToastMsg("Camera permission denied", "error");
+        return;
+      }
+
+      setIsScanning(true);
+      const result = await scan({ windowed: true, formats: [Format.QRCode] });
+      setIsScanning(false);
+      
+      if (!result || !result.content) {
+        showToastMsg("No QR code detected", "info");
+        return;
+      }
+      
+      if (result.content.startsWith("echo://")) {
+        const uri = result.content;
+        let keyBase64 = "";
+        
+        if (uri.startsWith("echo://connect?")) {
+          try {
+            const params = new URLSearchParams(uri.split("?")[1]);
+            keyBase64 = params.get("key") || "";
+          } catch (e) {
+            console.error("Failed to parse QR params", e);
+          }
         } else {
-           showToastMsg("Invalid QR Code", "error");
+          keyBase64 = uri.replace("echo://", "");
         }
+
+        if (keyBase64) {
+          const key = importKey(keyBase64);
+          await keys.saveKey(key);
+          showToastMsg("Device linked successfully!", "success");
+        } else {
+          showToastMsg("Invalid QR Code content", "error");
+        }
+      } else {
+        showToastMsg(`Not an Echo QR code`, "error");
+      }
+    } catch (e: any) {
+      console.error("QR Scanner error:", e);
+      setIsScanning(false);
+      if (e.message?.includes("permission")) {
+        showToastMsg("Camera permission denied", "error");
+      } else if (!e.message?.includes("cancel")) {
+        showToastMsg(`Scanner error: ${e.message || "Unknown error"}`, "error");
+      }
+    }
+  };
+
+  const handleCancelScan = async () => {
+    try {
+      const { cancel } = await import("@tauri-apps/plugin-barcode-scanner");
+      await cancel();
+      setIsScanning(false);
     } catch (e) {
-       console.error(e);
-       showToastMsg("Failed to scan QR", "error");
+      setIsScanning(false);
     }
   };
 
@@ -277,28 +401,31 @@ function App() {
 
   const getDeviceIcon = (name: string) => {
     const n = name.toLowerCase();
-    if (n.includes("phone") || n.includes("android") || n.includes("pixel") || n.includes("galaxy") || n.includes("ios") || n.includes("mobile")) return Icons.phone;
-    if (n.includes("mac") || n.includes("win") || n.includes("desktop") || n.includes("laptop") || n.includes("book")) return Icons.desktop;
+    if (n.includes("phone") || n.includes("android") || n.includes("ios") || n.includes("mobile")) return Icons.phone;
+    if (n.includes("mac") || n.includes("win") || n.includes("desktop") || n.includes("laptop")) return Icons.desktop;
     return Icons.devices;
   };
 
-  // Mobile Actions Bundle - Memoized (MUST be before any early returns!)
-  const mobileActions = useMemo(() => ({
+  const mobileActions = {
     onCopy: clipboard.copyToClipboard,
     onDelete: clipboard.deleteEntry,
-    onPin: clipboard.togglePin,
-    onClearHistory: () => setShowClearConfirm(true),
     onLogout: handleLogout,
     onScanQR: handleScanQR,
-    onEnterKey: () => setShowKeyInput(true),
-    onShowPairingCode: () => setShowQR(true),
+    onRefresh: handleRefresh,
     onShowDevices: () => setShowDevices(true),
-    onViewChange: setMobileView,
+    onShowPairingCode: () => setShowQR(true),
+    onEnterKey: () => setShowKeyInput(true),
+    onViewChange: (v: MobileView) => setMobileView(v),
     onSearchChange: setSearchQuery,
-    onSelectEntry: setSelectedEntry
-  }), [clipboard, handleScanQR]);
+    onFilterChange: setFilterType,
+    onSelectEntry: setSelectedEntry,
+    onPin: clipboard.togglePin,
+    onViewAllHistory: () => setMobileView("history"),
+    onClearHistory: () => {
+      setShowClearConfirm(true);
+    }
+  };
 
-  // Derived AppState - Memoized (MUST be before any early returns!)
   const derivedState: AppState = useMemo(() => ({
     history: clipboard.history,
     connected,
@@ -308,8 +435,8 @@ function App() {
     keyFingerprint: keys.fingerprint,
     toast,
     view,
-    isRefreshing: false,
-    filterType: "all",
+    isRefreshing,
+    filterType,
     devices,
     showQR,
     linkUri: keys.encryptionKey ? generateLinkUri(deviceId, keys.encryptionKey, config.wsUrl) : keys.linkUri,
@@ -322,94 +449,83 @@ function App() {
     showClearConfirm
   }), [clipboard.history, connected, searchQuery, selectedEntry, keys.encryptionKey, keys.fingerprint, toast, view, devices, showQR, keys.linkUri, showDevices, showKeyInput, manualKey, mobileView, isLoading, showClearConfirm, deviceId, email]);
 
-  // --- Render ---
+  const handleOnboardingComplete = () => {
+    localStorage.setItem("echo_onboarding_complete", "true");
+    setViewState("login");
+  };
 
-  if (view === "login") {
-    return (
-      <AuthLayout>
-        <Login onSuccess={handleAuthSuccess} onSwitchToRegister={() => setViewState("register")} />
-      </AuthLayout>
-    );
-  }
-
-  if (view === "register") {
-    return (
-      <AuthLayout>
-        <Register onSuccess={handleAuthSuccess} onSwitchToLogin={() => setViewState("login")} />
-      </AuthLayout>
-    );
-  }
-
+  if (view === "onboarding") return <Onboarding onComplete={handleOnboardingComplete} />;
+  if (view === "login") return <AuthLayout><Login onSuccess={handleAuthSuccess} onSwitchToRegister={() => setViewState("register")} /></AuthLayout>;
+  if (view === "register") return <AuthLayout><Register onSuccess={handleAuthSuccess} onSwitchToLogin={() => setViewState("login")} /></AuthLayout>;
 
   return (
     <>
-      {/* Mobile-only Layout */}
-      <div className="block md:hidden h-dvh w-full">
-        <MobileLayout 
-          state={derivedState} 
-          actions={mobileActions} 
-        />
+      {isScanning && <ScanningOverlay onCancel={handleCancelScan} />}
+      
+      <div className={`transition-opacity duration-300 ${isScanning ? 'opacity-0' : 'opacity-100'}`}>
+        <div className="block md:hidden h-dvh w-full">
+          <MobileLayout state={derivedState} actions={mobileActions} />
+        </div>
+
+        <div className="hidden md:flex flex-row h-screen w-full overflow-hidden bg-black text-white"> 
+          <Sidebar 
+            history={clipboard.history}
+            searchQuery={searchQuery}
+            filterType={filterType}
+            selectedEntryId={selectedEntry?.id || null}
+            onSearchChange={setSearchQuery}
+            onFilterChange={setFilterType}
+            onSelectEntry={setSelectedEntry}
+            onClearHistory={() => setShowClearConfirm(true)}
+            onCopyConstructor={clipboard.copyToClipboard}
+          />
+
+          <Main 
+             selectedEntry={selectedEntry}
+             connected={connected}
+             devices={devices}
+             historyCount={clipboard.history.length}
+             keyFingerprint={keys.fingerprint}
+             backgroundModeEnabled={backgroundModeEnabled}
+             onCopy={clipboard.copyToClipboard}
+             onPin={clipboard.togglePin}
+             onDelete={(id: string) => {
+               clipboard.deleteEntry(id);
+               if (selectedEntry?.id === id) setSelectedEntry(null);
+             }}
+             onLinkDevice={() => setShowQR(true)}
+             onEnterKey={() => setShowKeyInput(true)}
+             onManageDevices={() => setShowDevices(true)}
+             onToggleBackgroundMode={async () => {
+               const newValue = !backgroundModeEnabled;
+               setBackgroundModeEnabled(newValue);
+               try {
+                 const { invoke } = await import('@tauri-apps/api/core');
+                 await invoke('set_background_mode', { enabled: newValue });
+               } catch (e) {
+                 console.error('Failed to set background mode:', e);
+               }
+             }}
+             onLogout={handleLogout}
+             onBack={() => setSelectedEntry(null)}
+          />
+        </div>
       </div>
 
-      {/* Desktop-only Layout */}
-      <div className="hidden md:flex flex-row h-screen w-full overflow-hidden bg-black text-white"> 
-        <Sidebar 
-          history={clipboard.history}
-          searchQuery={searchQuery}
-          filterType={filterType}
-          selectedEntryId={selectedEntry?.id || null}
-          onSearchChange={setSearchQuery}
-          onFilterChange={setFilterType}
-          onSelectEntry={setSelectedEntry}
-          onClearHistory={() => setShowClearConfirm(true)}
-          onCopyConstructor={clipboard.copyToClipboard}
-        />
-
-        <Main 
-           selectedEntry={selectedEntry}
-           connected={connected}
-           devices={devices}
-           historyCount={clipboard.history.length}
-           keyFingerprint={keys.fingerprint}
-           onCopy={clipboard.copyToClipboard}
-           onPin={clipboard.togglePin}
-           onDelete={(id: string) => {
-             clipboard.deleteEntry(id);
-             if (selectedEntry?.id === id) setSelectedEntry(null);
-           }}
-           onLinkDevice={() => setShowQR(true)}
-           onEnterKey={() => setShowKeyInput(true)}
-           onManageDevices={() => setShowDevices(true)}
-           onLogout={mobileActions.onLogout}
-           onBack={() => setSelectedEntry(null)}
-        />
-      </div>
-
-      {/* Modals - Kept at root level */}
       <Modal
         isOpen={showKeyInput}
         onClose={() => setShowKeyInput(false)}
         title="Enter Sync Key"
         description="Paste the encryption key from your other device."
         footer={
-          <>
-            <button 
-              className="px-4 py-2 text-sm font-bold text-zinc-500 hover:text-white transition-colors" 
-              onClick={() => setShowKeyInput(false)}
-            >
-              Cancel
-            </button>
-            <button 
-              className="px-6 py-2 bg-purple-500 text-white rounded-xl font-bold text-sm hover:bg-purple-400 active:scale-95 transition-all shadow-lg shadow-purple-500/10" 
-              onClick={handleManualKeySync}
-            >
-              Save Key
-            </button>
-          </>
+          <div className="flex gap-3 w-full">
+            <button className="flex-1 py-3 text-zinc-500 font-bold text-sm" onClick={() => setShowKeyInput(false)}>Cancel</button>
+            <button className="flex-1 py-3 bg-purple-500 text-white rounded-2xl font-bold text-sm" onClick={handleManualKeySync}>Save Key</button>
+          </div>
         }
       >
         <input
-          className="w-full p-4 bg-zinc-800/50 rounded-2xl border border-white/5 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-purple-500/20 transition-all font-mono text-sm"
+          className="w-full p-4 bg-zinc-800 rounded-2xl border border-white/5 text-white font-mono text-sm focus:ring-2 focus:ring-purple-500/20 outline-none"
           placeholder="Paste key here..."
           value={manualKey}
           onChange={(e) => setManualKey(e.target.value)}
@@ -417,43 +533,29 @@ function App() {
       </Modal>
 
       <Modal
-        isOpen={showQR && !!keys.linkUri}
+        isOpen={showQR && !!derivedState.linkUri}
         onClose={() => setShowQR(false)}
         title="Link a Device"
         description="Scan this QR code with the Echo mobile app"
-        footer={
-          <button 
-            className="w-full py-3 bg-purple-500 text-white rounded-2xl font-bold text-sm hover:bg-purple-400 active:scale-95 transition-all" 
-            onClick={() => setShowQR(false)}
-          >
-            Done
-          </button>
-        }
+        footer={<button className="w-full py-3 bg-purple-500 text-white rounded-2xl font-bold text-sm" onClick={() => setShowQR(false)}>Done</button>}
       >
         <div className="flex flex-col items-center gap-6">
-          <div className="p-4 bg-white rounded-4xl shadow-2xl">
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(keys.linkUri || "")}`}
-              alt="QR Code"
-              className="rounded-lg"
-              width={200}
-              height={200}
-            />
+          <div className="p-4 bg-white rounded-4xl">
+            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(derivedState.linkUri || "")}`} alt="QR" width={200} height={200} />
           </div>
-          <div className="w-full bg-zinc-800/50 p-4 rounded-2xl border border-white/5 flex items-center gap-3">
-            <code className="text-xs text-zinc-400 truncate flex-1 block font-mono">
-              {keys.encryptionKey ? exportKey(keys.encryptionKey) : ""}
-            </code>
+          <div className="w-full bg-zinc-800 p-3 rounded-2xl border border-white/5 flex items-center gap-2">
+            <code className="text-xs text-zinc-400 truncate flex-1 font-mono">{keys.encryptionKey ? exportKey(keys.encryptionKey) : ""}</code>
             <button 
-              className="p-2.5 bg-zinc-700/50 rounded-xl hover:bg-zinc-600 text-white transition-colors"
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors flex items-center gap-2 shrink-0" 
               onClick={() => {
                 if (keys.encryptionKey) {
-                   clipboard.copyToClipboard(exportKey(keys.encryptionKey));
-                   showToastMsg("Key copied!");
+                  clipboard.copyToClipboard(exportKey(keys.encryptionKey));
+                  showToastMsg("Encryption key copied!", "success");
                 }
               }}
             >
-              <div className="w-4 h-4">{Icons.copy}</div>
+              <span className="w-4 h-4">{Icons.copy}</span>
+              Copy
             </button>
           </div>
         </div>
@@ -464,49 +566,29 @@ function App() {
         onClose={() => setShowDevices(false)}
         title="Manage Devices"
         description="Linked devices currently syncing with your clipboard."
-        footer={
-          <button 
-            className="w-full py-3 bg-zinc-800 text-white rounded-2xl font-bold text-sm hover:bg-zinc-700 active:scale-95 transition-all border border-white/5" 
-            onClick={() => setShowDevices(false)}
-          >
-            Done
-          </button>
-        }
+        footer={<button className="w-full py-3 bg-zinc-800 text-white rounded-2xl font-bold text-sm" onClick={() => setShowDevices(false)}>Done</button>}
       >
         <div className="flex flex-col gap-3">
-          {devices.map((device: LinkedDevice) => (
-            <div key={device.id} className="flex items-center justify-between p-4 bg-white/3 rounded-2xl border border-white/5 group hover:bg-white/5 transition-colors">
+          {devices.map(device => (
+            <div key={device.id} className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5">
               <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${device.isCurrentDevice ? 'bg-purple-500/20 text-purple-400' : 'bg-zinc-800 text-zinc-500'}`}>
-                  <div className="w-5 h-5">{getDeviceIcon(device.name)}</div>
-                </div>
+                <div className="w-10 h-10 rounded-xl bg-purple-500/10 text-purple-400 flex items-center justify-center">{getDeviceIcon(device.name)}</div>
                 <div>
-                  <p className="text-sm font-bold text-white leading-none">{device.name}</p>
-                  <div className="flex items-center gap-2 mt-2">
-                     <span className={`w-1.5 h-1.5 rounded-full ${device.isCurrentDevice ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.4)]' : 'bg-zinc-600'}`} />
-                     <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">
-                       {device.isCurrentDevice ? "This Device" : `Last seen ${formatTime(device.lastSeen)}`}
-                     </p>
+                  <p className="text-sm font-bold text-white">{device.name}</p>
+                  <div className="flex items-center gap-1.5">
+                    <div className={`w-1.5 h-1.5 rounded-full ${device.isCurrentDevice || true ? 'bg-green-500' : 'bg-zinc-600'}`} />
+                    <p className="text-[10px] text-zinc-500 uppercase font-medium">
+                      {device.isCurrentDevice ? "This Device" : "Online"}
+                    </p>
                   </div>
                 </div>
               </div>
-              {!device.isCurrentDevice && (
-                <button 
-                  className="p-2.5 rounded-xl text-zinc-600 hover:text-red-400 hover:bg-red-400/10 transition-all active:scale-95"
-                  onClick={() => removeDevice(device.id)}
-                  title="Unlink device"
-                >
-                  <div className="w-4 h-4">{Icons.trash}</div>
-                </button>
-              )}
+              {!device.isCurrentDevice && <button onClick={() => removeDevice(device.id)} className="text-zinc-600">{Icons.trash}</button>}
             </div>
           ))}
         </div>
       </Modal>
 
-      {/* Other Modals (Devices, Clear Confirm) omitted/simplified for this refactor to save space, 
-          but in production should be present. I will include ClearConfirm. */}
-      
       <Modal
          isOpen={showClearConfirm}
          onClose={() => setShowClearConfirm(false)}
@@ -514,32 +596,15 @@ function App() {
          description="This action cannot be undone."
          footer={
            <div className="flex gap-3 w-full">
-             <button 
-                className="flex-1 py-3 text-zinc-500 font-bold text-sm hover:text-white transition-colors" 
-                onClick={() => setShowClearConfirm(false)}
-             >
-                Cancel
-             </button>
-             <button 
-                className="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold text-sm hover:bg-red-400 active:scale-95 transition-all shadow-lg shadow-red-500/10" 
-                onClick={() => {
-                  clipboard.clearHistory();
-                  setShowClearConfirm(false);
-                }}
-             >
-                Clear All
-             </button>
+             <button className="flex-1 py-3 text-zinc-500 font-bold text-sm" onClick={() => setShowClearConfirm(false)}>Cancel</button>
+             <button className="flex-1 py-3 bg-red-500 text-white rounded-2xl font-bold text-sm" onClick={() => { clipboard.clearHistory(); setShowClearConfirm(false); }}>Clear All</button>
            </div>
          }
       >
-        <p className="text-sm text-zinc-400 leading-relaxed text-center px-4">
-          Are you sure you want to permanently delete all items from your clipboard history?
-        </p>
+        <p className="text-sm text-zinc-400 text-center">Delete all items from your clipboard history?</p>
       </Modal>
 
-      {toast && (
-        <Toast message={toast.message} type={toast.type} />
-      )}
+      {toast && <Toast message={toast.message} type={toast.type} />}
     </>
   );
 }

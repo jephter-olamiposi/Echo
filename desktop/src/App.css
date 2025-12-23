@@ -22,6 +22,14 @@ body,
     @apply bg-black text-white antialiased overflow-hidden selection:bg-purple-500/30;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   }
+
+  /* Safe Area Utilities */
+  .pt-safe {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 /* Big Tech: Dynamic Mesh Background */
@@ -36,6 +44,12 @@ body,
     radial-gradient(at 0% 100%, hsla(220, 100%, 50%, 0.1) 0px, transparent 50%);
   filter: blur(80px);
   background-color: #000;
+}
+
+body.scan-active,
+body.scan-active .mesh-background {
+  background-color: transparent !important;
+  background: transparent !important;
 }
 
 .mesh-orb {

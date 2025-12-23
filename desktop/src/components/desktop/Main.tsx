@@ -13,12 +13,14 @@ interface DesktopMainProps {
   devices: LinkedDevice[];
   historyCount: number;
   keyFingerprint: string | null;
+  backgroundModeEnabled: boolean;
   onCopy: (text: string) => void;
   onPin: (id: string) => void;
   onDelete: (id: string) => void;
   onLinkDevice: () => void;
   onEnterKey: () => void;
   onManageDevices: () => void;
+  onToggleBackgroundMode: () => void;
   onBack: () => void;
   onLogout: () => void;
 }
@@ -29,12 +31,14 @@ export const Main: React.FC<DesktopMainProps> = ({
   devices,
   historyCount,
   keyFingerprint,
+  backgroundModeEnabled,
   onCopy,
   onPin,
   onDelete,
   onLinkDevice,
   onEnterKey,
   onManageDevices,
+  onToggleBackgroundMode,
   onBack,
   onLogout
 }) => {
@@ -158,7 +162,7 @@ export const Main: React.FC<DesktopMainProps> = ({
             <div className="flex items-center gap-4 text-xs font-medium text-zinc-500 overflow-hidden whitespace-nowrap">
               <span className="hidden sm:inline">{historyCount} items</span>
               <span className="hidden sm:inline">{devices.length} device{devices.length !== 1 ? 's' : ''}</span>
-              <span className="font-mono bg-white/5 px-2 py-1 rounded text-zinc-400 truncate max-w-[120px] md:max-w-none">
+              <span className="font-mono bg-white/5 px-2 py-1 rounded text-zinc-400 truncate max-w-30 md:max-w-none">
                 Key: {keyFingerprint ? keyFingerprint.substring(0, 8) : '—'}
               </span>
             </div>
@@ -183,7 +187,7 @@ export const Main: React.FC<DesktopMainProps> = ({
         {/* Main Center Content */}
         <div className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 relative overflow-y-auto custom-scrollbar">
           {/* Background Glow */}
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] md:w-[500px] md:h-[500px] bg-purple-500/5 blur-[80px] md:blur-[120px] rounded-full pointer-events-none" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-75 h-75 md:w-125 md:h-125 bg-purple-500/5 blur-[80px] md:blur-[120px] rounded-full pointer-events-none" />
 
           <div className="relative z-10 max-w-2xl w-full flex flex-col items-center">
             {/* Hero Icon */}
@@ -245,6 +249,26 @@ export const Main: React.FC<DesktopMainProps> = ({
                   <h3 className="text-zinc-500 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-0.5">Devices</h3>
                   <p className="font-semibold text-sm md:text-base text-white">{devices.length} linked</p>
                 </div>
+              </div>
+            </div>
+
+            {/* Background Mode Toggle */}
+            <div 
+              className="w-full bg-[#25262b] rounded-2xl border border-white/5 p-4 md:p-5 mb-6 flex items-center justify-between cursor-pointer hover:bg-[#2c2d33] transition-colors group"
+              onClick={onToggleBackgroundMode}
+            >
+              <div className="flex items-center gap-4">
+                <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl flex items-center justify-center shrink-0 transition-colors ${backgroundModeEnabled ? 'bg-indigo-500/20 text-indigo-400' : 'bg-zinc-700/50 text-zinc-400'}`}>
+                  <div className="w-5 h-5 md:w-6 md:h-6">{Icons.sync}</div>
+                </div>
+                <div>
+                  <h3 className="text-zinc-300 text-sm md:text-base font-semibold mb-0.5">Run in Background</h3>
+                  <p className="text-zinc-500 text-xs md:text-sm">Keep syncing when window is closed</p>
+                </div>
+              </div>
+              {/* Toggle Switch */}
+              <div className={`w-12 h-7 rounded-full p-1 transition-colors ${backgroundModeEnabled ? 'bg-indigo-500' : 'bg-zinc-700'}`}>
+                <div className={`w-5 h-5 rounded-full bg-white shadow-md transition-transform ${backgroundModeEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
               </div>
             </div>
 

@@ -4,7 +4,7 @@ import { Dashboard } from './Dashboard';
 import { History } from './History';
 import { Settings } from './Settings';
 import { DetailModal } from './DetailModal';
-import { AppState, MobileView, ClipboardEntry } from '../../types';
+import { AppState, MobileView, ClipboardEntry, ContentType } from '../../types';
 
 interface MobileActions {
   onCopy: (text: string) => void;
@@ -17,8 +17,10 @@ interface MobileActions {
   onShowDevices: () => void;
   onViewChange: (view: MobileView) => void;
   onSearchChange: (query: string) => void;
+  onFilterChange: (type: ContentType | "all") => void;
   onSelectEntry: (entry: ClipboardEntry | null) => void;
   onPin: (id: string) => void;
+  onRefresh: () => Promise<void>;
 }
 
 interface MobileLayoutProps {
@@ -56,6 +58,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ state, actions }) =>
              onEnterKey={actions.onEnterKey}
              onShowPairingCode={actions.onShowPairingCode}
              onDelete={actions.onDelete}
+             onRefresh={actions.onRefresh}
+             isRefreshing={state.isRefreshing}
            />
          </div>
 
@@ -65,12 +69,15 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ state, actions }) =>
              history={state.history}
              isRefreshing={state.isRefreshing}
              searchQuery={state.searchQuery}
+             filterType={state.filterType}
              onSearchChange={actions.onSearchChange}
+             onFilterChange={actions.onFilterChange}
              onClearHistory={actions.onClearHistory}
              onBack={() => actions.onViewChange('dashboard')}
              onItemClick={actions.onSelectEntry}
              onCopy={actions.onCopy}
              deviceCount={state.devices.length}
+             onRefresh={actions.onRefresh}
            />
          </div>
 

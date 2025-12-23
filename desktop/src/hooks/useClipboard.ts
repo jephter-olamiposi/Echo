@@ -58,29 +58,41 @@ export function useClipboard() {
 
       // Hardened check for duplicates (ignore whitespace diffs and line endings)
       const normalize = (s: string) => s.replace(/\r\n/g, "\n").trim();
+      const normalizedText = normalize(text);
+
+      // Immediate check against last sent to avoid redundant processing
       if (
         text === lastSentRef.current ||
-        normalize(text) === normalize(lastSentRef.current)
-      )
-        return;
+        normalizedText === normalize(lastSentRef.current)
+      ) {
+        return false;
+      }
 
-      const contentType = detectContentType(text);
-      const newEntry: ClipboardEntry = {
-        id: crypto.randomUUID(),
-        content: text,
-        timestamp: Date.now(),
-        source,
-        deviceName,
-        contentType,
-      };
-
-      lastSentRef.current = text;
+      let wasAdded = true;
       setHistory((prev) => {
+        // More robust check: is it already in history?
+        if (prev.some((entry) => normalize(entry.content) === normalizedText)) {
+          wasAdded = false;
+          return prev;
+        }
+
+        const contentType = detectContentType(text);
+        const newEntry: ClipboardEntry = {
+          id: crypto.randomUUID(),
+          content: text,
+          timestamp: Date.now(),
+          source,
+          deviceName,
+          contentType,
+        };
+
+        lastSentRef.current = text;
         const updated = [newEntry, ...prev].slice(0, 50);
         saveToStore(updated);
         return updated;
       });
-      return newEntry;
+
+      return wasAdded;
     },
     []
   );
@@ -98,6 +110,17 @@ export function useClipboard() {
     } catch (err) {
       console.error("Failed to copy:", err);
       return false;
+    }
+  }, []);
+
+  const readFromClipboard = useCallback(async () => {
+    try {
+      const { readText } = await import("@tauri-apps/plugin-clipboard-manager");
+      const text = await readText();
+      return text;
+    } catch (err) {
+      console.error("Failed to read clipboard:", err);
+      return null;
     }
   }, []);
 
@@ -134,5 +157,6 @@ export function useClipboard() {
     deleteEntry,
     togglePin,
     clearHistory,
+    readFromClipboard,
   };
 }

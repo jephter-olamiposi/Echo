@@ -67,6 +67,7 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
           <div className="flex items-center gap-2 mr-4">
             <button 
               onClick={async () => {
+                // Just trigger close - Rust will hide if background mode ON, quit if OFF
                 const { getCurrentWindow } = await import('@tauri-apps/api/window');
                 getCurrentWindow().close();
               }}

@@ -10,12 +10,19 @@ declare global {
   }
 }
 
-export function usePushNotifications(
-  token: string | null,
-  deviceId: string,
-  isConnected: boolean,
-  onSyncTrigger?: () => void
-) {
+interface UsePushNotificationsOptions {
+  token: string | null;
+  deviceId: string;
+  isConnected?: boolean;
+  onSyncRequest?: () => void;
+}
+
+export function usePushNotifications({
+  token,
+  deviceId,
+  isConnected,
+  onSyncRequest,
+}: UsePushNotificationsOptions) {
   const hasRegistered = useRef(false);
 
   const registerPushToken = useCallback(
@@ -77,19 +84,19 @@ export function usePushNotifications(
   }, [token, isConnected, registerPushToken]);
 
   useEffect(() => {
-    if (!onSyncTrigger) return;
+    if (!onSyncRequest) return;
 
     const checkPushOpen = () => {
       const bridge = window.EchoBridge;
       if (bridge?.wasOpenedFromPush()) {
-        onSyncTrigger();
+        onSyncRequest();
       }
     };
 
     checkPushOpen();
     const interval = setInterval(checkPushOpen, 2000);
     return () => clearInterval(interval);
-  }, [onSyncTrigger]);
+  }, [onSyncRequest]);
 
   return { registerPushToken };
 }

@@ -34,6 +34,11 @@ class EchoFirebaseService : FirebaseMessagingService() {
     override fun onNewToken(token: String) {
         super.onNewToken(token)
         Log.d(TAG, "FCM Token refreshed: ${token.take(20)}...")
+        
+        // Persist token immediately to SharedPreferences
+        val prefs = getSharedPreferences("EchoPrefs", Context.MODE_PRIVATE)
+        prefs.edit().putString("fcm_token", token).apply()
+        
         fcmToken = token
         onTokenReceived?.invoke(token)
     }

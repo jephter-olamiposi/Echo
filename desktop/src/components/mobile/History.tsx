@@ -10,6 +10,7 @@ import { ClipboardEntry } from '../../types';
 import { EmptyState } from '../shared/EmptyState';
 import { Skeleton } from '../shared/Skeleton';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
+import { haptic } from '../../utils/haptics';
 
 
 
@@ -18,12 +19,15 @@ interface MobileHistoryProps {
   isLoading?: boolean;
   isRefreshing: boolean;
   searchQuery: string;
+  filterType: "all" | "text" | "code" | "url" | "other";
   onSearchChange: (query: string) => void;
+  onFilterChange: (type: any) => void;
   onClearHistory: () => void;
   onBack: () => void;
   onItemClick: (entry: ClipboardEntry) => void;
-  onCopy: (text: string) => void; // Optional if item click handles copy
+  onCopy: (text: string) => void; 
   deviceCount: number;
+  onRefresh: () => Promise<void>;
 }
 
 export const History: React.FC<MobileHistoryProps> = ({
@@ -31,39 +35,36 @@ export const History: React.FC<MobileHistoryProps> = ({
   isLoading,
   isRefreshing,
   searchQuery,
+  filterType,
   onSearchChange,
+  onFilterChange,
   onClearHistory,
   onBack,
   onItemClick,
-  deviceCount
+  onRefresh
 }) => {
-  // Pull to refresh integration
-  const refreshHistory = async () => {
-    // Add artificial delay for feel if needed, or just let the refresh prop handle it
-    // In this props structure, we might need a callback to trigger reload
-    // For now we simulate
-    await new Promise(resolve => setTimeout(resolve, 1500));
-  };
+  const { containerRef, pullHeight, isLoading: isHookLoading } = usePullToRefresh(onRefresh);
+  const activeRefreshing = isRefreshing || isHookLoading;
 
-  const { containerRef, pullHeight, isLoading: isPullLoading } = usePullToRefresh(refreshHistory);
-
-  const filteredHistory = history.filter(item => 
-    item.content.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredHistory = history.filter(item => {
+    const matchesSearch = item.content.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFilter = filterType === 'all' || item.contentType === filterType;
+    return matchesSearch && matchesFilter;
+  });
 
   return (
     <div className="flex flex-col h-full bg-black w-full pb-20 md:pb-0">
-      {/* Fixed Header Section */}
-      <div className="shrink-0 z-20 bg-black/95 border-b border-white/5 relative pt-12">
+      {/* Fixed Sticky Header Area */}
+      <div className="shrink-0 z-30 bg-black/80 backdrop-blur-xl border-b border-white/5 sticky top-0">
         <MobileHeader 
           title="History"
           showBack={true}
           onBack={onBack}
-          className="!sticky !top-0 !bg-transparent !border-none" 
+          className="bg-transparent! border-none!" 
           rightAction={
             history.length > 0 && (
               <button
-                className="p-2 rounded-full text-red-500/80 hover:bg-red-500/10 active:scale-95 transition-all"
+                className="p-2 rounded-full text-red-500/80 hover:bg-red-500/10 active:scale-90 transition-all"
                 onClick={onClearHistory}
                 title="Clear history"
               >
@@ -73,27 +74,51 @@ export const History: React.FC<MobileHistoryProps> = ({
           }
         />
         
-        {/* Search Bar */}
-        <div className="px-4 pb-3 pt-8">
-          <div className="relative flex items-center bg-zinc-900/80 rounded-xl h-10 border border-white/5 overflow-hidden focus-within:ring-1 focus-within:ring-purple-500/50 transition-all">
-            <div className="absolute left-3 text-zinc-500 w-4 h-4 flex items-center justify-center">
+        {/* Search & Filter Controls Container */}
+        <div className="px-4 space-y-4 pb-4">
+          {/* Search Bar */}
+          <div className="relative flex items-center bg-zinc-900/50 backdrop-blur-md rounded-2xl h-11 border border-white/10 overflow-hidden focus-within:ring-2 focus-within:ring-purple-500/30 transition-all group">
+            <div className="absolute left-4 text-zinc-500 w-4 h-4 flex items-center justify-center group-focus-within:text-purple-400 transition-colors">
               {Icons.search}
             </div>
             <input 
               type="text" 
-              className="w-full h-full bg-transparent pl-10 pr-10 text-sm text-white placeholder-zinc-500 focus:outline-none"
-              placeholder="Search history..." 
+              className="w-full h-full bg-transparent pl-11 pr-11 text-[15px] text-white placeholder-zinc-500 focus:outline-none"
+              placeholder="Search items..." 
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
             />
             {searchQuery && (
               <button 
-                className="absolute right-2 p-1 text-zinc-500 hover:text-white rounded-full bg-white/5"
+                className="absolute right-3 p-1.5 text-zinc-500 hover:text-white rounded-full bg-white/5 active:scale-90 transition-all"
                 onClick={() => onSearchChange("")}
               >
-                <div className="w-3 h-3">{Icons.close}</div>
+                <div className="w-3.5 h-3.5">{Icons.close}</div>
               </button>
             )}
+          </div>
+
+          {/* Filter Row */}
+          <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth -mx-4 px-4">
+            {(["all", "text", "code", "url"] as const).map((type) => {
+              const isActive = filterType === type;
+              return (
+                <button
+                  key={type}
+                  onClick={() => {
+                    haptic.selection();
+                    onFilterChange(type);
+                  }}
+                  className={`px-5 py-2 rounded-xl text-[12px] font-bold uppercase tracking-wider whitespace-nowrap transition-all active:scale-95 border ${
+                    isActive 
+                      ? "bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-600/20" 
+                      : "bg-zinc-900/50 border-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
+                  }`}
+                >
+                  {type === "all" ? "All Items" : type === "url" ? "Links" : type}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>
@@ -107,66 +132,66 @@ export const History: React.FC<MobileHistoryProps> = ({
           style={{ height: `${pullHeight}px` }}
         >
           <div 
-            className="flex items-center justify-center w-8 h-8 rounded-full bg-zinc-800 border border-white/10 shadow-xl mt-4 transition-transform duration-200"
+            className={`flex items-center justify-center w-9 h-9 rounded-full bg-zinc-800 border border-white/10 shadow-2xl mt-8 transition-all duration-300 ${activeRefreshing ? 'animate-pulse ring-4 ring-purple-500/20' : ''}`}
             style={{ 
-              opacity: Math.min(pullHeight / 40, 1),
-              transform: `rotate(${pullHeight * 5}deg) scale(${Math.min(pullHeight / 60, 1)})`
+              opacity: Math.min(pullHeight / 50, 1),
+              transform: activeRefreshing 
+                ? 'scale(1.1)' 
+                : `translateY(${Math.min(pullHeight * 0.2, 20)}px) rotate(${pullHeight * 3}deg) scale(${Math.min(pullHeight / 60, 1)})`,
             }}
           >
-            {isPullLoading || isRefreshing ? (
-               <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin"></div>
-            ) : (
-               <div className="w-4 h-4 text-purple-500">{Icons.sync}</div>
-            )}
+            <div className={`w-5 h-5 text-purple-500 ${activeRefreshing ? 'animate-spin' : ''}`}>
+              {Icons.sync}
+            </div>
           </div>
         </div>
 
-        <div className="p-4 space-y-3 min-h-[calc(100%+1px)]">
+        <div className="p-4 space-y-4 min-h-[calc(100%+1px)]">
           {isLoading ? (
             <div className="flex flex-col gap-3">
                {[1, 2, 3, 4, 5].map((i) => (
                   <div key={i} className="flex items-center gap-3 p-4 bg-zinc-900/40 rounded-2xl border border-white/5">
                     <Skeleton variant="circular" className="w-10 h-10 shrink-0" />
                     <div className="flex-1 min-w-0 flex flex-col gap-2">
-                      <Skeleton variant="text" className="w-3/4 h-4" />
-                      <Skeleton variant="text" className="w-1/2 h-3" />
+                       <Skeleton variant="text" className="w-3/4 h-4" />
+                       <Skeleton variant="text" className="w-1/2 h-3" />
                     </div>
                   </div>
                ))}
             </div>
           ) : filteredHistory.length > 0 ? (
-            <div className="flex flex-col bg-zinc-900/40 rounded-2xl overflow-hidden border border-white/5 divide-y divide-white/5">
+            <div className="flex flex-col gap-3">
               {filteredHistory.map((entry) => (
                 <button 
                   key={entry.id}
-                  className="flex items-center gap-3 p-4 w-full text-left active:bg-white/5 transition-colors group"
+                  className="flex items-center gap-4 p-4 w-full bg-zinc-900/30 rounded-2xl border border-white/5 text-left active:bg-white/10 active:scale-[0.98] transition-all group"
                   onClick={() => onItemClick(entry)}
                 >
-                  <div className="w-10 h-10 rounded-full bg-zinc-800/80 flex items-center justify-center text-zinc-400 shrink-0 relative group-hover:text-white transition-colors">
+                  <div className="w-11 h-11 rounded-full bg-zinc-800/80 flex items-center justify-center text-zinc-400 shrink-0 relative group-hover:text-purple-400 transition-colors">
                     <div className="w-5 h-5">{getContentTypeIcon(entry.contentType)}</div>
                     {entry.pinned && (
-                      <div className="absolute -top-1 -right-1 w-4 h-4 bg-purple-500 rounded-full flex items-center justify-center text-[8px] text-white border-2 border-zinc-900 shadow-sm">
+                      <div className="absolute -top-0.5 -right-0.5 w-4.5 h-4.5 bg-purple-500 rounded-full flex items-center justify-center text-[8px] text-white border-2 border-zinc-900 shadow-sm">
                         <div className="w-2 h-2">{Icons.pin}</div>
                       </div>
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <span className="block text-sm font-medium text-white/90 truncate mb-0.5 group-hover:text-purple-400 transition-colors">
-                      {truncate(entry.content, 60)}
-                    </span>
-                    <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                      <span className="font-medium text-zinc-400">{formatTime(entry.timestamp)}</span>
-                      {deviceCount > 1 && (
-                        <>
-                          <span className="text-zinc-700">•</span>
-                          <span className="truncate max-w-30">
-                            {entry.source === 'local' ? 'This Device' : (entry.deviceName || 'Remote Device')}
-                          </span>
-                        </>
-                      )}
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-[14px] font-semibold text-white/90 truncate group-active:text-purple-400 transition-colors">
+                        {truncate(entry.content, 60)}
+                      </span>
+                      <span className="text-[10px] font-medium text-zinc-500 shrink-0 ml-2">
+                        {formatTime(entry.timestamp)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className={`w-1 h-1 rounded-full ${entry.source === 'local' ? 'bg-zinc-600' : 'bg-purple-500'}`} />
+                      <span className="text-[11px] font-medium text-zinc-500 truncate">
+                        {entry.source === 'local' ? 'This Device' : (entry.deviceName || 'Remote Device')}
+                      </span>
                     </div>
                   </div>
-                  <div className="text-zinc-700 group-hover:text-zinc-500 transition-colors">
+                  <div className="text-zinc-700 group-active:text-zinc-400 transition-colors">
                     <div className="w-4 h-4">{Icons.chevron}</div>
                   </div>
                 </button>
@@ -176,7 +201,7 @@ export const History: React.FC<MobileHistoryProps> = ({
             <div className="pt-10">
               <EmptyState 
                 title={searchQuery ? "No matches found" : "No History Yet"}
-                description={searchQuery ? "Try adjusting your search terms." : "Copy something on your other devices to see it appear here instantly."}
+                description={searchQuery ? "Try adjusting your search terms or filters." : "Copy something on your other devices to see it appear here instantly."}
               />
             </div>
           )}

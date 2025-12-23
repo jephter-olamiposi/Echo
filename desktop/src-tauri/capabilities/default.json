@@ -15,13 +15,25 @@
         { "url": "https://28625d8341d0.ngrok-free.app/*" },
              
         { "url": "https://api.qrserver.com/*" },
-        { "url": "https://echo-production-784d.up.railway.app/*" }
+        { "url": "https://echo-production-784d.up.railway.app/*" },
+        { "url": "wss://echo-production-784d.up.railway.app/*" }
       ]
     },
     "haptics:default",
     "os:default",
     "barcode-scanner:default",
+    "barcode-scanner:allow-scan",
     "clipboard-manager:allow-read-text",
-    "clipboard-manager:allow-write-text"
+    "clipboard-manager:allow-write-text",
+    "core:app:allow-app-hide",
+    "core:app:allow-app-show",
+    "core:window:allow-hide",
+    "core:window:allow-show",
+    "core:window:allow-close",
+    "core:window:allow-minimize",
+    "core:window:allow-maximize",
+    "core:window:allow-unmaximize",
+    "core:window:allow-is-maximized",
+    "core:window:allow-set-focus"
   ]
 }

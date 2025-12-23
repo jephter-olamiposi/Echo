@@ -1,8 +1,4 @@
-use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use ring::{
-    rand::SystemRandom,
-    signature::{RsaKeyPair, RSA_PKCS1_SHA256},
-};
+use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
@@ -74,7 +70,11 @@ impl PushClient {
             exp: now + 3600,
         };
 
-        let jwt = self.sign_jwt(&claims)?;
+        // Sign JWT using jsonwebtoken crate
+        // Fix: Use the private key from the service account (PEM format)
+        let key = EncodingKey::from_rsa_pem(self.service_account.private_key.as_bytes())?;
+        let jwt = encode(&Header::new(Algorithm::RS256), &claims, &key)?;
+
         let resp: TokenResponse = self
             .client
             .post(&self.service_account.token_uri)
@@ -92,27 +92,6 @@ impl PushClient {
             Instant::now() + Duration::from_secs(resp.expires_in),
         ));
         Ok(resp.access_token)
-    }
-
-    fn sign_jwt(
-        &self,
-        claims: &Claims,
-    ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        let header = URL_SAFE_NO_PAD.encode(r#"{"alg":"RS256","typ":"JWT"}"#);
-        let payload = URL_SAFE_NO_PAD.encode(serde_json::to_string(claims)?);
-        let msg = format!("{}.{}", header, payload);
-
-        let key = pem::parse(self.service_account.private_key.replace("\\n", "\n"))?;
-        let pair = RsaKeyPair::from_pkcs8(key.contents())?;
-        let mut sig = vec![0u8; pair.public().modulus_len()];
-        pair.sign(
-            &RSA_PKCS1_SHA256,
-            &SystemRandom::new(),
-            msg.as_bytes(),
-            &mut sig,
-        )?;
-
-        Ok(format!("{}.{}", msg, URL_SAFE_NO_PAD.encode(&sig)))
     }
 
     pub async fn send(
