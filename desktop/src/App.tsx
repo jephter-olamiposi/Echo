@@ -94,7 +94,8 @@ function App() {
     if (!isHistory) {
       clipboard.copyToClipboard(entry.content);
     }
-  }, [clipboard]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleDeviceLeave = useCallback((id: string) => {
     setDevices(prev => prev.filter(d => d.id !== id || d.isCurrentDevice));
@@ -115,6 +116,7 @@ function App() {
   usePushNotifications({
     token,
     deviceId,
+    isConnected: connected,
     onSyncRequest: () => ws.connect()
   });
 
@@ -223,15 +225,17 @@ function App() {
       if (unlistenResume) unlistenResume();
       if (unlistenClipboard) unlistenClipboard();
     };
-  }, [keys.encryptionKey, ws, clipboard, deviceName]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keys.encryptionKey, deviceName]);
 
   useEffect(() => {
-    if (keys.encryptionKey) {
+    if (keys.encryptionKey && token) {
       ws.connect();
     } else {
       ws.disconnect();
     }
-  }, [keys.encryptionKey]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keys.encryptionKey, token]);
 
   // Mobile clipboard polling (arboard doesn't work on mobile)
   useEffect(() => {

@@ -297,12 +297,14 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     }
   }, []);
 
-  // Cleanup on unmount & Setup Network Listeners
+  // Setup Network Listeners (separate from unmount cleanup)
   useEffect(() => {
     const handleOnline = () => {
       console.log("[ws] Network online, attempting reconnect");
-      if (!intentionalCloseRef.current) {
-        // Reset retries for a fresh attempt
+      if (
+        !intentionalCloseRef.current &&
+        wsRef.current?.readyState !== WebSocket.OPEN
+      ) {
         retriesRef.current = 0;
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current);
@@ -314,10 +316,8 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
     const handleOffline = () => {
       console.log("[ws] Network offline");
-      if (wsRef.current) {
-        wsRef.current.close();
-      }
       updateConnectionState(false);
+      // Don't close the socket - let it timeout naturally or reconnect
     };
 
     window.addEventListener("online", handleOnline);
@@ -326,13 +326,19 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+    };
+  }, [connect, updateConnectionState]);
+
+  // Cleanup WebSocket on unmount ONLY
+  useEffect(() => {
+    return () => {
       intentionalCloseRef.current = true;
       cleanup();
       if (wsRef.current) {
         wsRef.current.close();
       }
     };
-  }, [cleanup, connect, updateConnectionState]);
+  }, [cleanup]);
 
   return {
     connected,
