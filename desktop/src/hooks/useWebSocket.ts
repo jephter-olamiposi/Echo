@@ -34,6 +34,7 @@ export interface UseWebSocketOptions {
   onIncomingCopy: (entry: ClipboardEntry, isHistory?: boolean) => void;
   onDeviceJoin: (device: LinkedDevice) => void;
   onDeviceLeave: (deviceId: string) => void;
+  onError?: (error: string) => void;
 }
 
 export interface UseWebSocketReturn {
@@ -53,6 +54,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     onIncomingCopy,
     onDeviceJoin,
     onDeviceLeave,
+    onError,
   } = options;
 
   const [connected, setConnected] = useState(false);
@@ -72,6 +74,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
   const encryptionKeyRef = useRef(encryptionKey);
   const deviceIdRef = useRef(deviceId);
   const deviceNameRef = useRef(deviceName);
+  const onErrorRef = useRef(onError);
 
   useEffect(() => {
     onConnectionChangeRef.current = onConnectionChange;
@@ -81,6 +84,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     encryptionKeyRef.current = encryptionKey;
     deviceIdRef.current = deviceId;
     deviceNameRef.current = deviceName;
+    onErrorRef.current = onError;
   });
 
   const cleanup = useCallback(() => {
@@ -104,6 +108,9 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       console.log(
         "[ws] Max retries reached or intentional close, stopping reconnection"
       );
+      if (retriesRef.current >= MAX_RETRIES) {
+        onErrorRef.current?.("Connection lost. Tap refresh to retry.");
+      }
       return;
     }
 
@@ -135,6 +142,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
       // Handle presence
       if (msg.content === MSG_PRESENCE_JOIN) {
+        console.log("[ws] Received JOIN from", msg.device_id, msg.device_name);
         onDeviceJoinRef.current({
           id: msg.device_id,
           name: msg.device_name || "Unknown",
@@ -232,6 +240,12 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       cleanup();
       updateConnectionState(false);
 
+      if (event.code === 4001 || event.code === 4002 || event.code === 4003) {
+        // Auth errors - do not retry
+        onErrorRef.current?.(`Auth Error: ${event.reason || "Check login"}`);
+        return;
+      }
+
       if (!intentionalCloseRef.current) {
         scheduleReconnect();
       }
@@ -239,6 +253,8 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
     ws.onerror = (error) => {
       console.error("[ws] Error:", error);
+      // Generic network error often doesn't give details in JS, but 'close' might.
+      // We rely on onclose for most error handling logic.
     };
   }, [token, cleanup, updateConnectionState, handleMessage, scheduleReconnect]);
 
@@ -273,17 +289,12 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
         encrypted: true,
         timestamp: Date.now(),
       };
+      wsRef.current.send(JSON.stringify(payload));
     } else {
-      payload = {
-        device_id: deviceIdRef.current,
-        device_name: deviceNameRef.current,
-        content,
-        encrypted: false,
-        timestamp: Date.now(),
-      };
+      console.warn(
+        "[ws] Cannot send: encryption key missing. Aborting send to prevent plaintext leak."
+      );
     }
-
-    wsRef.current.send(JSON.stringify(payload));
   }, []);
 
   // Cleanup on unmount & Setup Network Listeners

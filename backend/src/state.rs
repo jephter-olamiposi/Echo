@@ -135,31 +135,54 @@ impl AppState {
     }
 
     pub fn check_rate_limit(&self, device_id: &str) -> bool {
-        let now = Instant::now();
         let mut entry = self.rate_limits.entry(device_id.to_string()).or_default();
-        let state = entry.value_mut();
 
+        check_rate_custom(
+            entry.value_mut(),
+            false,
+            MAX_MESSAGES_PER_WINDOW,
+            WINDOW_DURATION_SECS,
+        )
+    }
+
+    pub fn check_rate_limit_custom(&self, key: &str, max_count: u32, window_secs: u64) -> bool {
+        let mut entry = self.rate_limits.entry(key.to_string()).or_default();
+        check_rate_custom(entry.value_mut(), true, max_count, window_secs)
+    }
+}
+
+fn check_rate_custom(
+    state: &mut RateLimitState,
+    ignore_interval: bool,
+    max_count: u32,
+    window_secs: u64,
+) -> bool {
+    let now = Instant::now();
+
+    if !ignore_interval {
         if let Some(last) = state.last_message {
             if now.duration_since(last).as_millis() < MIN_INTERVAL_MS {
                 return false;
             }
         }
-
-        let window_start = state.window_start.get_or_insert(now);
-        if now.duration_since(*window_start).as_secs() >= WINDOW_DURATION_SECS {
-            state.window_start = Some(now);
-            state.message_count = 0;
-        }
-
-        if state.message_count >= MAX_MESSAGES_PER_WINDOW {
-            return false;
-        }
-
-        state.last_message = Some(now);
-        state.message_count += 1;
-        true
     }
 
+    let window_start = state.window_start.get_or_insert(now);
+    if now.duration_since(*window_start).as_secs() >= window_secs {
+        state.window_start = Some(now);
+        state.message_count = 0;
+    }
+
+    if state.message_count >= max_count {
+        return false;
+    }
+
+    state.last_message = Some(now);
+    state.message_count += 1;
+    true
+}
+
+impl AppState {
     pub fn add_to_history(&self, user_id: Uuid, msg: ClipboardMessage) {
         let mut entry = self.history.entry(user_id).or_default();
         let history = entry.value_mut();

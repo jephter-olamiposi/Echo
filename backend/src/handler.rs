@@ -12,14 +12,14 @@ use crate::{
 use axum::{
     extract::{
         ws::{Message, WebSocket},
-        Query, State, WebSocketUpgrade,
+        ConnectInfo, Query, State, WebSocketUpgrade,
     },
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
 use futures::{SinkExt, StreamExt};
-use std::{sync::Arc, time::Duration};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
@@ -27,8 +27,15 @@ const PING_INTERVAL_SECS: u64 = 30;
 
 pub async fn login(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(payload): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    if !state.check_rate_limit_custom(&format!("login:{}", addr.ip()), 5, 900) {
+        return Err(AppError::Auth(
+            "Too many attempts. Please try again later.".into(),
+        ));
+    }
+
     let repo = UserRepository::new(state.pool.clone());
 
     let (user_id, hash) = repo
@@ -51,8 +58,15 @@ pub async fn login(
 
 pub async fn register(
     State(state): State<AppState>,
+    ConnectInfo(addr): ConnectInfo<SocketAddr>,
     Json(payload): Json<RegisterRequest>,
 ) -> Result<impl IntoResponse, AppError> {
+    if !state.check_rate_limit_custom(&format!("register:{}", addr.ip()), 3, 3600) {
+        return Err(AppError::Auth(
+            "Too many account creations. Please try again later.".into(),
+        ));
+    }
+
     let password = payload.password;
 
     let hash = tokio::task::spawn_blocking(move || auth::hash_password(password)).await??;

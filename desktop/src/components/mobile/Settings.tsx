@@ -26,28 +26,6 @@ export const Settings: React.FC<MobileSettingsProps> = ({
   onEnterKey,
   onShowPairingCode
 }) => {
-  const [showDebug, setShowDebug] = React.useState(false);
-  const debugClickCount = React.useRef(0);
-  const debugTimer = React.useRef<NodeJS.Timeout>();
-  const [debugToken, setDebugToken] = React.useState<string | null>(null);
-
-  const handleDebugClick = () => {
-    debugClickCount.current += 1;
-    
-    if (debugTimer.current) clearTimeout(debugTimer.current);
-    
-    debugTimer.current = setTimeout(() => {
-      debugClickCount.current = 0;
-    }, 500);
-
-    if (debugClickCount.current >= 3) {
-      const token = window.EchoBridge?.getFcmToken() || "No token found";
-      setDebugToken(token);
-      setShowDebug(true);
-      debugClickCount.current = 0;
-    }
-  };
-
   return (
     <div className="flex flex-col h-full w-full bg-black text-white overflow-hidden">
       {/* Fixed Header */}
@@ -163,60 +141,12 @@ export const Settings: React.FC<MobileSettingsProps> = ({
           </div>
 
           {/* App Info */}
-          <div 
-            className="text-center py-4 text-xs text-zinc-600 flex flex-col gap-1 active:text-zinc-400 transition-colors cursor-pointer select-none"
-            onClick={handleDebugClick}
-          >
+          <div className="text-center py-4 text-xs text-zinc-600 flex flex-col gap-1">
             <p>Echo v1.0.0</p>
             <p>Made with ♥ for secure clipboard sync</p>
           </div>
         </div>
       </div>
-
-      {/* Debug Modal */}
-      {showDebug && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setShowDebug(false)} />
-          <div className="relative w-full max-w-lg bg-zinc-900 border-t border-white/10 rounded-t-3xl p-6 pb-12 animate-in slide-in-from-bottom duration-300">
-            <div className="flex justify-between items-center mb-6">
-              <h3 className="text-lg font-bold text-white">Debug Info</h3>
-              <button onClick={() => setShowDebug(false)} className="p-2 bg-zinc-800 rounded-full">
-                <div className="w-5 h-5">{Icons.close}</div>
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              <div>
-                <label className="text-xs text-zinc-500 uppercase font-bold tracking-wider">FCM Token</label>
-                <div 
-                  className="mt-2 p-3 bg-black rounded-xl border border-white/10 text-xs font-mono text-zinc-300 break-all active:bg-zinc-900"
-                  onClick={() => {
-                    navigator.clipboard.writeText(debugToken || "");
-                  }}
-                >
-                  {debugToken || "Loading..."}
-                </div>
-                <p className="text-[10px] text-zinc-500 mt-1">Tap to copy</p>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div className="p-3 bg-zinc-800/50 rounded-xl border border-white/5">
-                  <label className="text-xs text-zinc-500 block mb-1">Opened from Push?</label>
-                  <span className="text-sm font-medium text-white">
-                    {window.EchoBridge?.wasOpenedFromPush() ? "YES" : "NO"}
-                  </span>
-                </div>
-                <div className="p-3 bg-zinc-800/50 rounded-xl border border-white/5">
-                  <label className="text-xs text-zinc-500 block mb-1">Platform</label>
-                  <span className="text-sm font-medium text-white">
-                    {window.EchoBridge ? "Android" : "Web/Other"}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

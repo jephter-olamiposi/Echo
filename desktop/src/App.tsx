@@ -109,6 +109,7 @@ function App() {
     onIncomingCopy: handleIncomingCopy,
     onDeviceJoin: handleDeviceJoin,
     onDeviceLeave: handleDeviceLeave,
+    onError: (msg) => showToastMsg(msg, "error"),
   });
 
   usePushNotifications({
@@ -205,7 +206,7 @@ function App() {
           const content = event.payload;
           if (content && typeof content === 'string') {
             const wasAdded = clipboard.addEntry(content, 'local', deviceName);
-            if (wasAdded) {
+            if (wasAdded && keys.encryptionKey) {
               ws.send(content);
             }
           }
@@ -283,6 +284,14 @@ function App() {
     if (!import.meta.env.DEV) {
       document.addEventListener('contextmenu', event => event.preventDefault());
     }
+
+    const handleAuthError = () => {
+      handleLogout();
+      showToastMsg("Session expired. Please sign in again.", "error");
+    };
+
+    window.addEventListener('auth-error', handleAuthError);
+    return () => window.removeEventListener('auth-error', handleAuthError);
   }, []);
 
   const handleAuthSuccess = (newToken: string, newEmail: string) => {

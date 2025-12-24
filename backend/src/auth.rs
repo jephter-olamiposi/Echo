@@ -7,7 +7,7 @@ use argon2::{
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use uuid::Uuid;
 
-const JWT_EXPIRY_HOURS: u64 = 24;
+const JWT_EXPIRY_HOURS: u64 = 48;
 
 pub fn hash_password(password: String) -> Result<String, AppError> {
     let salt = SaltString::generate(&mut OsRng);
