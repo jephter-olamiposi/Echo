@@ -19,7 +19,10 @@
         { "url": "wss://echo-production-784d.up.railway.app/*" }
       ]
     },
-    "haptics:default",
+    "haptics:allow-vibrate",
+    "haptics:allow-impact-feedback",
+    "haptics:allow-notification-feedback",
+    "haptics:allow-selection-feedback",
     "os:default",
     "barcode-scanner:default",
     "barcode-scanner:allow-scan",
