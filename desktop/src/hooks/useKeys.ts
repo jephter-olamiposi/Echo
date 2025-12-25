@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { Store } from "@tauri-apps/plugin-store";
 import { generateSecretKey, exportKey, importKey } from "../crypto";
 
@@ -80,11 +80,14 @@ export function useKeys() {
     initKeys();
   }, [initKeys]);
 
-  return {
-    encryptionKey,
-    fingerprint,
-    linkUri,
-    saveKey,
-    isReady,
-  };
+  return useMemo(
+    () => ({
+      encryptionKey,
+      fingerprint,
+      linkUri,
+      saveKey,
+      isReady,
+    }),
+    [encryptionKey, fingerprint, linkUri, saveKey, isReady]
+  );
 }

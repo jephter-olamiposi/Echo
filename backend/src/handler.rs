@@ -117,22 +117,17 @@ pub async fn ws_handler(
 async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
     let (sender, mut receiver) = socket.split();
 
-    // Wait for first message to extract device_id and name
     let (device_id, device_name) = loop {
         match receiver.next().await {
             Some(Ok(Message::Text(text))) if text != "ping" => {
                 if let Ok(msg) = serde_json::from_str::<ClipboardMessage>(&text) {
                     tracing::info!(user = %user_id, device = %msg.device_id, "device connected");
-
-                    // If it's a handshake, established connection
                     if msg.content == MSG_HANDSHAKE {
                         break (
                             msg.device_id,
                             msg.device_name.unwrap_or_else(|| "Unknown".to_string()),
                         );
                     }
-
-                    // Process this first message as a fallback sync
                     if state.check_rate_limit(&msg.device_id) {
                         state.add_to_history(user_id, msg.clone());
                         let tx = state.get_or_create_channel(user_id);
@@ -151,18 +146,12 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
     };
 
     let sender = Arc::new(Mutex::new(sender));
-
-    // Register session and broadcast presence
     state.add_session(user_id, device_id.clone(), device_name.clone());
-
-    // 1. Broadcast my presence to others (JOIN)
     let mut presence_msg =
         ClipboardMessage::new(device_id.clone(), crate::models::MSG_PRESENCE_JOIN);
     presence_msg.device_name = Some(device_name.clone());
     let tx = state.get_or_create_channel(user_id);
     let _ = tx.send(presence_msg);
-
-    // 2. Send existing devices to me so I can populate my list
     let existing_devices = state.get_sessions(&user_id);
     for (dev_id, dev_name) in existing_devices {
         if dev_id != device_id {
@@ -173,29 +162,17 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
             }
         }
     }
-
-    // 3. Replay history (Mailbox feature for offline mobile sync)
-    // - Send the LATEST non-self message as "sync" (triggers clipboard write)
-    // - Send older messages as "history" (populates UI only)
     let history = state.get_history(&user_id);
     let mut sent_sync = false;
-
     for mut msg in history {
-        // Skip messages from this device (don't echo back)
         if msg.device_id == device_id {
             continue;
         }
-
-        // Skip presence messages and pings
         if msg.content == MSG_PRESENCE || msg.content == MSG_HANDSHAKE || msg.content == "ping" {
             continue;
         }
-
-        // First valid message = sync (write to clipboard)
-        // Rest = history only (populate UI)
         msg.is_history = sent_sync;
         sent_sync = true;
-
         if let Ok(json) = serde_json::to_string(&msg) {
             if sender
                 .lock()
@@ -333,7 +310,6 @@ async fn handle_incoming(
     }
 }
 
-/// Register a push notification token for the authenticated user's device
 pub async fn register_push_token(
     AuthUser { user_id }: AuthUser,
     State(state): State<AppState>,

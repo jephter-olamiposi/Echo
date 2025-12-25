@@ -30,7 +30,7 @@ export const Nav: React.FC<MobileNavProps> = ({ currentView, onChange, badgeCoun
       
       <button 
         className={`relative flex flex-col items-center justify-center gap-1 w-16 h-full transition-colors ${currentView === 'history' ? 'text-purple-500' : 'text-zinc-500 hover:text-zinc-300'}`}
-        onClick={() => onChange('history')}
+        onClick={() => handleNav('history')}
       >
         <span className="w-6 h-6">{Icons.history}</span>
         <span className="text-[10px] font-medium">History</span>

@@ -70,8 +70,6 @@ impl PushClient {
             exp: now + 3600,
         };
 
-        // Sign JWT using jsonwebtoken crate
-        // Fix: Use the private key from the service account (PEM format)
         let key = EncodingKey::from_rsa_pem(self.service_account.private_key.as_bytes())?;
         let jwt = encode(&Header::new(Algorithm::RS256), &claims, &key)?;
 

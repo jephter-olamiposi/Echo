@@ -1,5 +1,7 @@
-import { useState, useEffect, useMemo, useCallback } from "react";
-import { hostname } from "@tauri-apps/plugin-os";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { hostname, type as platformType } from "@tauri-apps/plugin-os";
+import { listen } from "@tauri-apps/api/event";
+import { scan, Format, checkPermissions, requestPermissions, cancel as cancelScan } from "@tauri-apps/plugin-barcode-scanner";
 import "./App.css"; 
 import "./KeyStyles.css";
 import "./Fingerprint.css";
@@ -28,24 +30,20 @@ import { useKeys } from "./hooks/useKeys";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { useWebSocket } from "./hooks/useWebSocket";
 
-// Initial values shifted to state
+
 
 function App() {
-  // --- Hooks ---
   const clipboard = useClipboard();
   const keys = useKeys();
   
-  // --- Local UI State ---
   const [token, setToken] = useState<string | null>(localStorage.getItem("echo_token"));
   const [email, setEmail] = useState<string | null>(localStorage.getItem("echo_email"));
   
-  const getInitialView = () => {
+  const [view, setViewState] = useState<"login" | "register" | "main" | "onboarding">(() => {
     const onboardingComplete = localStorage.getItem("echo_onboarding_complete") === "true";
     if (!onboardingComplete) return "onboarding";
-    return token ? "main" : "login";
-  };
-  
-  const [view, setViewState] = useState<"login" | "register" | "main" | "onboarding">(getInitialView());
+    return localStorage.getItem("echo_token") ? "main" : "login";
+  });
   const [mobileView, setMobileView] = useState<MobileView>("dashboard");
   const [isLoading, setIsLoading] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -61,17 +59,16 @@ function App() {
   const [isScanning, setIsScanning] = useState(false);
   const [backgroundModeEnabled, setBackgroundModeEnabled] = useState(false);
 
-  // --- Modal States ---
   const [showQR, setShowQR] = useState(false);
   const [showDevices, setShowDevices] = useState(false);
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [manualKey, setManualKey] = useState("");
 
-  const showToastMsg = (message: string, type: "success" | "error" | "info" = "info") => {
+  const showToastMsg = useCallback((message: string, type: "success" | "error" | "info" = "info") => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
-  };
+  }, []);
 
   const handleDeviceJoin = useCallback((device: LinkedDevice) => {
       setDevices(prev => {
@@ -120,35 +117,39 @@ function App() {
     onSyncRequest: () => ws.connect()
   });
 
+  // Refs for accessing current values in polling interval (avoids stale closures)
+  const clipboardRef = useRef(clipboard);
+  const wsRef = useRef(ws);
+  const deviceNameRef = useRef(deviceName);
+  const keysRef = useRef(keys);
+  useEffect(() => { clipboardRef.current = clipboard; }, [clipboard]);
+  useEffect(() => { wsRef.current = ws; }, [ws]);
+  useEffect(() => { deviceNameRef.current = deviceName; }, [deviceName]);
+  useEffect(() => { keysRef.current = keys; }, [keys]);
+
   useEffect(() => {
     const init = async () => {
       try {
         const id = await getOrCreateDeviceId();
         setDeviceId(id);
-        // Detect platform first to enforce OS-based naming rules
         let platform = 'unknown';
         try {
-           const { type } = await import("@tauri-apps/plugin-os");
-           platform = type();
+           platform = platformType();
         } catch (e) {
            console.warn("Failed to detect platform:", e);
         }
 
         let name = "Echo Device";
-        
-        // Mobile: Always use clean OS-based naming
         if (platform === 'android') {
           name = 'Echo Mobile (Android)';
         } else if (platform === 'ios') {
           name = 'Echo Mobile (iOS)';
         } else {
-          // Desktop: Try hostname, fallback to OS-based name
           try {
             const sysName = await hostname();
             if (sysName && !sysName.includes("localhost") && sysName !== "This Device") {
               name = sysName;
             } else {
-               // Fallback for desktop if hostname is generic
                name = platform === 'macos' ? 'Echo Desktop (Mac)' : 
                       platform === 'windows' ? 'Echo Desktop (Windows)' : 
                       platform === 'linux' ? 'Echo Desktop (Linux)' : 'Echo Desktop';
@@ -163,7 +164,6 @@ function App() {
         setDevices([{ id, name, lastSeen: Date.now(), isCurrentDevice: true }]);
       } catch (e) {
         console.error("Initialization error:", e);
-        // Fallback if everything critical fails
         if (deviceId === "unknown") {
              const fallbackId = crypto.randomUUID();
              setDeviceId(fallbackId);
@@ -175,14 +175,12 @@ function App() {
     };
     init();
 
-    let unlistenFocus: (() => void) | undefined;
-    let unlistenResume: (() => void) | undefined;
-    let unlistenClipboard: (() => void) | undefined;
+    const unlistenFocusRef = { current: undefined as (() => void) | undefined };
+    const unlistenResumeRef = { current: undefined as (() => void) | undefined };
+    const unlistenClipboardRef = { current: undefined as (() => void) | undefined };
     
     const setupListeners = async () => {
       try {
-        const { listen } = await import("@tauri-apps/api/event");
-        
         const checkClipboard = async () => {
           const text = await clipboard.readFromClipboard();
           if (text) {
@@ -193,18 +191,17 @@ function App() {
           }
         };
 
-        unlistenFocus = await listen('tauri://window-focus', () => {
+        unlistenFocusRef.current = await listen('tauri://window-focus', () => {
           if (keys.encryptionKey) ws.connect();
           checkClipboard();
         });
 
-        unlistenResume = await listen('tauri://resume', () => {
+        unlistenResumeRef.current = await listen('tauri://resume', () => {
           if (keys.encryptionKey) ws.connect();
           checkClipboard();
         });
 
-        // Listen for local clipboard changes (Mainly Desktop Rust monitor)
-        unlistenClipboard = await listen<string>('clipboard-change', (event) => {
+        unlistenClipboardRef.current = await listen<string>('clipboard-change', (event) => {
           const content = event.payload;
           if (content && typeof content === 'string') {
             const wasAdded = clipboard.addEntry(content, 'local', deviceName);
@@ -221,9 +218,9 @@ function App() {
     setupListeners();
 
     return () => {
-      if (unlistenFocus) unlistenFocus();
-      if (unlistenResume) unlistenResume();
-      if (unlistenClipboard) unlistenClipboard();
+      unlistenFocusRef.current?.();
+      unlistenResumeRef.current?.();
+      unlistenClipboardRef.current?.();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keys.encryptionKey, deviceName]);
@@ -241,23 +238,22 @@ function App() {
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
     
-    const setupMobilePolling = async () => {
+    const setupMobilePolling = () => {
       try {
-        const { type } = await import("@tauri-apps/plugin-os");
-        const platform = type();
+        const platform = platformType();
         const isMobile = platform === 'android' || platform === 'ios';
         
         if (isMobile && keys.encryptionKey) {
           console.log("[Mobile] Starting clipboard polling");
           interval = setInterval(async () => {
-            const text = await clipboard.readFromClipboard();
+            const text = await clipboardRef.current.readFromClipboard();
             if (text) {
-              const wasAdded = clipboard.addEntry(text, 'local', deviceName);
-              if (wasAdded && keys.encryptionKey) {
-                ws.send(text);
+              const wasAdded = clipboardRef.current.addEntry(text, 'local', deviceNameRef.current);
+              if (wasAdded && keysRef.current.encryptionKey) {
+                wsRef.current.send(text);
               }
             }
-          }, 2000); // Poll every 2s (battery-friendly)
+          }, 2000);
         }
       } catch (e) {
         console.error("[Mobile] Polling setup failed:", e);
@@ -272,7 +268,8 @@ function App() {
         clearInterval(interval);
       }
     };
-  }, [keys.encryptionKey, clipboard, deviceName, ws]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keys.encryptionKey]);
 
   // Toggle transparency for scanner
   useEffect(() => {
@@ -338,8 +335,6 @@ function App() {
   const handleScanQR = async () => {
     setMobileView("settings");
     try {
-      const { scan, Format, checkPermissions, requestPermissions } = await import("@tauri-apps/plugin-barcode-scanner");
-      
       let permissions = await checkPermissions();
       
       // Request permission if not already granted
@@ -399,8 +394,7 @@ function App() {
 
   const handleCancelScan = async () => {
     try {
-      const { cancel } = await import("@tauri-apps/plugin-barcode-scanner");
-      await cancel();
+      await cancelScan();
       setIsScanning(false);
     } catch (e) {
       setIsScanning(false);
@@ -460,7 +454,7 @@ function App() {
     isLoading,
     email: email || "",
     showClearConfirm
-  }), [clipboard.history, connected, searchQuery, selectedEntry, keys.encryptionKey, keys.fingerprint, toast, view, devices, showQR, keys.linkUri, showDevices, showKeyInput, manualKey, mobileView, isLoading, showClearConfirm, deviceId, email]);
+  }), [clipboard.history, connected, searchQuery, selectedEntry, keys.encryptionKey, keys.fingerprint, toast, view, isRefreshing, filterType, devices, showQR, keys.linkUri, showDevices, showKeyInput, manualKey, mobileView, isLoading, showClearConfirm, deviceId, email]);
 
   const handleOnboardingComplete = () => {
     localStorage.setItem("echo_onboarding_complete", "true");

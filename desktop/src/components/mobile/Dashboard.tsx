@@ -44,7 +44,6 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
 
   return (
     <div className="flex flex-col h-full w-full bg-black text-white overflow-hidden">
-      {/* Fixed Header */}
       <MobileHeader 
         centerAction={
           <span className="text-lg font-bold tracking-tight text-white">Echo</span>
@@ -52,12 +51,10 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
         className="bg-black!" 
       />
 
-      {/* Scrollable Content Area */}
       <div 
         ref={containerRef}
         className="flex-1 overflow-y-auto custom-scrollbar pb-24 relative"
       >
-        {/* Pull to refresh indicator */}
         <div 
           className="absolute top-0 left-0 w-full flex items-center justify-center pointer-events-none z-40"
           style={{ 
@@ -80,7 +77,6 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
         </div>
 
         <div className="flex flex-col gap-6 max-w-xl mx-auto w-full p-4">
-          {/* Status Section - Hero Style */}
           <div className="flex justify-center py-4">
             {isLoading ? (
               <div className="flex flex-col items-center gap-3">

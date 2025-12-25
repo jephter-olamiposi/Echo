@@ -1,5 +1,6 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Store } from "@tauri-apps/plugin-store";
+import { writeText, readText } from "@tauri-apps/plugin-clipboard-manager";
 import { ClipboardEntry } from "../types";
 import { detectContentType } from "../utils";
 import { haptic } from "../utils/haptics";
@@ -99,10 +100,6 @@ export function useClipboard() {
 
   const copyToClipboard = useCallback(async (text: string) => {
     try {
-      // Dynamic import to support both Tauri and non-Tauri envs conceptually (though we strictly use Tauri here)
-      const { writeText } = await import(
-        "@tauri-apps/plugin-clipboard-manager"
-      );
       await writeText(text);
       lastSentRef.current = text;
       haptic.success();
@@ -115,7 +112,6 @@ export function useClipboard() {
 
   const readFromClipboard = useCallback(async () => {
     try {
-      const { readText } = await import("@tauri-apps/plugin-clipboard-manager");
       const text = await readText();
       return text;
     } catch (err) {
@@ -150,13 +146,24 @@ export function useClipboard() {
     haptic.medium();
   }, []);
 
-  return {
-    history,
-    addEntry,
-    copyToClipboard,
-    deleteEntry,
-    togglePin,
-    clearHistory,
-    readFromClipboard,
-  };
+  return useMemo(
+    () => ({
+      history,
+      addEntry,
+      copyToClipboard,
+      deleteEntry,
+      togglePin,
+      clearHistory,
+      readFromClipboard,
+    }),
+    [
+      history,
+      addEntry,
+      copyToClipboard,
+      deleteEntry,
+      togglePin,
+      clearHistory,
+      readFromClipboard,
+    ]
+  );
 }

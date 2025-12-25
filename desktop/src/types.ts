@@ -28,7 +28,7 @@ export interface AppState {
   keyFingerprint: string | null;
   toast: { message: string; type: "success" | "error" | "info" } | null;
   view: "onboarding" | "login" | "register" | "main";
-  isRefreshing: boolean; // For pull-to-refresh
+  isRefreshing: boolean;
   filterType: ContentType | "all";
   devices: LinkedDevice[];
   showQR: boolean;
@@ -36,7 +36,7 @@ export interface AppState {
   showDevices: boolean;
   showKeyInput: boolean;
   manualKey: string;
-  mobileView: "dashboard" | "history" | "settings";
+  mobileView: MobileView;
   isLoading: boolean;
   email: string | null;
   showClearConfirm: boolean;

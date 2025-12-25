@@ -1,36 +1,20 @@
+import {
+  impactFeedback,
+  notificationFeedback,
+  selectionFeedback,
+} from "@tauri-apps/plugin-haptics";
+
 export const haptic = {
-  light: async () => {
-    try {
-      const { impactFeedback } = await import("@tauri-apps/plugin-haptics");
-      await impactFeedback("light");
-    } catch {
-      /* Silently fail on desktop */
-    }
+  light: () => {
+    impactFeedback("light").catch(() => {});
   },
-  medium: async () => {
-    try {
-      const { impactFeedback } = await import("@tauri-apps/plugin-haptics");
-      await impactFeedback("medium");
-    } catch {
-      /* Silently fail on desktop */
-    }
+  medium: () => {
+    impactFeedback("medium").catch(() => {});
   },
-  success: async () => {
-    try {
-      const { notificationFeedback } = await import(
-        "@tauri-apps/plugin-haptics"
-      );
-      await notificationFeedback("success");
-    } catch {
-      /* Silently fail on desktop */
-    }
+  success: () => {
+    notificationFeedback("success").catch(() => {});
   },
-  selection: async () => {
-    try {
-      const { selectionFeedback } = await import("@tauri-apps/plugin-haptics");
-      await selectionFeedback();
-    } catch {
-      /* Silently fail on desktop */
-    }
+  selection: () => {
+    selectionFeedback().catch(() => {});
   },
 };

@@ -1,63 +1,68 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
+const THRESHOLD = 80;
+const MAX_HEIGHT = 120;
+
 export const usePullToRefresh = (onRefresh: () => Promise<void>) => {
-  const [isPulling, setIsPulling] = useState(false);
   const [pullHeight, setPullHeight] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const startY = useRef(0);
-  const THRESHOLD = 80; // px to trigger refresh
-  const MAX_HEIGHT = 120; // max visual pull height
+  const isPulling = useRef(false);
+  const pullHeightRef = useRef(0);
+
+  useEffect(() => {
+    pullHeightRef.current = pullHeight;
+  }, [pullHeight]);
 
   const handleTouchStart = useCallback((e: TouchEvent) => {
-    const scrollTop = containerRef.current?.scrollTop || 0;
-    if (scrollTop === 0) {
-      startY.current = e.touches[0].clientY;
-      setIsPulling(true);
+    const el = containerRef.current;
+    if (!el || el.scrollTop > 0) return;
+    startY.current = e.touches[0].clientY;
+    isPulling.current = true;
+  }, []);
+
+  const handleTouchMove = useCallback((e: TouchEvent) => {
+    if (!isPulling.current) return;
+    const el = containerRef.current;
+    if (!el || el.scrollTop > 0) {
+      isPulling.current = false;
+      setPullHeight(0);
+      return;
+    }
+
+    const diff = e.touches[0].clientY - startY.current;
+    if (diff > 0) {
+      const newHeight = Math.min(diff * 0.4, MAX_HEIGHT);
+      setPullHeight(newHeight);
+      if (e.cancelable) e.preventDefault();
     }
   }, []);
 
-  const handleTouchMove = useCallback(
-    (e: TouchEvent) => {
-      if (!isPulling || isLoading) return;
-
-      const y = e.touches[0].clientY;
-      const diff = y - startY.current;
-
-      // Only allow pulling if we are at the top and pulling down
-      if (diff > 0 && (containerRef.current?.scrollTop || 0) === 0) {
-        // Add resistance
-        const newHeight = Math.min(diff * 0.4, MAX_HEIGHT);
-        setPullHeight(newHeight);
-
-        // Prevent default to stop scrolling while pulling
-        if (e.cancelable) e.preventDefault();
-      }
-    },
-    [isPulling, isLoading]
-  );
-
   const handleTouchEnd = useCallback(async () => {
-    if (!isPulling || isLoading) return;
+    if (!isPulling.current) return;
+    isPulling.current = false;
 
-    if (pullHeight > THRESHOLD) {
+    if (pullHeightRef.current >= THRESHOLD) {
       setIsLoading(true);
-      setPullHeight(60); // Snap to loading height
-      await onRefresh();
-      setIsLoading(false);
+      setPullHeight(60);
+      try {
+        await onRefresh();
+      } finally {
+        setIsLoading(false);
+        setPullHeight(0);
+      }
+    } else {
+      setPullHeight(0);
     }
-
-    // Reset
-    setPullHeight(0);
-    setIsPulling(false);
-  }, [isPulling, pullHeight, isLoading, onRefresh]);
+  }, [onRefresh]);
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
 
-    el.addEventListener("touchstart", handleTouchStart);
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
     el.addEventListener("touchmove", handleTouchMove, { passive: false });
     el.addEventListener("touchend", handleTouchEnd);
 
@@ -68,9 +73,5 @@ export const usePullToRefresh = (onRefresh: () => Promise<void>) => {
     };
   }, [handleTouchStart, handleTouchMove, handleTouchEnd]);
 
-  return {
-    containerRef,
-    pullHeight,
-    isLoading,
-  };
+  return { containerRef, pullHeight, isLoading };
 };

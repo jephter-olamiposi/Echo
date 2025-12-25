@@ -75,7 +75,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ state, actions }) =>
              onClearHistory={actions.onClearHistory}
              onBack={() => actions.onViewChange('dashboard')}
              onItemClick={actions.onSelectEntry}
-             onCopy={actions.onCopy}
              deviceCount={state.devices.length}
              onRefresh={actions.onRefresh}
            />

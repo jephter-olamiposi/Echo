@@ -24,7 +24,6 @@ type Hub = Arc<DashMap<Uuid, broadcast::Sender<ClipboardMessage>>>;
 type RateLimits = Arc<DashMap<String, RateLimitState>>;
 type History = Arc<DashMap<Uuid, Vec<ClipboardMessage>>>;
 type Sessions = Arc<DashMap<Uuid, HashMap<String, String>>>;
-// Push tokens: user_id -> { device_id -> fcm_token }
 type PushTokens = Arc<DashMap<Uuid, HashMap<String, String>>>;
 
 #[derive(Clone)]
@@ -78,7 +77,6 @@ impl AppState {
         }
     }
 
-    /// Store a push token for a user's device
     pub fn store_push_token(&self, user_id: Uuid, device_id: &str, token: &str) {
         self.push_tokens
             .entry(user_id)
@@ -87,7 +85,6 @@ impl AppState {
         tracing::info!(user = %user_id, device = %device_id, "Push token registered");
     }
 
-    /// Get push tokens for offline devices (devices not in active sessions)
     pub fn get_offline_push_tokens(&self, user_id: &Uuid, exclude_device: &str) -> Vec<String> {
         let active_devices: std::collections::HashSet<String> = self
             .sessions
@@ -109,7 +106,6 @@ impl AppState {
             .unwrap_or_default()
     }
 
-    /// Get the push client if configured
     pub fn push_client(&self) -> Option<&Arc<PushClient>> {
         self.push_client.as_ref()
     }

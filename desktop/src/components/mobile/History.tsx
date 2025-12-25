@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Icons } from '../Icons';
 import { MobileHeader } from './Header';
 import { 
@@ -24,8 +24,7 @@ interface MobileHistoryProps {
   onFilterChange: (type: any) => void;
   onClearHistory: () => void;
   onBack: () => void;
-  onItemClick: (entry: ClipboardEntry) => void;
-  onCopy: (text: string) => void; 
+  onItemClick: (entry: ClipboardEntry) => void; 
   deviceCount: number;
   onRefresh: () => Promise<void>;
 }
@@ -46,15 +45,14 @@ export const History: React.FC<MobileHistoryProps> = ({
   const { containerRef, pullHeight, isLoading: isHookLoading } = usePullToRefresh(onRefresh);
   const activeRefreshing = isRefreshing || isHookLoading;
 
-  const filteredHistory = history.filter(item => {
+  const filteredHistory = useMemo(() => history.filter(item => {
     const matchesSearch = item.content.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = filterType === 'all' || item.contentType === filterType;
     return matchesSearch && matchesFilter;
-  });
+  }), [history, searchQuery, filterType]);
 
   return (
     <div className="flex flex-col h-full bg-black w-full pb-20 md:pb-0">
-      {/* Fixed Sticky Header Area */}
       <div className="shrink-0 z-30 bg-black/80 backdrop-blur-xl border-b border-white/5 sticky top-0">
         <MobileHeader 
           title="History"
@@ -74,9 +72,7 @@ export const History: React.FC<MobileHistoryProps> = ({
           }
         />
         
-        {/* Search & Filter Controls Container */}
         <div className="px-4 space-y-4 pb-4">
-          {/* Search Bar */}
           <div className="relative flex items-center bg-zinc-900/50 backdrop-blur-md rounded-2xl h-11 border border-white/10 overflow-hidden focus-within:ring-2 focus-within:ring-purple-500/30 transition-all group">
             <div className="absolute left-4 text-zinc-500 w-4 h-4 flex items-center justify-center group-focus-within:text-purple-400 transition-colors">
               {Icons.search}
@@ -98,18 +94,20 @@ export const History: React.FC<MobileHistoryProps> = ({
             )}
           </div>
 
-          {/* Filter Row */}
-          <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth -mx-4 px-4">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth -mx-4 px-4 touch-pan-x">
             {(["all", "text", "code", "url"] as const).map((type) => {
               const isActive = filterType === type;
               return (
                 <button
                   key={type}
-                  onClick={() => {
+                  type="button"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
                     haptic.selection();
                     onFilterChange(type);
                   }}
-                  className={`px-5 py-2 rounded-xl text-[12px] font-bold uppercase tracking-wider whitespace-nowrap transition-all active:scale-95 border ${
+                  className={`px-5 py-2 rounded-xl text-[12px] font-bold uppercase tracking-wider whitespace-nowrap transition-all active:scale-95 border select-none touch-manipulation ${
                     isActive 
                       ? "bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-600/20" 
                       : "bg-zinc-900/50 border-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
@@ -123,10 +121,7 @@ export const History: React.FC<MobileHistoryProps> = ({
         </div>
       </div>
 
-      {/* Scrollable List Section */}
       <div ref={containerRef} className="flex-1 overflow-y-auto custom-scrollbar relative bg-black">
-        
-        {/* Pull to Refresh Indicator */}
         <div 
           className="absolute top-0 left-0 right-0 flex justify-center overflow-hidden pointer-events-none z-10" 
           style={{ height: `${pullHeight}px` }}
