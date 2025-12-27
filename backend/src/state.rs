@@ -5,13 +5,17 @@ use sqlx::PgPool;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, Semaphore};
 use uuid::Uuid;
 
 const MAX_MESSAGES_PER_WINDOW: u32 = 300;
 const WINDOW_DURATION_SECS: u64 = 60;
 const MIN_INTERVAL_MS: u128 = 50;
 const MAX_HISTORY_SIZE: usize = 50;
+const MIN_CHANNEL_CAPACITY: usize = 50;
+const MAX_CHANNEL_CAPACITY: usize = 500;
+const CAPACITY_PER_DEVICE: usize = 25;
+const MAX_CONCURRENT_PUSH_TASKS: usize = 50;
 
 #[derive(Clone, Default)]
 pub struct RateLimitState {
@@ -36,6 +40,7 @@ pub struct AppState {
     sessions: Sessions,
     push_tokens: PushTokens,
     push_client: Option<Arc<PushClient>>,
+    push_semaphore: Arc<Semaphore>,
 }
 
 impl AppState {
@@ -74,6 +79,7 @@ impl AppState {
             sessions: Arc::default(),
             push_tokens: Arc::default(),
             push_client,
+            push_semaphore: Arc::new(Semaphore::new(MAX_CONCURRENT_PUSH_TASKS)),
         }
     }
 
@@ -97,10 +103,10 @@ impl AppState {
             .map(|tokens| {
                 tokens
                     .iter()
-                    .filter(|(dev_id, _)| {
+                    .filter(|(dev_id, _token)| {
                         *dev_id != exclude_device && !active_devices.contains(*dev_id)
                     })
-                    .map(|(_, token)| token.clone())
+                    .map(|(_dev_id, token)| token.clone())
                     .collect()
             })
             .unwrap_or_default()
@@ -108,6 +114,10 @@ impl AppState {
 
     pub fn push_client(&self) -> Option<&Arc<PushClient>> {
         self.push_client.as_ref()
+    }
+
+    pub fn push_semaphore(&self) -> &Arc<Semaphore> {
+        &self.push_semaphore
     }
 
     pub fn add_session(&self, user_id: Uuid, device_id: String, device_name: String) {
@@ -126,7 +136,11 @@ impl AppState {
     pub fn get_sessions(&self, user_id: &Uuid) -> Vec<(String, String)> {
         self.sessions
             .get(user_id)
-            .map(|s| s.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            .map(|s| {
+                s.iter()
+                    .map(|(key, value)| (key.clone(), value.clone()))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
@@ -144,6 +158,38 @@ impl AppState {
     pub fn check_rate_limit_custom(&self, key: &str, max_count: u32, window_secs: u64) -> bool {
         let mut entry = self.rate_limits.entry(key.to_string()).or_default();
         check_rate_custom(entry.value_mut(), true, max_count, window_secs)
+    }
+
+    /// Clean up old rate limiting entries to prevent memory leaks
+    pub fn cleanup_old_rate_limits(&self) {
+        let now = Instant::now();
+        let cleanup_threshold = std::time::Duration::from_secs(3600); // 1 hour
+        let mut keys_to_remove = Vec::new();
+
+        // Collect keys of expired entries
+        for entry in self.rate_limits.iter() {
+            let key = entry.key();
+            let state = entry.value();
+            
+            // Remove entries that haven't been accessed in the last hour
+            if let Some(last_access) = state.last_message {
+                if now.duration_since(last_access) > cleanup_threshold {
+                    keys_to_remove.push(key.clone());
+                }
+            }
+        }
+
+        // Remove expired entries
+        for key in keys_to_remove {
+            self.rate_limits.remove(&key);
+        }
+
+        if !self.rate_limits.is_empty() {
+            tracing::debug!(
+                "Rate limit cleanup completed, {} entries remaining", 
+                self.rate_limits.len()
+            );
+        }
     }
 }
 
@@ -196,7 +242,26 @@ impl AppState {
     pub fn get_or_create_channel(&self, user_id: Uuid) -> broadcast::Sender<ClipboardMessage> {
         self.hub
             .entry(user_id)
-            .or_insert_with(|| broadcast::channel(100).0)
+            .or_insert_with(|| {
+                // Calculate dynamic capacity based on active devices
+                let device_count = self.sessions
+                    .get(&user_id)
+                    .map(|s| s.len())
+                    .unwrap_or(1); // At least 1 for the connecting device
+                
+                let capacity = (device_count * CAPACITY_PER_DEVICE)
+                    .max(MIN_CHANNEL_CAPACITY)
+                    .min(MAX_CHANNEL_CAPACITY);
+                
+                tracing::debug!(
+                    user = %user_id, 
+                    devices = device_count, 
+                    capacity = capacity,
+                    "creating channel with dynamic capacity"
+                );
+                
+                broadcast::channel(capacity).0
+            })
             .clone()
     }
 

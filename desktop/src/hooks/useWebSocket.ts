@@ -14,6 +14,7 @@ const MAX_RETRIES = 8;
 const BASE_DELAY_MS = 500; // Fast but not aggressive
 const MAX_DELAY_MS = 10000; // Cap at 10s
 const PING_INTERVAL_MS = 20000; // 20s keep-alive
+const MAX_QUEUE = 200; // Cap queued messages while offline to avoid memory growth
 
 interface ServerMessage {
   device_id: string;
@@ -115,16 +116,20 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     }
 
     // Checking navigator.onLine prevents rapid retry loops when completely offline
-    // We relies on window 'online' event to trigger immediate retry
+    // We rely on window 'online' event to trigger immediate retry
     if (!navigator.onLine) {
       console.log("[ws] Offline, pausing reconnection until online event");
       return;
     }
 
-    const delay = Math.min(
+    const baseDelay = Math.min(
       BASE_DELAY_MS * Math.pow(2, retriesRef.current),
       MAX_DELAY_MS
     );
+    // Add jitter +/-15% to avoid synchronized reconnect storms
+    const jittered = baseDelay * (0.85 + Math.random() * 0.3);
+    const delay = Math.floor(jittered);
+
     console.log(
       `[ws] Reconnecting in ${delay}ms (attempt ${
         retriesRef.current + 1
@@ -171,15 +176,23 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       // Skip handshake echoes
       if (msg.content === MSG_HANDSHAKE) return;
 
-      // Decrypt if needed
-      let content = msg.content;
-      if (msg.encrypted && msg.nonce && encryptionKeyRef.current) {
-        try {
-          content = decrypt(msg.content, msg.nonce, encryptionKeyRef.current);
-        } catch (e) {
-          console.error("[ws] Decryption failed:", e);
-          return;
-        }
+      // Handle encryption for clipboard messages (non-presence/handshake)
+      if (!msg.encrypted || !msg.nonce) {
+        console.warn("[ws] Rejected unencrypted message");
+        onErrorRef.current?.("Received unencrypted message. Please ensure all devices have encryption enabled.");
+        return;
+      }
+      if (!encryptionKeyRef.current) {
+        onErrorRef.current?.("Encryption key required to receive messages. Please set up encryption in settings.");
+        return;
+      }
+
+      let content: string;
+      try {
+        content = decrypt(msg.content, msg.nonce, encryptionKeyRef.current);
+      } catch (e) {
+        console.error("[ws] Decryption failed:", e);
+        return;
       }
 
       // Build entry and notify
@@ -202,6 +215,12 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     if (!token || !deviceIdRef.current) {
       return;
     }
+    if (!encryptionKeyRef.current) {
+      onErrorRef.current?.(
+        "Encryption is required. Set your passphrase/key before connecting."
+      );
+      return;
+    }
 
     // Close existing connection
     if (wsRef.current) {
@@ -214,7 +233,23 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     intentionalCloseRef.current = false;
     retriesRef.current = 0; // Reset retries on manual connect (e.g. pull-to-refresh)
 
-    const wsUrl = `${config.wsUrl}?token=${token}`;
+    // Build a robust WS URL: pick ws/wss based on scheme, ensure /ws endpoint, append token
+    let wsUrl: string;
+    try {
+      const base = config.wsUrl || config.apiUrl;
+      const url = new URL(base);
+      if (url.protocol === "http:") url.protocol = "ws:";
+      if (url.protocol === "https:") url.protocol = "wss:";
+      if (!url.pathname.endsWith("/ws")) {
+        url.pathname = url.pathname.replace(/\/+$/, "") + "/ws";
+      }
+      url.searchParams.set("token", token);
+      wsUrl = url.toString();
+    } catch {
+      const base =
+        (config.wsUrl || "ws://localhost:3000").replace(/\/+$/, "");
+      wsUrl = `${base}/ws?token=${encodeURIComponent(token)}`;
+    }
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -278,7 +313,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     connectRef.current = connect;
   }, [connect]);
 
-  // Add network status listeners
+  // Add network and visibility listeners
   useEffect(() => {
     const handleOnline = () => {
       console.log("[ws] Network online detected, reconnecting immediately");
@@ -292,14 +327,25 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       updateConnectionState(false);
     };
 
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible" && !connected && navigator.onLine) {
+        console.log("[ws] App visible; attempting reconnect");
+        cleanup();
+        retriesRef.current = 0;
+        connect();
+      }
+    };
+
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
+    document.addEventListener("visibilitychange", handleVisibility);
 
     return () => {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
+      document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [connect, cleanup]);
+  }, [connect, cleanup, connected, updateConnectionState]);
 
   const disconnect = useCallback(() => {
     intentionalCloseRef.current = true;
@@ -315,29 +361,32 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
   const send = useCallback((content: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.log("[ws] Connection not open, queuing message");
+      if (messageQueueRef.current.length >= MAX_QUEUE) {
+        // Drop oldest to keep memory bounded
+        messageQueueRef.current.shift();
+      }
       messageQueueRef.current.push(content);
       return;
     }
 
     const key = encryptionKeyRef.current;
-    let payload: Record<string, unknown>;
-
-    if (key) {
-      const { ciphertext, nonce } = encrypt(content, key);
-      payload = {
-        device_id: deviceIdRef.current,
-        device_name: deviceNameRef.current,
-        content: ciphertext,
-        nonce,
-        encrypted: true,
-        timestamp: Date.now(),
-      };
-      wsRef.current.send(JSON.stringify(payload));
-    } else {
-      console.warn(
-        "[ws] Cannot send: encryption key missing. Aborting send to prevent plaintext leak."
+    if (!key) {
+      onErrorRef.current?.(
+        "Encryption is required. Set your passphrase/key before sending."
       );
+      return;
     }
+
+    const { ciphertext, nonce } = encrypt(content, key);
+    const payload: Record<string, unknown> = {
+      device_id: deviceIdRef.current,
+      device_name: deviceNameRef.current,
+      content: ciphertext,
+      nonce,
+      encrypted: true,
+      timestamp: Date.now(),
+    };
+    wsRef.current.send(JSON.stringify(payload));
   }, []);
 
   // Update sendRef

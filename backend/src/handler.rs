@@ -20,10 +20,13 @@ use axum::{
 };
 use futures::{SinkExt, StreamExt};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, Semaphore};
 use uuid::Uuid;
 
 const PING_INTERVAL_SECS: u64 = 30;
+const MAX_CLIPBOARD_SIZE: usize = 10 * 1024 * 1024; // 10MB
+const MAX_DEVICE_NAME_SIZE: usize = 256;
+const MAX_PUSH_TOKEN_SIZE: usize = 512;
 
 pub async fn login(
     State(state): State<AppState>,
@@ -121,22 +124,21 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
         match receiver.next().await {
             Some(Ok(Message::Text(text))) if text != "ping" => {
                 if let Ok(msg) = serde_json::from_str::<ClipboardMessage>(&text) {
-                    tracing::info!(user = %user_id, device = %msg.device_id, "device connected");
+                    // Only allow handshake messages during initial connection
                     if msg.content == MSG_HANDSHAKE {
+                        tracing::info!(user = %user_id, device = %msg.device_id, "device handshake completed");
                         break (
                             msg.device_id,
                             msg.device_name.unwrap_or_else(|| "Unknown".to_string()),
                         );
+                    } else {
+                        tracing::warn!(user = %user_id, device = %msg.device_id, "rejected non-handshake message during connection");
+                        // Drop non-handshake messages during connection phase
+                        continue;
                     }
-                    if state.check_rate_limit(&msg.device_id) {
-                        state.add_to_history(user_id, msg.clone());
-                        let tx = state.get_or_create_channel(user_id);
-                        let _ = tx.send(msg.clone());
-                    }
-                    break (
-                        msg.device_id,
-                        msg.device_name.unwrap_or_else(|| "Unknown".to_string()),
-                    );
+                } else {
+                    tracing::warn!(user = %user_id, "failed to parse message during handshake");
+                    continue;
                 }
             }
             Some(Ok(Message::Close(_))) => return,
@@ -163,7 +165,6 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
         }
     }
     let history = state.get_history(&user_id);
-    let mut sent_sync = false;
     for mut msg in history {
         if msg.device_id == device_id {
             continue;
@@ -171,8 +172,8 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
         if msg.content == MSG_PRESENCE || msg.content == MSG_HANDSHAKE || msg.content == "ping" {
             continue;
         }
-        msg.is_history = sent_sync;
-        sent_sync = true;
+        // Always mark replayed messages as history so clients don't treat them as live.
+        msg.is_history = true;
         if let Ok(json) = serde_json::to_string(&msg) {
             if sender
                 .lock()
@@ -252,11 +253,12 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
         _ = ping_task => {},
     }
 
-    state.cleanup_channel_if_empty(&user_id, &tx);
+    // Remove session and notify others before potentially cleaning up the channel.
     state.remove_session(user_id, &device_id);
     let presence_leave =
         ClipboardMessage::new(device_id.clone(), crate::models::MSG_PRESENCE_LEAVE);
     let _ = tx.send(presence_leave);
+    state.cleanup_channel_if_empty(&user_id, &tx);
 }
 
 async fn handle_incoming(
@@ -281,6 +283,20 @@ async fn handle_incoming(
                     }
                 };
 
+                // Validate clipboard content size
+                if clipboard_msg.content.len() > MAX_CLIPBOARD_SIZE {
+                    tracing::warn!(user = %user_id, device = %device_id, size = clipboard_msg.content.len(), "clipboard content too large");
+                    continue;
+                }
+
+                // Validate device name size if present
+                if let Some(ref name) = clipboard_msg.device_name {
+                    if name.len() > MAX_DEVICE_NAME_SIZE {
+                        tracing::warn!(user = %user_id, device = %device_id, size = name.len(), "device name too long");
+                        continue;
+                    }
+                }
+
                 if !state.check_rate_limit(&device_id) {
                     tracing::warn!(device = %device_id, "rate limited");
                     continue;
@@ -293,9 +309,11 @@ async fn handle_incoming(
                 if !offline_tokens.is_empty() {
                     if let Some(push_client) = state.push_client() {
                         let push_client = push_client.clone();
+                        let semaphore = state.push_semaphore().clone();
                         let device_name =
                             clipboard_msg.device_name.unwrap_or_else(|| "device".into());
                         tokio::spawn(async move {
+                            let _permit = semaphore.acquire().await.ok();
                             for token in offline_tokens {
                                 let _ = push_client.notify_sync(&token, &device_name).await;
                             }
@@ -314,7 +332,25 @@ pub async fn register_push_token(
     AuthUser { user_id }: AuthUser,
     State(state): State<AppState>,
     Json(payload): Json<PushTokenRequest>,
-) -> impl IntoResponse {
+) -> Result<impl IntoResponse, AppError> {
+    // Validate push token size
+    if payload.token.len() > MAX_PUSH_TOKEN_SIZE {
+        tracing::warn!(user = %user_id, token_size = payload.token.len(), "push token too long");
+        return Err(AppError::BadRequest("Push token too long".into()));
+    }
+
+    // Validate device_id is not empty and reasonable size
+    if payload.device_id.is_empty() || payload.device_id.len() > MAX_DEVICE_NAME_SIZE {
+        tracing::warn!(user = %user_id, device_id_size = payload.device_id.len(), "invalid device_id");
+        return Err(AppError::BadRequest("Invalid device_id".into()));
+    }
+
+    // Basic token format validation (should contain only alphanumeric and some special chars)
+    if !payload.token.chars().all(|c| c.is_ascii_alphanumeric() || "-_.:".contains(c)) {
+        tracing::warn!(user = %user_id, "invalid push token format");
+        return Err(AppError::BadRequest("Invalid push token format".into()));
+    }
+
     state.store_push_token(user_id, &payload.device_id, &payload.token);
-    StatusCode::OK
+    Ok(StatusCode::OK)
 }

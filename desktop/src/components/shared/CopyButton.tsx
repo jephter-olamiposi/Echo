@@ -40,6 +40,9 @@ export const CopyButton: React.FC<CopyButtonProps> = ({
       className={`${className} group relative overflow-hidden`} 
       onClick={handleClick}
       disabled={copied}
+      aria-label={copied ? "Copied to clipboard" : "Copy to clipboard"}
+      title={copied ? "Copied!" : "Copy"}
+      type="button"
     >
       <div className={`relative ${iconClassName} flex items-center justify-center`}>
         {/* Copy Icon - Exits when copied */}

@@ -15,6 +15,7 @@ import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
 import { Onboarding } from "./components/auth/Onboarding";
 import { AuthLayout } from "./components/auth/AuthLayout";
+import { ErrorBoundary } from "./components/shared/ErrorBoundary";
 import { 
   importKey, 
   exportKey,
@@ -22,6 +23,7 @@ import {
   generateLinkUri
 } from "./crypto";
 import { config } from "./config";
+import { getAuthToken, saveAuthToken, removeAuthToken } from "./api";
 
 import { AppState, MobileView, LinkedDevice, ClipboardEntry, ContentType } from "./types";
 import { ScanningOverlay } from "./components/mobile/ScanningOverlay";
@@ -36,14 +38,10 @@ function App() {
   const clipboard = useClipboard();
   const keys = useKeys();
   
-  const [token, setToken] = useState<string | null>(localStorage.getItem("echo_token"));
-  const [email, setEmail] = useState<string | null>(localStorage.getItem("echo_email"));
+  const [token, setToken] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
   
-  const [view, setViewState] = useState<"login" | "register" | "main" | "onboarding">(() => {
-    const onboardingComplete = localStorage.getItem("echo_onboarding_complete") === "true";
-    if (!onboardingComplete) return "onboarding";
-    return localStorage.getItem("echo_token") ? "main" : "login";
-  });
+  const [view, setViewState] = useState<"login" | "register" | "main" | "onboarding">("onboarding");
   const [mobileView, setMobileView] = useState<MobileView>("dashboard");
   const [isLoading, setIsLoading] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -126,6 +124,33 @@ function App() {
   useEffect(() => { wsRef.current = ws; }, [ws]);
   useEffect(() => { deviceNameRef.current = deviceName; }, [deviceName]);
   useEffect(() => { keysRef.current = keys; }, [keys]);
+
+  // Initialize secure token and auth state
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const storedToken = await getAuthToken();
+        const storedEmail = localStorage.getItem("echo_email");
+        const onboardingComplete = localStorage.getItem("echo_onboarding_complete") === "true";
+        
+        setToken(storedToken);
+        setEmail(storedEmail);
+        
+        if (!onboardingComplete) {
+          setViewState("onboarding");
+        } else if (storedToken) {
+          setViewState("main");
+        } else {
+          setViewState("login");
+        }
+      } catch (error) {
+        console.error("Failed to load auth state:", error);
+        setViewState("login");
+      }
+    };
+    
+    initAuth();
+  }, []);
 
   useEffect(() => {
     const init = async () => {
@@ -253,7 +278,7 @@ function App() {
                 wsRef.current.send(text);
               }
             }
-          }, 2000);
+          }, 5000); // Reduced from 2s to 5s to improve battery life
         }
       } catch (e) {
         console.error("[Mobile] Polling setup failed:", e);
@@ -295,21 +320,34 @@ function App() {
     return () => window.removeEventListener('auth-error', handleAuthError);
   }, []);
 
-  const handleAuthSuccess = (newToken: string, newEmail: string) => {
-    localStorage.setItem("echo_token", newToken);
-    localStorage.setItem("echo_email", newEmail);
-    setToken(newToken);
-    setEmail(newEmail);
-    setViewState("main");
-    showToastMsg("Welcome to Echo!", "success");
+  const handleAuthSuccess = async (newToken: string, newEmail: string) => {
+    try {
+      await saveAuthToken(newToken);
+      localStorage.setItem("echo_email", newEmail);
+      setToken(newToken);
+      setEmail(newEmail);
+      setViewState("main");
+      showToastMsg("Welcome to Echo!", "success");
+    } catch (error) {
+      console.error("Failed to save auth token:", error);
+      showToastMsg("Failed to save login credentials", "error");
+    }
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("echo_token");
-    localStorage.removeItem("echo_email");
-    setToken(null);
-    setEmail(null);
-    setViewState("login");
+  const handleLogout = async () => {
+    try {
+      await removeAuthToken();
+      localStorage.removeItem("echo_email");
+      setToken(null);
+      setEmail(null);
+      setViewState("login");
+    } catch (error) {
+      console.error("Failed to clear auth token:", error);
+      // Still update UI state even if storage fails
+      setToken(null);
+      setEmail(null);
+      setViewState("login");
+    }
   };
 
   const handleRefresh = async () => {
@@ -441,12 +479,12 @@ function App() {
     setViewState("login");
   };
 
-  if (view === "onboarding") return <Onboarding onComplete={handleOnboardingComplete} />;
-  if (view === "login") return <AuthLayout><Login onSuccess={handleAuthSuccess} onSwitchToRegister={() => setViewState("register")} /></AuthLayout>;
-  if (view === "register") return <AuthLayout><Register onSuccess={handleAuthSuccess} onSwitchToLogin={() => setViewState("login")} /></AuthLayout>;
+  if (view === "onboarding") return <ErrorBoundary><Onboarding onComplete={handleOnboardingComplete} /></ErrorBoundary>;
+  if (view === "login") return <ErrorBoundary><AuthLayout><Login onSuccess={handleAuthSuccess} onSwitchToRegister={() => setViewState("register")} /></AuthLayout></ErrorBoundary>;
+  if (view === "register") return <ErrorBoundary><AuthLayout><Register onSuccess={handleAuthSuccess} onSwitchToLogin={() => setViewState("login")} /></AuthLayout></ErrorBoundary>;
 
   return (
-    <>
+    <ErrorBoundary>
       {isScanning && <ScanningOverlay onCancel={handleCancelScan} />}
       
       <div className={`transition-opacity duration-300 ${isScanning ? 'opacity-0' : 'opacity-100'}`}>
@@ -617,7 +655,7 @@ function App() {
       </Modal>
 
       {toast && <Toast message={toast.message} type={toast.type} />}
-    </>
+    </ErrorBoundary>
   );
 }
 

@@ -130,7 +130,9 @@ On Android and iOS, background clipboard access is restricted. Echo solves this 
 | `DATABASE_URL` | Postgres connection string | Yes |
 | `JWT_SECRET` | Secret for signing auth tokens | Yes |
 | `GOOGLE_PROJECT_ID` | Firebase Project ID (for FCM) | No |
-| `FIREBASE_SERVICE_ACCOUNT` | Path to service account JSON | No |
+| `FIREBASE_SERVICE_ACCOUNT` | Path to service account (or use `FCM_SERVICE_ACCOUNT_PATH`) | No |
+| `FCM_SERVICE_ACCOUNT_JSON` | Raw JSON content of service account | No |
+| `ALLOWED_ORIGINS` | CORS origins (comma-separated) | No (defaults to localhost+tauri) |
 
 ### Frontend (`desktop/.env`)
 

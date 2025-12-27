@@ -11,6 +11,7 @@ pub enum AppError {
     Database(sqlx::Error),
     Internal(String),
     Conflict(String),
+    BadRequest(String),
 }
 
 #[derive(Serialize)]
@@ -31,6 +32,7 @@ impl IntoResponse for AppError {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal error".into())
             }
             Self::Conflict(msg) => (StatusCode::CONFLICT, msg),
+            Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
         };
         (status, Json(ErrorBody { error: message })).into_response()
     }

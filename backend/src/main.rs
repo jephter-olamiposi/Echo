@@ -16,9 +16,10 @@ use axum::{
 };
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
-use tower_http::cors::CorsLayer;
+use tower_http::cors::{CorsLayer, Any};
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tokio::signal;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -26,15 +27,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     tracing_subscriber::registry()
         .with(tracing_subscriber::EnvFilter::new(
-            std::env::var("RUST_LOG").unwrap_or_else(|_| "echo_backend=debug".into()),
+            std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()),
         ))
         .with(tracing_subscriber::fmt::layer())
         .init();
 
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL required");
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET required");
-    let fcm_json = std::env::var("FCM_SERVICE_ACCOUNT_JSON").ok();
-    let fcm_path = std::env::var("FCM_SERVICE_ACCOUNT_PATH").ok();
+
+    // Prefer explicit JSON first, then file path fallbacks compatible with common setups.
+    let fcm_json = std::env::var("FCM_SERVICE_ACCOUNT_JSON")
+        .or_else(|_| std::env::var("FIREBASE_SERVICE_ACCOUNT_JSON"))
+        .ok();
+
+    let fcm_path = std::env::var("FCM_SERVICE_ACCOUNT_PATH")
+        .or_else(|_| std::env::var("FIREBASE_SERVICE_ACCOUNT"))
+        .or_else(|_| std::env::var("GOOGLE_APPLICATION_CREDENTIALS"))
+        .ok();
 
     tracing::info!("Connecting to database...");
     let pool = PgPoolOptions::new()
@@ -61,7 +70,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/history", get(handler::get_history))
         .route("/push/register", post(handler::register_push_token))
         .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive())
+        .layer(
+            CorsLayer::new()
+                .allow_origin(
+                    std::env::var("ALLOWED_ORIGINS")
+                        .unwrap_or_else(|_| "http://localhost:1420,http://127.0.0.1:1420,tauri://localhost".to_string())
+                        .split(',')
+                        .map(|s| s.trim().parse().unwrap())
+                        .collect::<Vec<_>>()
+                )
+                .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
+                .allow_headers([axum::http::header::CONTENT_TYPE, axum::http::header::AUTHORIZATION])
+                .allow_credentials(true)
+        )
         .with_state(state);
 
     let port = std::env::var("PORT")
@@ -77,11 +98,45 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Server listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    axum::serve(
+    
+    // Setup graceful shutdown
+    let server = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .await?;
+    .with_graceful_shutdown(shutdown_signal());
+
+    tracing::info!("Server starting with graceful shutdown support");
+    server.await?;
+    tracing::info!("Server shutdown complete");
 
     Ok(())
+}
+
+async fn shutdown_signal() {
+    let ctrl_c = async {
+        signal::ctrl_c()
+            .await
+            .expect("failed to install Ctrl+C handler");
+    };
+
+    #[cfg(unix)]
+    let terminate = async {
+        signal::unix::signal(signal::unix::SignalKind::terminate())
+            .expect("failed to install signal handler")
+            .recv()
+            .await;
+    };
+
+    #[cfg(not(unix))]
+    let terminate = std::future::pending::<()>();
+
+    tokio::select! {
+        _ = ctrl_c => {
+            tracing::info!("Received Ctrl+C, initiating graceful shutdown...");
+        },
+        _ = terminate => {
+            tracing::info!("Received SIGTERM, initiating graceful shutdown...");
+        },
+    }
 }

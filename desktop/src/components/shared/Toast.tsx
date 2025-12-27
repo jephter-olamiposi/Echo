@@ -45,13 +45,21 @@ export const Toast: React.FC<ToastProps> = ({ message, type }) => {
 
   return (
     <div className="fixed top-6 left-1/2 -translate-x-1/2 z-200 max-w-sm w-full px-4 pointer-events-none flex justify-center">
-      <div className={`
-        flex items-center gap-3 pl-2 pr-5 py-2 rounded-full border backdrop-blur-2xl
-        animate-in slide-in-from-top-8 fade-in zoom-in-95 duration-500 ease-(--spring-easing)
-        ${styles.bg} ${styles.border} ${styles.shadow}
-      `}>
+      <div 
+        className={`
+          flex items-center gap-3 pl-2 pr-5 py-2 rounded-full border backdrop-blur-2xl
+          animate-in slide-in-from-top-8 fade-in zoom-in-95 duration-500 ease-(--spring-easing)
+          ${styles.bg} ${styles.border} ${styles.shadow}
+        `}
+        role="alert"
+        aria-live={type === 'error' ? 'assertive' : 'polite'}
+        aria-atomic="true"
+      >
         {/* Condensed Icon Circle */}
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${styles.iconBg}`}>
+        <div 
+          className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${styles.iconBg}`}
+          aria-hidden="true"
+        >
           <div className="w-4 h-4">
             {getIcon()}
           </div>
