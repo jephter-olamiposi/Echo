@@ -98,19 +98,26 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     }
   }, []);
 
+  // Add network status listeners
+  const connectRef = useRef<() => void>(() => {});
+  const messageQueueRef = useRef<string[]>([]);
+  const sendRef = useRef<((content: string) => void) | null>(null);
+
   const updateConnectionState = useCallback((state: boolean) => {
     setConnected(state);
     onConnectionChangeRef.current(state);
   }, []);
 
   const scheduleReconnect = useCallback(() => {
-    if (intentionalCloseRef.current || retriesRef.current >= MAX_RETRIES) {
-      console.log(
-        "[ws] Max retries reached or intentional close, stopping reconnection"
-      );
-      if (retriesRef.current >= MAX_RETRIES) {
-        onErrorRef.current?.("Connection lost. Tap refresh to retry.");
-      }
+    if (intentionalCloseRef.current) {
+      console.log("[ws] Intentional close, stopping reconnection");
+      return;
+    }
+
+    // Checking navigator.onLine prevents rapid retry loops when completely offline
+    // We relies on window 'online' event to trigger immediate retry
+    if (!navigator.onLine) {
+      console.log("[ws] Offline, pausing reconnection until online event");
       return;
     }
 
@@ -126,13 +133,18 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
     reconnectTimeoutRef.current = setTimeout(() => {
       retriesRef.current++;
-      connect();
+      connectRef.current();
     }, delay);
   }, []);
 
   const handleMessage = useCallback(async (event: MessageEvent) => {
     const text = event.data;
-    if (text === "ping" || text === "pong") return;
+    if (text === "ping") {
+      wsRef.current?.send("pong");
+      return;
+    }
+    // Backend doesn't send "pong", so we don't track it anymore
+    if (text === "pong") return;
 
     try {
       const msg: ServerMessage = JSON.parse(text);
@@ -142,7 +154,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
       // Handle presence
       if (msg.content === MSG_PRESENCE_JOIN) {
-        console.log("[ws] Received JOIN from", msg.device_id, msg.device_name);
         onDeviceJoinRef.current({
           id: msg.device_id,
           name: msg.device_name || "Unknown",
@@ -189,7 +200,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
   const connect = useCallback(() => {
     if (!token || !deviceIdRef.current) {
-      console.log("[ws] Cannot connect: missing token or deviceId");
       return;
     }
 
@@ -205,13 +215,11 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     retriesRef.current = 0; // Reset retries on manual connect (e.g. pull-to-refresh)
 
     const wsUrl = `${config.wsUrl}?token=${token}`;
-    console.log("[ws] Connecting to:", wsUrl.replace(token, "***"));
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
-      console.log("[ws] Connected, sending handshake");
       retriesRef.current = 0;
       updateConnectionState(true);
 
@@ -225,18 +233,25 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       };
       ws.send(JSON.stringify(handshake));
 
-      // Start ping interval
+      // Start ping interval (keep-alive only)
       pingIntervalRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send("ping");
         }
       }, PING_INTERVAL_MS);
+
+      // Flush queue
+      while (messageQueueRef.current.length > 0) {
+        const msg = messageQueueRef.current.shift();
+        if (msg) {
+          sendRef.current?.(msg);
+        }
+      }
     };
 
     ws.onmessage = handleMessage;
 
     ws.onclose = (event) => {
-      console.log(`[ws] Closed: code=${event.code}, reason=${event.reason}`);
       cleanup();
       updateConnectionState(false);
 
@@ -258,8 +273,35 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     };
   }, [token, cleanup, updateConnectionState, handleMessage, scheduleReconnect]);
 
+  // Update connectRef
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
+
+  // Add network status listeners
+  useEffect(() => {
+    const handleOnline = () => {
+      console.log("[ws] Network online detected, reconnecting immediately");
+      cleanup();
+      retriesRef.current = 0;
+      connect();
+    };
+
+    const handleOffline = () => {
+      console.log("[ws] Network offline detected");
+      updateConnectionState(false);
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, [connect, cleanup]);
+
   const disconnect = useCallback(() => {
-    console.log("[ws] Intentional disconnect");
     intentionalCloseRef.current = true;
     cleanup();
     if (wsRef.current) {
@@ -272,7 +314,8 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
   const send = useCallback((content: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn("[ws] Cannot send: not connected");
+      console.log("[ws] Connection not open, queuing message");
+      messageQueueRef.current.push(content);
       return;
     }
 
@@ -297,37 +340,10 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     }
   }, []);
 
-  // Setup Network Listeners (separate from unmount cleanup)
+  // Update sendRef
   useEffect(() => {
-    const handleOnline = () => {
-      console.log("[ws] Network online, attempting reconnect");
-      if (
-        !intentionalCloseRef.current &&
-        wsRef.current?.readyState !== WebSocket.OPEN
-      ) {
-        retriesRef.current = 0;
-        if (reconnectTimeoutRef.current) {
-          clearTimeout(reconnectTimeoutRef.current);
-          reconnectTimeoutRef.current = null;
-        }
-        connect();
-      }
-    };
-
-    const handleOffline = () => {
-      console.log("[ws] Network offline");
-      updateConnectionState(false);
-      // Don't close the socket - let it timeout naturally or reconnect
-    };
-
-    window.addEventListener("online", handleOnline);
-    window.addEventListener("offline", handleOffline);
-
-    return () => {
-      window.removeEventListener("online", handleOnline);
-      window.removeEventListener("offline", handleOffline);
-    };
-  }, [connect, updateConnectionState]);
+    sendRef.current = send;
+  }, [send]);
 
   // Cleanup WebSocket on unmount ONLY
   useEffect(() => {

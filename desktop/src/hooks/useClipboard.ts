@@ -88,7 +88,7 @@ export function useClipboard() {
         };
 
         lastSentRef.current = text;
-        const updated = [newEntry, ...prev].slice(0, 50);
+        const updated = [newEntry, ...prev].slice(0, 500);
         saveToStore(updated);
         return updated;
       });

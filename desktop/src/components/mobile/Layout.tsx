@@ -4,9 +4,22 @@ import { Dashboard } from './Dashboard';
 import { History } from './History';
 import { Settings } from './Settings';
 import { DetailModal } from './DetailModal';
-import { AppState, MobileView, ClipboardEntry, ContentType } from '../../types';
+import { MobileView, ClipboardEntry, ContentType, LinkedDevice } from '../../types';
 
-interface MobileActions {
+interface MobileLayoutProps {
+  // State props - passed directly
+  history: ClipboardEntry[];
+  devices: LinkedDevice[];
+  mobileView: MobileView;
+  filterType: ContentType | "all";
+  searchQuery: string;
+  selectedEntry: ClipboardEntry | null;
+  connected: boolean;
+  isLoading: boolean;
+  isRefreshing: boolean;
+  email: string;
+  
+  // Action handlers - passed directly
   onCopy: (text: string) => void;
   onDelete: (id: string) => void;
   onClearHistory: () => void;
@@ -23,14 +36,36 @@ interface MobileActions {
   onRefresh: () => Promise<void>;
 }
 
-interface MobileLayoutProps {
-  state: AppState;
-  actions: MobileActions;
-}
-
-export const MobileLayout: React.FC<MobileLayoutProps> = ({ state, actions }) => {
+export const MobileLayout: React.FC<MobileLayoutProps> = ({
+  // State
+  history,
+  devices,
+  mobileView,
+  filterType,
+  searchQuery,
+  selectedEntry,
+  connected,
+  isLoading,
+  isRefreshing,
+  email,
+  // Actions
+  onCopy,
+  onDelete,
+  onClearHistory,
+  onLogout,
+  onScanQR,
+  onEnterKey,
+  onShowPairingCode,
+  onShowDevices,
+  onViewChange,
+  onSearchChange,
+  onFilterChange,
+  onSelectEntry,
+  onPin,
+  onRefresh,
+}) => {
   // Calculate horizontal offset for sliding effect
-  const viewIndex = state.mobileView === 'dashboard' ? 0 : state.mobileView === 'history' ? 1 : 2;
+  const viewIndex = mobileView === 'dashboard' ? 0 : mobileView === 'history' ? 1 : 2;
   const slideOffset = `-${viewIndex * 100}%`;
 
   return (
@@ -44,75 +79,79 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({ state, actions }) =>
          className="relative w-full h-full flex transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
          style={{ transform: `translateX(${slideOffset})` }}
        >
-         {/* View Containers - each takes full width and height with its own scroll */}
+         {/* Dashboard */}
          <div className="w-full h-full shrink-0 pt-0 pb-0 max-w-2xl mx-auto">
            <Dashboard 
-             isLoading={state.isLoading}
-             connected={state.connected}
-             history={state.history}
-             devices={state.devices}
-             onCopy={actions.onCopy}
-             onViewAllHistory={() => actions.onViewChange('history')}
-             onShowDevices={actions.onShowDevices}
-             onScanQR={actions.onScanQR}
-             onEnterKey={actions.onEnterKey}
-             onShowPairingCode={actions.onShowPairingCode}
-             onDelete={actions.onDelete}
-             onRefresh={actions.onRefresh}
-             isRefreshing={state.isRefreshing}
+             isLoading={isLoading}
+             connected={connected}
+             history={history}
+             devices={devices}
+             onCopy={onCopy}
+             onViewAllHistory={() => onViewChange('history')}
+             onShowDevices={onShowDevices}
+             onScanQR={onScanQR}
+             onEnterKey={onEnterKey}
+             onShowPairingCode={onShowPairingCode}
+             onDelete={onDelete}
+             onRefresh={onRefresh}
+             isRefreshing={isRefreshing}
            />
          </div>
 
+         {/* History */}
          <div className="w-full h-full shrink-0 pt-0 pb-0 max-w-2xl mx-auto">
            <History 
-             isLoading={state.isLoading}
-             history={state.history}
-             isRefreshing={state.isRefreshing}
-             searchQuery={state.searchQuery}
-             filterType={state.filterType}
-             onSearchChange={actions.onSearchChange}
-             onFilterChange={actions.onFilterChange}
-             onClearHistory={actions.onClearHistory}
-             onBack={() => actions.onViewChange('dashboard')}
-             onItemClick={actions.onSelectEntry}
-             deviceCount={state.devices.length}
-             onRefresh={actions.onRefresh}
+             isLoading={isLoading}
+             history={history}
+             isRefreshing={isRefreshing}
+             searchQuery={searchQuery}
+             filterType={filterType}
+             onSearchChange={onSearchChange}
+             onFilterChange={onFilterChange}
+             onClearHistory={onClearHistory}
+             onBack={() => onViewChange('dashboard')}
+             onItemClick={onSelectEntry}
+             deviceCount={devices.length}
+             onRefresh={onRefresh}
            />
          </div>
 
+         {/* Settings */}
          <div className="w-full h-full shrink-0 pt-0 pb-0 max-w-2xl mx-auto">
            <Settings 
-             email={state.email || ""}
-             devices={state.devices}
-             historyCount={state.history.length}
-             onClearHistory={actions.onClearHistory}
-             onLogout={actions.onLogout}
-             onShowDevices={actions.onShowDevices}
-             onScanQR={actions.onScanQR}
-             onEnterKey={actions.onEnterKey}
-             onShowPairingCode={actions.onShowPairingCode}
+             email={email}
+             devices={devices}
+             historyCount={history.length}
+             onClearHistory={onClearHistory}
+             onLogout={onLogout}
+             onShowDevices={onShowDevices}
+             onScanQR={onScanQR}
+             onEnterKey={onEnterKey}
+             onShowPairingCode={onShowPairingCode}
+             onViewHistory={() => onViewChange('history')}
            />
          </div>
        </div>
  
+       {/* Bottom Nav */}
        <div className="fixed bottom-0 left-0 right-0 z-80 flex justify-center pointer-events-none pb-safe">
          <div className="w-full max-w-2xl pointer-events-auto">
            <Nav 
-             currentView={state.mobileView} 
-             onChange={actions.onViewChange}
-             badgeCount={state.history.length}
+             currentView={mobileView} 
+             onChange={onViewChange}
+             badgeCount={history.length}
            />
          </div>
        </div>
 
       {/* Mobile Detail Modal */}
-      {state.selectedEntry && (
+      {selectedEntry && (
         <DetailModal 
-          entry={state.selectedEntry}
-          onClose={() => actions.onSelectEntry(null)}
-          onCopy={actions.onCopy}
-          onPin={actions.onPin}
-          onDelete={actions.onDelete}
+          entry={selectedEntry}
+          onClose={() => onSelectEntry(null)}
+          onCopy={onCopy}
+          onPin={onPin}
+          onDelete={onDelete}
         />
       )}
     </div>

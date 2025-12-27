@@ -31,13 +31,13 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
   onCopyConstructor
 }) => {
 
-  const filteredHistory = history.filter((entry) => {
+  const filteredHistory = React.useMemo(() => history.filter((entry) => {
     const matchesSearch = entry.content.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFilter = filterType === "all" || entry.contentType === filterType;
     return matchesSearch && matchesFilter;
-  });
+  }), [history, searchQuery, filterType]);
 
-  const groupedHistory = filteredHistory.reduce((groups, entry) => {
+  const groupedHistory = React.useMemo(() => filteredHistory.reduce((groups, entry) => {
     const date = new Date(entry.timestamp);
     const today = new Date();
     const yesterday = new Date(today);
@@ -56,7 +56,7 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
     }
     groups[key].push(entry);
     return groups;
-  }, {} as Record<string, ClipboardEntry[]>);
+  }, {} as Record<string, ClipboardEntry[]>), [filteredHistory]);
 
   return (
     <aside className="w-80 h-screen bg-[#1a1b1e] border-r border-white/5 flex flex-col overflow-hidden relative">

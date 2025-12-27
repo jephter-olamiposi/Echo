@@ -13,6 +13,7 @@ interface MobileSettingsProps {
   onScanQR: () => void;
   onEnterKey: () => void;
   onShowPairingCode: () => void;
+  onViewHistory: () => void;
 }
 
 export const Settings: React.FC<MobileSettingsProps> = ({
@@ -24,7 +25,8 @@ export const Settings: React.FC<MobileSettingsProps> = ({
   onShowDevices,
   onScanQR,
   onEnterKey,
-  onShowPairingCode
+  onShowPairingCode,
+  onViewHistory
 }) => {
   return (
     <div className="flex flex-col h-full w-full bg-black text-white overflow-hidden">
@@ -107,7 +109,7 @@ export const Settings: React.FC<MobileSettingsProps> = ({
               <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Data & Storage</h3>
             </div>
             <div className="flex flex-col bg-zinc-900/40 rounded-2xl overflow-hidden border border-white/5 divide-y divide-white/5">
-              <div className="flex items-center gap-3 p-4 w-full text-left">
+              <button className="flex items-center gap-3 p-4 w-full text-left active:bg-white/5 transition-colors" onClick={onViewHistory}>
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center text-amber-400 bg-amber-400/15">
                   <div className="w-5 h-5">{Icons.history}</div>
                 </div>
@@ -115,7 +117,10 @@ export const Settings: React.FC<MobileSettingsProps> = ({
                   <span className="block text-sm font-medium text-white">History Items</span>
                   <span className="text-[11px] text-zinc-500 block">{historyCount} items stored</span>
                 </div>
-              </div>
+                <div className="text-zinc-700">
+                  <div className="w-4 h-4">{Icons.chevron}</div>
+                </div>
+              </button>
               
               {historyCount > 0 && (
                 <button className="flex items-center gap-3 p-4 w-full text-left active:bg-white/5 transition-colors" onClick={onClearHistory}>

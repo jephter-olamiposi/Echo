@@ -43,7 +43,6 @@ export function usePushNotifications({
         });
 
         if (response.ok) {
-          console.log("[Push] Token registered with backend");
           hasRegistered.current = true;
         }
       } catch (error) {
@@ -66,7 +65,7 @@ export function usePushNotifications({
         const bridge = window.EchoBridge;
         if (!bridge) {
           setTimeout(initPush, 500);
-          return;
+          return; // Original return statement
         }
 
         const fcmToken = bridge.getFcmToken();
@@ -89,13 +88,28 @@ export function usePushNotifications({
     const checkPushOpen = () => {
       const bridge = window.EchoBridge;
       if (bridge?.wasOpenedFromPush()) {
+        console.log("[Push] App opened from notification");
         onSyncRequest();
       }
     };
 
+    // Check on mount
     checkPushOpen();
-    const interval = setInterval(checkPushOpen, 2000);
-    return () => clearInterval(interval);
+
+    // Check when app comes to foreground or window gets focus
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        checkPushOpen();
+      }
+    };
+
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("focus", checkPushOpen);
+
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("focus", checkPushOpen);
+    };
   }, [onSyncRequest]);
 
   return { registerPushToken };

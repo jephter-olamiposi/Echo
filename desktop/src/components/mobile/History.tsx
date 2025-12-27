@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Icons } from '../Icons';
 import { MobileHeader } from './Header';
 import { 
@@ -51,6 +51,32 @@ export const History: React.FC<MobileHistoryProps> = ({
     return matchesSearch && matchesFilter;
   }), [history, searchQuery, filterType]);
 
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
+  
+  const visibleHistory = useMemo(() => {
+    return filteredHistory.slice(0, page * ITEMS_PER_PAGE);
+  }, [filteredHistory, page]);
+
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && visibleHistory.length < filteredHistory.length) {
+          setPage((prev) => prev + 1);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (loadMoreRef.current) {
+      observer.observe(loadMoreRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [visibleHistory.length, filteredHistory.length]);
+
   return (
     <div className="flex flex-col h-full bg-black w-full pb-20 md:pb-0">
       <div className="shrink-0 z-30 bg-black/80 backdrop-blur-xl border-b border-white/5 sticky top-0">
@@ -94,20 +120,18 @@ export const History: React.FC<MobileHistoryProps> = ({
             )}
           </div>
 
-          <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth -mx-4 px-4 touch-pan-x">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-smooth -mx-4 px-4">
             {(["all", "text", "code", "url"] as const).map((type) => {
               const isActive = filterType === type;
               return (
                 <button
                   key={type}
                   type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    haptic.selection();
+                  onClick={() => {
                     onFilterChange(type);
+                    haptic.selection();
                   }}
-                  className={`px-5 py-2 rounded-xl text-[12px] font-bold uppercase tracking-wider whitespace-nowrap transition-all active:scale-95 border select-none touch-manipulation ${
+                  className={`px-5 py-2 rounded-xl text-[12px] font-bold uppercase tracking-wider whitespace-nowrap active:scale-95 border select-none transition-colors duration-150 ${
                     isActive 
                       ? "bg-purple-600 border-purple-400 text-white shadow-lg shadow-purple-600/20" 
                       : "bg-zinc-900/50 border-white/5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800"
@@ -154,9 +178,9 @@ export const History: React.FC<MobileHistoryProps> = ({
                   </div>
                ))}
             </div>
-          ) : filteredHistory.length > 0 ? (
+          ) : visibleHistory.length > 0 ? (
             <div className="flex flex-col gap-3">
-              {filteredHistory.map((entry) => (
+              {visibleHistory.map((entry) => (
                 <button 
                   key={entry.id}
                   className="flex items-center gap-4 p-4 w-full bg-zinc-900/30 rounded-2xl border border-white/5 text-left active:bg-white/10 active:scale-[0.98] transition-all group"
@@ -191,6 +215,7 @@ export const History: React.FC<MobileHistoryProps> = ({
                   </div>
                 </button>
               ))}
+              <div ref={loadMoreRef} className="h-4 w-full" />
             </div>
           ) : (
             <div className="pt-10">

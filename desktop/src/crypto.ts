@@ -92,7 +92,15 @@ export async function getOrCreateDeviceId(): Promise<string> {
 export const exportKey = (key: Uint8Array) => toBase64Url(key);
 export const importKey = (str: string) => fromBase64Url(str);
 
-const toBase64 = (b: Uint8Array) => btoa(String.fromCharCode(...b));
+const toBase64 = (b: Uint8Array) => {
+  const CHUNK_SIZE = 0x8000;
+  const arr = [];
+  for (let i = 0; i < b.length; i += CHUNK_SIZE) {
+    // @ts-expect-error - apply accepts number[] but we pass Uint8Array subarray which works
+    arr.push(String.fromCharCode.apply(null, b.subarray(i, i + CHUNK_SIZE)));
+  }
+  return btoa(arr.join(""));
+};
 const fromBase64 = (s: string) =>
   Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 const toBase64Url = (b: Uint8Array) =>

@@ -413,26 +413,6 @@ function App() {
     return Icons.devices;
   };
 
-  const mobileActions = {
-    onCopy: clipboard.copyToClipboard,
-    onDelete: clipboard.deleteEntry,
-    onLogout: handleLogout,
-    onScanQR: handleScanQR,
-    onRefresh: handleRefresh,
-    onShowDevices: () => setShowDevices(true),
-    onShowPairingCode: () => setShowQR(true),
-    onEnterKey: () => setShowKeyInput(true),
-    onViewChange: (v: MobileView) => setMobileView(v),
-    onSearchChange: setSearchQuery,
-    onFilterChange: setFilterType,
-    onSelectEntry: setSelectedEntry,
-    onPin: clipboard.togglePin,
-    onViewAllHistory: () => setMobileView("history"),
-    onClearHistory: () => {
-      setShowClearConfirm(true);
-    }
-  };
-
   const derivedState: AppState = useMemo(() => ({
     history: clipboard.history,
     connected,
@@ -471,7 +451,32 @@ function App() {
       
       <div className={`transition-opacity duration-300 ${isScanning ? 'opacity-0' : 'opacity-100'}`}>
         <div className="block md:hidden h-dvh w-full">
-          <MobileLayout state={derivedState} actions={mobileActions} />
+          <MobileLayout 
+            history={clipboard.history}
+            devices={devices}
+            mobileView={mobileView}
+            filterType={filterType}
+            searchQuery={searchQuery}
+            selectedEntry={selectedEntry}
+            connected={connected}
+            isLoading={isLoading}
+            isRefreshing={isRefreshing}
+            email={email || ""}
+            onCopy={clipboard.copyToClipboard}
+            onDelete={clipboard.deleteEntry}
+            onClearHistory={() => setShowClearConfirm(true)}
+            onLogout={handleLogout}
+            onScanQR={handleScanQR}
+            onEnterKey={() => setShowKeyInput(true)}
+            onShowPairingCode={() => setShowQR(true)}
+            onShowDevices={() => setShowDevices(true)}
+            onViewChange={setMobileView}
+            onSearchChange={setSearchQuery}
+            onFilterChange={setFilterType}
+            onSelectEntry={setSelectedEntry}
+            onPin={clipboard.togglePin}
+            onRefresh={handleRefresh}
+          />
         </div>
 
         <div className="hidden md:flex flex-row h-screen w-full overflow-hidden bg-black text-white"> 

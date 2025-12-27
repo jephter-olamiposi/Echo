@@ -4,46 +4,46 @@
 
 ![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
-![Tauri](https://img.shields.io/badge/Tauri-FFC131?style=flat&logo=tauri&logoColor=black)
-![React](https://img.shields.io/badge/React-20232A?style=flat&logo=react&logoColor=61DAFB)
+![Tauri](https://img.shields.io/badge/Tauri_v2-FFC131?style=flat&logo=tauri&logoColor=black)
+![React](https://img.shields.io/badge/React_19-20232A?style=flat&logo=react&logoColor=61DAFB)
+![Android](https://img.shields.io/badge/Android-3DDC84?style=flat&logo=android&logoColor=white)
+![iOS](https://img.shields.io/badge/iOS-000000?style=flat&logo=apple&logoColor=white)
 
 ## ✨ Features
 
-- 🔄 **Real-time Sync** — Clipboard changes sync instantly across all devices
-- 🔐 **End-to-End Encryption** — Optional AES-256-GCM encryption (your passphrase never leaves your device)
-- 📱 **QR Code Device Linking** — Scan to connect new devices in seconds
-- 🖥️ **Cross-Platform** — macOS, Windows, Linux (mobile coming soon)
-- 📜 **Clipboard History** — Access your last 50 clipboard items
-- ⚡ **Low Latency** — WebSocket-based for sub-second sync
-- 🛡️ **Rate Limiting** — Built-in protection against abuse
+- 🔄 **Real-time Sync** — Clipboard changes sync instantly across all devices via WebSockets.
+- 📱 **Mobile Support** — Native Android and iOS apps built with Tauri v2.
+- 🔔 **Tap to Sync** — Smart push notifications (FCM) explicitly sync clipboard data on mobile to bypass background restrictions.
+- 🔐 **End-to-End Encryption** — Optional AES-256-GCM encryption. Your data is encrypted before it leaves your device.
+- 🔗 **QR Code Linking** — Securely pair new devices in seconds by scanning a QR code.
+- 📜 **Clipboard History** — Access and search your recent clipboard items.
+- ⚡ **High Performance** — Rust backend and Rust-based native mobile bindings for maximum speed.
 
 ## 🏗️ Architecture
 
+```mermaid
+graph TD
+    subgraph Devices
+        A[Desktop macOS/Win/Lin]
+        B[Mobile Android/iOS]
+    end
+
+    subgraph Backend
+        S[Echo Server Rust/Axum]
+        DB[(PostgreSQL)]
+        FCM[Firebase Cloud Messaging]
+    end
+
+    A <-->|WebSocket| S
+    B <-->|WebSocket| S
+    S -->|Push Notification| FCM
+    FCM -->|Wake Up/Sync| B
+    S <--> DB
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        Echo Architecture                         │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                   │
-│   ┌──────────┐     ┌──────────┐     ┌──────────┐                │
-│   │ Device A │     │ Device B │     │ Device C │                │
-│   │ (macOS)  │     │ (Windows)│     │ (Mobile) │                │
-│   └────┬─────┘     └────┬─────┘     └────┬─────┘                │
-│        │                │                │                       │
-│        │    WebSocket   │    WebSocket   │                       │
-│        └───────────┬────┴────────────────┘                       │
-│                    │                                              │
-│              ┌─────▼─────┐                                       │
-│              │   Echo    │  Hub-and-Spoke Model                  │
-│              │  Backend  │  (Rust + Axum)                        │
-│              └─────┬─────┘                                       │
-│                    │                                              │
-│              ┌─────▼─────┐                                       │
-│              │ PostgreSQL│                                       │
-│              │    DB     │                                       │
-│              └───────────┘                                       │
-│                                                                   │
-└─────────────────────────────────────────────────────────────────┘
-```
+
+- **Hub-and-Spoke**: A central Rust server coordinates sync.
+- **WebSockets**: Primary real-time transport for active devices.
+- **FCM (Firebase Cloud Messaging)**: Used to wake up or notify mobile devices when the app is in the background, enabling "Tap to Sync".
 
 ## 🚀 Quick Start
 
@@ -52,156 +52,97 @@
 - [Rust](https://rustup.rs/) (1.70+)
 - [Node.js](https://nodejs.org/) (18+)
 - [PostgreSQL](https://www.postgresql.org/) (14+)
+- **Mobile Dev**: Android Studio (for Android) or Xcode (for iOS).
 
-### 1. Clone & Setup Database
+### 1. Backend Setup
 
 ```bash
 git clone https://github.com/jephter-olamiposi/echo.git
-cd echo
+cd echo/backend
 
-# Create database
+# 1. Setup Database
 createdb echo_db
-```
+# Copy environment file
+cp .env.example .env
+# Update .env with your DATABASE_URL
 
-### 2. Configure Environment
-
-```bash
-# Backend
-cp backend/.env.example backend/.env
-# Edit backend/.env with your database credentials
-
-# Frontend (optional, for production URLs)
-cp desktop/.env.example desktop/.env
-```
-
-### 3. Run Migrations
-
-```bash
-cd backend
+# 2. Run Migrations
 cargo install sqlx-cli
 sqlx migrate run
-```
 
-### 4. Start Backend
+# 3. Setup Firebase (Optional for Mobile Push)
+# Place your 'service-account.json' in the backend/ directory
+# and update .env with GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
 
-```bash
-cd backend
+# 4. Run Server
 cargo run
-# Server starts at http://localhost:3000
+# Server starts at http://0.0.0.0:3000
 ```
 
-### 5. Start Desktop App
+### 2. Frontend & Mobile Setup
+
+The desktop and mobile apps share the same codebase in `desktop/`.
 
 ```bash
 cd desktop
+
+# 1. Install Dependencies
 npm install
+
+# 2. Configure Env
+cp .env.example .env
+# Set VITE_API_URL=http://<YOUR_IP>:3000
+# Set VITE_WS_URL=ws://<YOUR_IP>:3000
+# IMPORTANT: For mobile, use your local IP, not localhost!
+
+# 3. Run Desktop Dev
 npm run tauri dev
+
+# 4. Run Mobile Dev
+# Ensure an emulator is running or device is connected
+npm run tauri android dev
+# OR
+npm run tauri ios dev
 ```
-
-## 📱 Device Linking
-
-Echo uses QR codes for easy device pairing:
-
-1. **Open Echo** on your primary device
-2. Click **"📱 Link Device"** to show QR code
-3. **Scan the QR code** with your mobile/secondary device
-4. Devices are now synced!
-
-The QR code contains your session token and server URLs, allowing instant connection without manual login on new devices.
 
 ## 🔐 End-to-End Encryption
 
-Echo supports optional E2EE using AES-256-GCM:
+Echo supports optional E2EE. When enabled:
+1.  A random 256-bit key is generated from your passphrase (PBKDF2).
+2.  Content is encrypted with AES-256-GCM before sending to the server.
+3.  The server stores only encrypted blobs.
+4.  Other devices need the same passphrase to decrypt and view content.
 
-1. Click **"🔐 Enable E2EE"** in the dashboard
-2. Enter a **passphrase** (use the same passphrase on all devices)
-3. All clipboard data is now encrypted client-side
+## 📱 "Tap to Sync" (Mobile)
 
-**Security Details:**
-- Key derivation: PBKDF2 with 100,000 iterations
-- Encryption: AES-256-GCM with random nonces
-- The server only sees encrypted ciphertext
-- Passphrase never leaves your device
-
-## 📁 Project Structure
-
-```
-echo/
-├── backend/              # Rust API server
-│   ├── src/
-│   │   ├── main.rs       # Entry point, router setup
-│   │   ├── handler.rs    # HTTP & WebSocket handlers
-│   │   ├── state.rs      # AppState, SyncEngine
-│   │   ├── models.rs     # Request/response types
-│   │   ├── middleware.rs # Auth middleware
-│   │   ├── error.rs      # Error handling
-│   │   └── tests.rs      # Unit tests
-│   └── migrations/       # SQL migrations
-├── desktop/              # Tauri desktop app
-│   ├── src/              # React frontend
-│   │   ├── App.tsx       # Main UI
-│   │   ├── crypto.ts     # E2EE utilities
-│   │   ├── auth.ts       # Token storage
-│   │   └── config.ts     # Environment config
-│   └── src-tauri/        # Rust backend
-│       └── src/
-│           ├── lib.rs    # Tauri setup
-│           └── clipboard.rs  # Clipboard monitoring
-└── README.md
-```
+On Android and iOS, background clipboard access is restricted. Echo solves this with **Tap to Sync**:
+1.  When you copy on Desktop, the Server receives the data.
+2.  Server sends a high-priority FCM notification to your Mobile device.
+3.  Notification appears: *"Tap to sync from Desktop"*.
+4.  Tapping the notification opens Echo and instantly syncs the clipboard.
 
 ## 🔧 Configuration
 
 ### Backend (`backend/.env`)
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | Required |
-| `JWT_SECRET` | Secret for JWT signing | Required |
-| `RUST_LOG` | Log level (debug, info, warn, error) | `debug` |
+| Variable | Description | Required |
+|----------|-------------|----------|
+| `DATABASE_URL` | Postgres connection string | Yes |
+| `JWT_SECRET` | Secret for signing auth tokens | Yes |
+| `GOOGLE_PROJECT_ID` | Firebase Project ID (for FCM) | No |
+| `FIREBASE_SERVICE_ACCOUNT` | Path to service account JSON | No |
 
 ### Frontend (`desktop/.env`)
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `VITE_API_URL` | Backend API URL | `http://localhost:3000` |
-| `VITE_WS_URL` | WebSocket URL | `ws://localhost:3000` |
+| `VITE_API_URL` | HTTP URL of backend | `http://localhost:3000` |
+| `VITE_WS_URL` | WebSocket URL of backend | `ws://localhost:3000` |
 
-## 🧪 Running Tests
+## 🤝 Contributing
 
-```bash
-cd backend
-cargo test
-```
-
-## 🚢 Deployment
-
-### Backend (Railway/Fly.io)
-
-1. Set environment variables in your hosting platform
-2. Deploy the `backend/` directory
-3. Run migrations: `sqlx migrate run`
-
-### Desktop App
-
-```bash
-cd desktop
-npm run tauri build
-# Outputs to desktop/src-tauri/target/release/bundle/
-```
-
-## 🛣️ Roadmap
-
-- [ ] Mobile apps (iOS/Android via Tauri)
-- [ ] Image/file clipboard sync
-- [ ] Clipboard sharing between users
-- [ ] Browser extension
-- [ ] Self-hosted Docker deployment
+PRs are welcome! Please match the existing code style (Rustfmt for backend, Prettier for frontend).
 
 ## 📄 License
 
 MIT © [Jephter Olamiposi](https://github.com/jephter-olamiposi)
-
----
-
-**Built with ❤️ using Rust, TypeScript, and Tauri**
