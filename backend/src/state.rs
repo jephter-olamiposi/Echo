@@ -90,37 +90,7 @@ impl AppState {
             .or_default()
             .insert(device_id.to_string(), token.to_string());
         tracing::info!(user = %user_id, device = %device_id, "Push token registered");
-
-        // Persist to database (fire-and-forget)
-        let pool = self.pool.clone();
-        let tokens_snapshot: Vec<serde_json::Value> = self
-            .push_tokens
-            .get(&user_id)
-            .map(|t| {
-                t.iter()
-                    .map(|(dev, tok)| {
-                        serde_json::json!({
-                            "device_id": dev,
-                            "token": tok
-                        })
-                    })
-                    .collect()
-            })
-            .unwrap_or_default();
-
-        tokio::spawn(async move {
-            let json = serde_json::Value::Array(tokens_snapshot);
-            if let Err(e) = sqlx::query!(
-                "UPDATE users SET push_tokens = $1 WHERE id = $2",
-                json,
-                user_id
-            )
-            .execute(&pool)
-            .await
-            {
-                tracing::warn!(user = %user_id, error = %e, "Failed to persist push token to DB");
-            }
-        });
+        self.persist_push_tokens(user_id);
     }
 
     pub fn get_offline_push_tokens(&self, user_id: &Uuid, exclude_device: &str) -> Vec<String> {
@@ -135,36 +105,31 @@ impl AppState {
             .map(|tokens| {
                 tokens
                     .iter()
-                    .filter(|(dev_id, _token)| {
+                    .filter(|(dev_id, _)| {
                         *dev_id != exclude_device && !active_devices.contains(*dev_id)
                     })
-                    .map(|(_dev_id, token)| token.clone())
+                    .map(|(_, token)| token.clone())
                     .collect()
             })
             .unwrap_or_default()
     }
 
-    /// Remove a push token by its value (used when FCM returns 404/410).
     pub fn remove_push_token_by_value(&self, user_id: &Uuid, token_value: &str) {
         if let Some(mut tokens) = self.push_tokens.get_mut(user_id) {
-            tokens.retain(|_device_id, token| token != token_value);
+            tokens.retain(|_, token| token != token_value);
             tracing::info!(user = %user_id, "Removed invalid push token");
         }
+        self.persist_push_tokens(*user_id);
+    }
 
-        // Persist to database
+    fn persist_push_tokens(&self, user_id: Uuid) {
         let pool = self.pool.clone();
-        let user_id = *user_id;
         let tokens_snapshot: Vec<serde_json::Value> = self
             .push_tokens
             .get(&user_id)
             .map(|t| {
                 t.iter()
-                    .map(|(dev, tok)| {
-                        serde_json::json!({
-                            "device_id": dev,
-                            "token": tok
-                        })
-                    })
+                    .map(|(dev, tok)| serde_json::json!({"device_id": dev, "token": tok}))
                     .collect()
             })
             .unwrap_or_default();
@@ -179,7 +144,7 @@ impl AppState {
             .execute(&pool)
             .await
             {
-                tracing::warn!(user = %user_id, error = %e, "Failed to persist push token removal to DB");
+                tracing::warn!(user = %user_id, error = %e, "Failed to persist push tokens");
             }
         });
     }
@@ -347,8 +312,7 @@ impl AppState {
                 let device_count = self.sessions.get(&user_id).map(|s| s.len()).unwrap_or(1); // At least 1 for the connecting device
 
                 let capacity = (device_count * CAPACITY_PER_DEVICE)
-                    .max(MIN_CHANNEL_CAPACITY)
-                    .min(MAX_CHANNEL_CAPACITY);
+                    .clamp(MIN_CHANNEL_CAPACITY, MAX_CHANNEL_CAPACITY);
 
                 tracing::debug!(
                     user = %user_id,
@@ -400,29 +364,13 @@ mod test_utils {
 
     impl SyncEngine {
         pub fn check_rate_limit(&self, device_id: &str) -> bool {
-            let now = Instant::now();
             let mut entry = self.rate_limits.entry(device_id.to_string()).or_default();
-            let state = entry.value_mut();
-
-            if let Some(last) = state.last_message {
-                if now.duration_since(last).as_millis() < MIN_INTERVAL_MS {
-                    return false;
-                }
-            }
-
-            let window_start = state.window_start.get_or_insert(now);
-            if now.duration_since(*window_start).as_secs() >= WINDOW_DURATION_SECS {
-                state.window_start = Some(now);
-                state.message_count = 0;
-            }
-
-            if state.message_count >= MAX_MESSAGES_PER_WINDOW {
-                return false;
-            }
-
-            state.last_message = Some(now);
-            state.message_count += 1;
-            true
+            check_rate_custom(
+                entry.value_mut(),
+                false,
+                MAX_MESSAGES_PER_WINDOW,
+                WINDOW_DURATION_SECS,
+            )
         }
 
         pub fn add_to_history(&self, user_id: Uuid, msg: ClipboardMessage) {

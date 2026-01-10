@@ -42,8 +42,6 @@ class MainActivity : TauriActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         
-        // ClipboardService.start(this)
-        
         val prefs = getSharedPreferences("echo_fcm", Context.MODE_PRIVATE)
         fcmToken = prefs.getString("token", null)
         

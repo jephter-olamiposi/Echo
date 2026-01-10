@@ -29,7 +29,6 @@ export function usePushNotifications({
   onSyncRequest,
 }: UsePushNotificationsOptions) {
   const hasRegistered = useRef(false);
-  const initRetryCount = useRef(0);
 
   const registerPushToken = useCallback(
     async (fcmToken: string) => {
@@ -51,16 +50,12 @@ export function usePushNotifications({
     [token, deviceId]
   );
 
-  // Reset registration when auth/device context changes to ensure re-register
   useEffect(() => {
     hasRegistered.current = false;
   }, [token, deviceId]);
 
   useEffect(() => {
     if (!token || !isConnected || hasRegistered.current) return;
-
-    // Reset retry counter for each new attempt
-    initRetryCount.current = 0;
 
     const initPush = async () => {
       try {

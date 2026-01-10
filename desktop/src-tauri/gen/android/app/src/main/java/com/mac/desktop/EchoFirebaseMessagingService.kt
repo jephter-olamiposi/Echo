@@ -59,9 +59,6 @@ class EchoFirebaseMessagingService : FirebaseMessagingService() {
             Log.d(TAG, "Message data payload: ${remoteMessage.data}")
             
             if (remoteMessage.data["type"] == "clipboard_sync") {
-                // Start the clipboard service
-                // ClipboardService.start(this)
-                
                 // Show a visible notification so user can tap to sync
                 val title = remoteMessage.data["title"] ?: "Echo"
                 val body = remoteMessage.data["body"] ?: "Tap to sync clipboard"
