@@ -26,9 +26,11 @@
       "identifier": "http:allow-fetch",
       "allow": [
         { "url": "http://localhost:3000/*" },
+        { "url": "http://10.0.2.2:3000/*" },
+        { "url": "http://10.0.3.2:3000/*" },
+        { "url": "https://api.qrserver.com/*" },
         { "url": "https://echo-production-784d.up.railway.app/*" },
-        { "url": "wss://echo-production-784d.up.railway.app/*" },
-        { "url": "https://api.qrserver.com/*" }
+        { "url": "wss://echo-production-784d.up.railway.app/*" }
       ]
     },
     "barcode-scanner:default",

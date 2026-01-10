@@ -20,7 +20,7 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
 }) => {
   return (
     <div 
-      className={`flex items-center justify-between px-4 sticky top-0 z-50 bg-black border-b border-white/5 ${className}`}
+      className={`flex items-center justify-between px-4 sticky top-0 z-50 bg-(--color-bg) border-b border-(--color-border) transition-colors duration-300 ${className}`}
       style={{ 
         height: 'calc(env(safe-area-inset-top, 0px) + 3.5rem)',
         paddingTop: 'env(safe-area-inset-top, 0px)' 
@@ -28,13 +28,13 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
     >
       <div className="min-w-10 flex items-start">
         {showBack && (
-          <button className="p-2 -ml-2 rounded-full hover:bg-white/10 active:scale-95 transition-all text-white" onClick={onBack}>
+          <button className="p-2 -ml-2 rounded-full hover:bg-(--color-surface-raised) active:scale-95 transition-all text-(--color-text-primary)" onClick={onBack}>
             {Icons.back}
           </button>
         )}
       </div>
       <div className="flex-1 flex justify-center items-center">
-        {title ? <h2 className="text-lg font-semibold text-white">{title}</h2> : centerAction}
+        {title ? <h2 className="text-lg font-semibold text-(--color-text-primary)">{title}</h2> : centerAction}
       </div>
       <div className="min-w-10 flex justify-end items-center">
         {rightAction}

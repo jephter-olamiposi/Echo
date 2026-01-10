@@ -4,8 +4,8 @@ import { Store } from "@tauri-apps/plugin-store";
 
 const KEY_BYTES = 32;
 const NONCE_BYTES = 24;
-const STORE_PATH = "echo-secrets.json";
-const STORE_KEYS = { key: "encryption_key", device: "device_id" } as const;
+const STORE_PATH = "store.json";
+const STORE_KEYS = { key: "echo_encryption_key", device: "device_id" } as const;
 
 let store: Store | null = null;
 const getStore = async () => (store ??= await Store.load(STORE_PATH));

@@ -1,16 +1,10 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Store } from "@tauri-apps/plugin-store";
-import { generateSecretKey, exportKey, importKey } from "../crypto";
-
-const KEY_STORAGE_KEY = "echo_encryption_key";
-let storeInstance: Store | null = null;
-
-const getStore = async () => {
-  if (!storeInstance) {
-    storeInstance = await Store.load("store.json");
-  }
-  return storeInstance;
-};
+import {
+  generateSecretKey,
+  exportKey,
+  saveEncryptionKey,
+  loadEncryptionKey,
+} from "../crypto";
 
 export function useKeys() {
   const [encryptionKey, setEncryptionKey] = useState<Uint8Array | null>(null);
@@ -41,9 +35,7 @@ export function useKeys() {
   };
 
   const saveKey = useCallback(async (key: Uint8Array) => {
-    const store = await getStore();
-    await store.set(KEY_STORAGE_KEY, exportKey(key));
-    await store.save();
+    await saveEncryptionKey(key);
     setEncryptionKey(key);
     await generateFingerprint(key);
     generateLink(key);
@@ -51,17 +43,11 @@ export function useKeys() {
 
   const initKeys = useCallback(async () => {
     try {
-      const store = await getStore();
-      const stored = await store.get<string>(KEY_STORAGE_KEY);
+      let key = await loadEncryptionKey();
 
-      let key: Uint8Array;
-
-      if (stored) {
-        key = importKey(stored);
-      } else {
+      if (!key) {
         key = await generateSecretKey();
-        await store.set(KEY_STORAGE_KEY, exportKey(key));
-        await store.save();
+        await saveEncryptionKey(key);
       }
 
       setEncryptionKey(key);

@@ -1,11 +1,25 @@
+import React from 'react';
 import { Icons } from '../Icons';
 import { MobileHeader } from './Header';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { ClipboardEntry, LinkedDevice } from '../../types';
 import { formatTime } from '../../utils';
 import { haptic } from '../../utils/haptics';
-import { Skeleton } from '../shared/Skeleton';
-import { CopyButton } from '../shared/CopyButton';
+import { Skeleton } from '../ui/Skeleton';
+import { CopyButton } from '../ui/CopyButton';
+import { Button } from '../ui/Button';
+import { Card } from '../ui/Card';
+import { StatusBadge } from '../ui/StatusBadge';
+import { QuickAction } from '../ui/QuickAction';
+import { StatCard } from '../ui/StatCard';
+import { useLanguage } from '../../contexts/LanguageContext';
+
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Dashboard Component
+ * 
+ * Main mobile dashboard showing connection status, latest clip, 
+ * recent history, and quick actions.
+ * ───────────────────────────────────────────────────────────────────────────── */
 
 interface MobileDashboardProps {
   isLoading?: boolean;
@@ -39,30 +53,28 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
   onRefresh
 }) => {
   const { containerRef, pullHeight, isLoading: isHookLoading } = usePullToRefresh(onRefresh);
+  const { t } = useLanguage();
   const activeRefreshing = isRefreshing || isHookLoading;
   const latestItem = history[0];
 
   return (
-    <div className="flex flex-col h-full w-full bg-black text-white overflow-hidden">
+    <div className="flex flex-col h-full w-full bg-transparent text-(--color-text-primary) overflow-hidden transition-colors duration-300">
       <MobileHeader 
-        centerAction={
-          <span className="text-lg font-bold tracking-tight text-white">Echo</span>
-        }
-        className="bg-black!" 
+        centerAction={<span className="text-[17px] font-semibold text-(--color-text-primary)">Echo</span>}
+        className="bg-transparent backdrop-blur-md sticky top-0 z-10" 
       />
 
       <div 
         ref={containerRef}
-        className="flex-1 overflow-y-auto custom-scrollbar pb-24 relative"
+        className="flex-1 overflow-y-auto custom-scrollbar pb-32! relative"
       >
+        {/* Pull to Refresh Indicator */}
         <div 
           className="absolute top-0 left-0 w-full flex items-center justify-center pointer-events-none z-40"
-          style={{ 
-            height: `${pullHeight}px`,
-          }}
+          style={{ height: `${pullHeight}px` }}
         >
           <div 
-            className={`p-2 rounded-full bg-zinc-800 border border-white/10 shadow-2xl mt-12 transition-all duration-300 ${activeRefreshing ? 'animate-pulse ring-4 ring-purple-500/20' : ''}`}
+            className={`p-2 rounded-full bg-(--color-surface-raised) border border-(--color-border) shadow-xl mt-12 transition-all duration-300 ${activeRefreshing ? 'animate-pulse ring-4 ring-purple-500/20' : ''}`}
             style={{ 
               opacity: Math.min(pullHeight / 50, 1),
               transform: activeRefreshing 
@@ -76,172 +88,156 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-col gap-6 max-w-xl mx-auto w-full p-4">
-          <div className="flex justify-center py-4">
+        <div className="flex flex-col gap-8 max-w-xl mx-auto w-full p-6 pt-2">
+          {/* Hero Status */}
+          <div className="flex justify-center py-6">
             {isLoading ? (
               <div className="flex flex-col items-center gap-3">
                 <Skeleton variant="rectangular" className="w-16 h-16 rounded-2xl!" />
-                <Skeleton variant="text" className="w-32 h-5" />
+                <Skeleton variant="text" className="w-32 h-5 rounded!" />
                 <Skeleton variant="circular" className="w-24 h-7 mt-1" />
               </div>
             ) : (
               <div className="flex flex-col items-center gap-3">
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center border transition-all duration-300 ${
-                  connected 
-                    ? 'bg-green-500/10 text-green-500 border-green-500/20 shadow-[0_0_20px_rgba(50,215,75,0.15)]' 
-                    : 'bg-white/5 text-zinc-500 border-white/5'
-                }`}>
-                  <div className="w-8 h-8 flex items-center justify-center">
+                <div 
+                  className={`w-20 h-20 rounded-3xl flex items-center justify-center border-2 transition-all duration-500 ${
+                    connected 
+                      ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.15)]' 
+                      : 'bg-(--color-surface) text-(--color-text-tertiary) border-(--color-border)'
+                  }`} 
+                  onClick={() => haptic.medium()}
+                >
+                  <div className="w-10 h-10 flex items-center justify-center">
                     {Icons.clipboard}
                   </div>
                 </div>
-                <h2 className="text-base font-semibold text-white/95 tracking-wide">
-                  {connected ? 'Ready to Sync' : 'Waiting for Device'}
+                <h2 className="text-[17px] font-semibold text-(--color-text-primary)">
+                  {connected ? t('ready_to_sync') : t('waiting_for_device')}
                 </h2>
-                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-800/90 border border-white/10 rounded-full mt-1">
-                  <div className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-500 shadow-[0_0_6px_rgba(50,215,75,0.5)]' : 'bg-zinc-500'}`}></div>
-                  <span className="text-[11px] font-semibold text-white/90 uppercase tracking-wider">
-                    {connected ? 'Connected' : 'Offline'}
-                  </span>
-                </div>
+                <StatusBadge status={connected ? 'online' : 'offline'} />
               </div>
             )}
           </div>
 
-          {/* Contextual Info Bar - Minimal or Loading */}
+          {/* Stats Bar */}
           {isLoading ? (
-            <div className="flex items-center justify-center gap-5 px-5 py-4 bg-zinc-900/40 border border-white/5 rounded-2xl">
-              <Skeleton variant="rectangular" className="w-12 h-10 rounded-lg!" />
-              <Skeleton variant="rectangular" className="w-12 h-10 rounded-lg!" />
-              <Skeleton variant="rectangular" className="w-12 h-10 rounded-lg!" />
-            </div>
+            <Card variant="ghost" padding="lg" className="flex items-center justify-center gap-5">
+              <Skeleton variant="rectangular" className="w-14 h-12 rounded-xl!" />
+              <Skeleton variant="rectangular" className="w-14 h-12 rounded-xl!" />
+              <Skeleton variant="rectangular" className="w-14 h-12 rounded-xl!" />
+            </Card>
           ) : (
-            <div className="flex items-center justify-between px-6 py-5 bg-zinc-900/80 border border-white/5 rounded-2xl backdrop-blur-md shadow-lg">
-              <div className="flex flex-col items-center gap-1 flex-1">
-                <span className="text-xl font-bold text-white tabular-nums">{history.length}</span>
-                <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Items</span>
-              </div>
-              <div className="w-px h-8 bg-white/10"></div>
-              <div className="flex flex-col items-center gap-1 flex-1 cursor-pointer active:opacity-70" onClick={() => { haptic.light(); onShowDevices(); }}>
-                <span className="text-xl font-bold text-white tabular-nums">{devices.length}</span>
-                <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Devices</span>
-              </div>
-              <div className="w-px h-8 bg-white/10"></div>
-              <div className="flex flex-col items-center gap-1 flex-1">
-                <span className="text-xl font-bold text-white">E2E</span>
-                <span className="text-[10px] font-medium text-zinc-400 uppercase tracking-wider">Encrypted</span>
-              </div>
-            </div>
+            <Card variant="default" padding="md" className="flex items-center justify-between">
+              <StatCard value={history.length} label={t('items')} />
+              <div className="w-px h-8 bg-(--color-border)" />
+              <StatCard value={devices.length} label={t('devices')} onClick={onShowDevices} />
+              <div className="w-px h-8 bg-(--color-border)" />
+              <StatCard value="E2E" label={t('encrypted')} />
+            </Card>
           )}
 
-          {/* Latest Item Preview - With Actions */}
+          {/* Latest Item Preview */}
           {!isLoading && latestItem && (
-            <div className="bg-zinc-800/30 border border-white/5 rounded-2xl p-5 transition-colors">
+            <Card variant="default" padding="lg" className="rounded-2xl">
               <div className="flex justify-between items-center mb-3">
-                <span className="text-xs font-semibold text-white/90 flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500"></span>
-                  Latest Clipboard
+                <span className="text-[13px] font-medium text-purple-400 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
+                  {t('latest_clip')}
                 </span>
-                <span className="text-[10px] text-zinc-500">Just now</span>
+                <span className="text-[12px] text-(--color-text-tertiary)">{formatTime(latestItem.timestamp)}</span>
               </div>
-              <p className="text-sm leading-relaxed text-zinc-300 font-mono line-clamp-2 overflow-hidden">
+              <p className="text-[15px] leading-relaxed text-(--color-text-secondary) line-clamp-2 overflow-hidden mb-5">
                 {latestItem.content.substring(0, 100)}
                 {latestItem.content.length > 100 ? '...' : ''}
               </p>
-              <div className="flex gap-3 mt-4 pt-4 border-t border-white/5">
-
+              <div className="flex gap-3">
                 <CopyButton 
                   content={latestItem.content}
                   onCopy={onCopy}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold bg-white/5 text-white hover:bg-white/10 active:scale-95 transition-all"
+                  className="flex-1 flex items-center justify-center gap-2 h-12 rounded-xl text-[15px] font-medium bg-(--color-text-primary) text-(--color-bg) active:scale-[0.98] transition-all hover:opacity-90"
                   iconClassName="w-4 h-4"
                 >
-                  Copy
+                  {t('copy')}
                 </CopyButton>
-                <button 
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-semibold text-red-500 border border-red-500/20 active:bg-red-500/10 active:scale-95 transition-all"
-                  onClick={() => onDelete(latestItem.id)}
-                >
-                  <span className="w-4 h-4">{Icons.trash}</span>
-                  <span>Delete</span>
-                </button>
+                <Button
+                  variant="secondary"
+                  size="md"
+                  icon={Icons.trash}
+                  className="w-12 text-red-500!"
+                  onClick={() => { haptic.medium(); onDelete(latestItem.id); }}
+                  aria-label={t('delete')}
+                />
               </div>
-            </div>
-          )}
-          
-          {/* Loading State for Latest Item */}
-          {isLoading && (
-             <div className="bg-zinc-800/30 border border-white/5 rounded-2xl p-5 flex flex-col gap-3 min-h-35">
-               <Skeleton variant="text" className="w-1/3 h-4 mb-2" />
-               <Skeleton variant="text" className="w-full h-4" />
-               <Skeleton variant="text" className="w-2/3 h-4" />
-             </div>
+            </Card>
           )}
 
           {/* Recent History Preview */}
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between px-1">
-              <h3 className="text-xs font-semibold text-white/60 uppercase tracking-widest">Recent History</h3>
-              <button 
-                className="text-purple-400 text-[11px] font-bold px-3 py-1 bg-purple-500/10 rounded-full active:scale-95 transition-all"
+              <h3 className="text-[13px] font-medium text-(--color-text-tertiary)">{t('recent')}</h3>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-purple-400 bg-purple-500/10"
                 onClick={onViewAllHistory}
               >
-                View All
-              </button>
+                {t('view_all')}
+              </Button>
             </div>
             
             {history.length > 0 ? (
-              <div className="bg-zinc-900/40 border border-white/5 rounded-2xl divide-y divide-white/5 overflow-hidden">
+              <Card variant="default" padding="none" className="divide-y divide-(--color-border) overflow-hidden">
                 {history.slice(0, 3).map((item) => (
                   <button 
                     key={item.id}
-                    className="flex justify-between items-center p-4 w-full text-left active:bg-white/5 transition-colors group"
+                    className="flex justify-between items-center min-h-14 px-4 w-full text-left active:bg-(--color-surface-raised) transition-colors"
                     onClick={() => { haptic.light(); onViewAllHistory(); }}
                   >
-                    <span className="text-sm text-zinc-300 truncate pr-4 group-hover:text-purple-400 transition-colors">
+                    <span className="text-[15px] text-(--color-text-secondary) truncate pr-4">
                       {item.content}
                     </span>
-                    <span className="text-[10px] text-zinc-600 shrink-0 uppercase tracking-tighter">
+                    <span className="text-[12px] text-(--color-text-tertiary) shrink-0">
                       {formatTime(item.timestamp).split(' ')[0]}
                     </span>
                   </button>
                 ))}
-              </div>
+              </Card>
             ) : !isLoading && (
-              <div className="bg-zinc-900/20 border border-dashed border-white/5 rounded-2xl p-8 flex flex-col items-center justify-center gap-2 text-center">
-                <span className="text-zinc-600 font-medium text-xs">No history yet</span>
-              </div>
+              <Card variant="outlined" padding="lg" className="border-dashed flex flex-col items-center justify-center gap-2 text-center">
+                <div className="w-8 h-8 text-(--color-text-tertiary)">{Icons.history}</div>
+                <span className="text-(--color-text-tertiary) text-[14px]">{t('no_history')}</span>
+              </Card>
             )}
           </div>
 
-          {/* Quick Actions - Primary Tasks */}
-          <div className="flex flex-col gap-3 mt-2">
-            <h3 className="text-xs font-semibold text-white/60 uppercase tracking-widest pl-1">Quick Actions</h3>
+          {/* Quick Actions */}
+          <div className="flex flex-col gap-4">
+            <h3 className="text-[13px] font-medium text-(--color-text-tertiary) pl-1">{t('quick_actions')}</h3>
             <div className="grid grid-cols-2 gap-3">
-              <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={() => { haptic.light(); onScanQR(); }}>
-                <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-green-400/10 text-green-400">
-                  <div className="w-5 h-5">{Icons.qr}</div>
-                </div>
-                <span className="text-[11px] font-medium text-zinc-300">Scan QR</span>
-              </button>
-              <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={() => { haptic.light(); onEnterKey(); }}>
-                <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-pink-400/10 text-pink-400">
-                  <div className="w-5 h-5">{Icons.shield}</div>
-                </div>
-                <span className="text-[11px] font-medium text-zinc-300">Enter Key</span>
-              </button>
-              <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={() => { haptic.light(); onShowPairingCode(); }}>
-                <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-blue-400/10 text-blue-400">
-                  <div className="w-5 h-5">{Icons.code}</div>
-                </div>
-                <span className="text-[11px] font-medium text-zinc-300">Pairing Code</span>
-              </button>
-              <button className="flex flex-col items-center justify-center gap-2 p-3.5 bg-zinc-800/40 border border-white/5 rounded-2xl cursor-pointer active:scale-95 active:bg-zinc-800/60 transition-all" onClick={() => { haptic.light(); onShowDevices(); }}>
-                <div className="w-9 h-9 flex items-center justify-center rounded-xl bg-violet-400/10 text-violet-400">
-                  <div className="w-5 h-5">{Icons.devices}</div>
-                </div>
-                <span className="text-[11px] font-medium text-zinc-300">Devices</span>
-              </button>
+              <QuickAction 
+                icon={Icons.qr} 
+                iconBg="bg-emerald-500/15 text-emerald-400" 
+                label={t('scan_qr')} 
+                onClick={onScanQR} 
+              />
+              <QuickAction 
+                icon={Icons.shield} 
+                iconBg="bg-amber-500/15 text-amber-400" 
+                label={t('enter_key')} 
+                onClick={onEnterKey} 
+              />
+              <QuickAction 
+                icon={Icons.code} 
+                iconBg="bg-sky-500/15 text-sky-400" 
+                label={t('show_pairing_code')}
+                onClick={onShowPairingCode} 
+              />
+              <QuickAction 
+                icon={Icons.devices} 
+                iconBg="bg-purple-500/15 text-purple-400" 
+                label={t('devices')} 
+                onClick={onShowDevices} 
+              />
             </div>
           </div>
         </div>

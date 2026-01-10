@@ -148,7 +148,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       wsRef.current?.send("pong");
       return;
     }
-    // Backend doesn't send "pong", so we don't track it anymore
+
     if (text === "pong") return;
 
     try {
@@ -179,11 +179,15 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       // Handle encryption for clipboard messages (non-presence/handshake)
       if (!msg.encrypted || !msg.nonce) {
         console.warn("[ws] Rejected unencrypted message");
-        onErrorRef.current?.("Received unencrypted message. Please ensure all devices have encryption enabled.");
+        onErrorRef.current?.(
+          "Received unencrypted message. Please ensure all devices have encryption enabled."
+        );
         return;
       }
       if (!encryptionKeyRef.current) {
-        onErrorRef.current?.("Encryption key required to receive messages. Please set up encryption in settings.");
+        onErrorRef.current?.(
+          "Encryption key required to receive messages. Please set up encryption in settings."
+        );
         return;
       }
 
@@ -233,23 +237,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     intentionalCloseRef.current = false;
     retriesRef.current = 0; // Reset retries on manual connect (e.g. pull-to-refresh)
 
-    // Build a robust WS URL: pick ws/wss based on scheme, ensure /ws endpoint, append token
-    let wsUrl: string;
-    try {
-      const base = config.wsUrl || config.apiUrl;
-      const url = new URL(base);
-      if (url.protocol === "http:") url.protocol = "ws:";
-      if (url.protocol === "https:") url.protocol = "wss:";
-      if (!url.pathname.endsWith("/ws")) {
-        url.pathname = url.pathname.replace(/\/+$/, "") + "/ws";
-      }
-      url.searchParams.set("token", token);
-      wsUrl = url.toString();
-    } catch {
-      const base =
-        (config.wsUrl || "ws://localhost:3000").replace(/\/+$/, "");
-      wsUrl = `${base}/ws?token=${encodeURIComponent(token)}`;
-    }
+    const wsUrl = `${config.wsUrl}?token=${encodeURIComponent(token)}`;
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
@@ -328,7 +316,11 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     };
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible" && !connected && navigator.onLine) {
+      if (
+        document.visibilityState === "visible" &&
+        !connected &&
+        navigator.onLine
+      ) {
         console.log("[ws] App visible; attempting reconnect");
         cleanup();
         retriesRef.current = 0;

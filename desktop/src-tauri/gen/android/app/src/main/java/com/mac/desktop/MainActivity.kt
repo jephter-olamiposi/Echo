@@ -1,41 +1,58 @@
 package com.mac.desktop
 
-import android.Manifest
+import android.content.BroadcastReceiver
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
-import com.google.firebase.messaging.FirebaseMessaging
 
 class MainActivity : TauriActivity() {
-    
-    companion object {
-        private const val TAG = "EchoMain"
-        private const val NOTIFICATION_PERMISSION_CODE = 1001
-        
-        @JvmStatic
-        var sharedText: String? = null
-        
-        @JvmStatic
-        var fcmToken: String? = null
-            private set
-        
-        @JvmStatic
-        var openedFromPush: Boolean = false
-            private set
+    private var clipboardManager: ClipboardManager? = null
+    private var lastClipContent: String? = null
+    private var fcmToken: String? = null
+    private var openedFromPush: Boolean = false
+
+    private val tokenReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            intent?.getStringExtra("token")?.let { token ->
+                fcmToken = token
+                notifyFcmToken(token)
+            }
+        }
     }
-    
+
+    private val clipboardReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            intent?.getStringExtra("content")?.let { content ->
+                if (content != lastClipContent) {
+                    lastClipContent = content
+                    notifyClipboardChange(content)
+                    android.util.Log.d("Echo", "Received clipboard change from background service")
+                }
+            }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        requestNotificationPermission()
-        fetchFcmToken()
+        
+        // ClipboardService.start(this)
+        
+        val prefs = getSharedPreferences("echo_fcm", Context.MODE_PRIVATE)
+        fcmToken = prefs.getString("token", null)
+        
+        if (intent?.hasExtra("google.message_id") == true) {
+            openedFromPush = true
+        }
+        
+        setupClipboardListener()
+        setupJavaScriptBridge()
         handleIntent(intent)
     }
     
@@ -44,102 +61,194 @@ class MainActivity : TauriActivity() {
         handleIntent(intent)
     }
     
-    override fun onWebViewCreate(webView: WebView) {
-        super.onWebViewCreate(webView)
-        webView.addJavascriptInterface(EchoBridge(), "EchoBridge")
+    override fun onResume() {
+        super.onResume()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            registerReceiver(tokenReceiver, IntentFilter("com.mac.desktop.FCM_TOKEN"), RECEIVER_NOT_EXPORTED)
+            registerReceiver(clipboardReceiver, IntentFilter("com.mac.desktop.CLIPBOARD_CHANGE"), RECEIVER_NOT_EXPORTED)
+        } else {
+             registerReceiver(tokenReceiver, IntentFilter("com.mac.desktop.FCM_TOKEN"))
+             registerReceiver(clipboardReceiver, IntentFilter("com.mac.desktop.CLIPBOARD_CHANGE"))
+        }
     }
     
-    private fun requestNotificationPermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                    NOTIFICATION_PERMISSION_CODE
-                )
+    override fun onPause() {
+        super.onPause()
+        try {
+            unregisterReceiver(tokenReceiver)
+            unregisterReceiver(clipboardReceiver)
+        } catch (e: Exception) {
+            android.util.Log.w("Echo", "Failed to unregister receivers", e)
+        }
+    }
+    
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.action == Intent.ACTION_SEND && "text/plain" == intent.type) {
+            intent.getStringExtra(Intent.EXTRA_TEXT)?.let { sharedText ->
+                lastClipContent = sharedText
+                notifyClipboardChange(sharedText)
             }
         }
-    }
-    
-    private fun fetchFcmToken() {
-        // Try to get from SharedPreferences first (fastest)
-        val prefs = getSharedPreferences("EchoPrefs", android.content.Context.MODE_PRIVATE)
-        val cachedToken = prefs.getString("fcm_token", null)
         
-        if (cachedToken != null) {
-            fcmToken = cachedToken
-            Log.d(TAG, "FCM Token loaded from cache")
-        }
+        // Handle Push Notification tap (FCM)
+        val isPush = intent?.getBooleanExtra("from_notification", false) == true ||
+                     intent?.hasExtra("google.message_id") == true ||
+                     intent?.getStringExtra("type") == "clipboard_sync"
 
-        FirebaseMessaging.getInstance().token.addOnCompleteListener { task ->
-            if (!task.isSuccessful) {
-                Log.w(TAG, "Fetching FCM token failed", task.exception)
-                return@addOnCompleteListener
-            }
-            val newToken = task.result
-            
-            // Update cache if changed
-            if (newToken != cachedToken) {
-                prefs.edit().putString("fcm_token", newToken).apply()
-                fcmToken = newToken
-                Log.d(TAG, "FCM Token updated from network")
-            }
-        }
-    }
-    
-    private fun handleIntent(intent: Intent) {
-        if (intent.getBooleanExtra("from_push", false)) {
+        if (isPush) {
             openedFromPush = true
-            Log.d(TAG, "Opened from push notification")
+            android.util.Log.d("Echo", "App opened from push notification")
+            
+            // Immediately dispatch event to JS (for warm starts)
+            dispatchSyncEvent()
         }
+    }
+
+    private fun setupClipboardListener() {
+        clipboardManager = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         
-        if (intent.action == Intent.ACTION_SEND && intent.type == "text/plain") {
-            intent.getStringExtra(Intent.EXTRA_TEXT)?.let { text ->
-                try {
-                    val clipboard = getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    val clip = android.content.ClipData.newPlainText("Shared to Echo", text)
-                    clipboard.setPrimaryClip(clip)
-                    android.widget.Toast.makeText(this, "Copied to Echo", android.widget.Toast.LENGTH_SHORT).show()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Failed to write to clipboard", e)
+        clipboardManager?.addPrimaryClipChangedListener {
+            val clip = clipboardManager?.primaryClip
+            val content = clip?.getItemAt(0)?.text?.toString()
+            
+            if (content != null && content != lastClipContent && content.isNotBlank()) {
+                lastClipContent = content
+                notifyClipboardChange(content)
+            }
+        }
+    }
+
+    private fun setupJavaScriptBridge() {
+        runOnUiThread {
+            try {
+                val webView = findWebView()
+                webView?.addJavascriptInterface(EchoBridge(this), "EchoBridge")
+            } catch (e: Exception) {
+                android.util.Log.e("Echo", "Failed to setup JS bridge", e)
+            }
+        }
+    }
+    
+    private fun notifyFcmToken(token: String) {
+        runOnUiThread {
+            try {
+                val webView = findWebView()
+                webView?.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('fcm-token', { detail: '$token' }));",
+                    null
+                )
+            } catch (e: Exception) {
+                android.util.Log.e("Echo", "Failed to notify FCM token", e)
+            }
+        }
+    }
+
+    private fun findWebView(): WebView? {
+        return try {
+            val decorView = window.decorView
+            findWebViewRecursive(decorView as android.view.ViewGroup)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    private fun findWebViewRecursive(viewGroup: android.view.ViewGroup): WebView? {
+        for (i in 0 until viewGroup.childCount) {
+            val child = viewGroup.getChildAt(i)
+            if (child is WebView) {
+                return child
+            } else if (child is android.view.ViewGroup) {
+                val found = findWebViewRecursive(child)
+                if (found != null) return found
+            }
+        }
+        return null
+    }
+
+    private fun notifyClipboardChange(content: String) {
+        runOnUiThread {
+            try {
+                val webView = findWebView()
+                val escaped = content
+                    .replace("\\", "\\\\")
+                    .replace("'", "\\'")
+                    .replace("\n", "\\n")
+                    .replace("\r", "\\r")
+                
+                webView?.evaluateJavascript(
+                    "window.dispatchEvent(new CustomEvent('native-clipboard-change', { detail: '$escaped' }));",
+                    null
+                )
+                android.util.Log.d("Echo", "Clipboard change dispatched to JS")
+            } catch (e: Exception) {
+                android.util.Log.e("Echo", "Failed to notify clipboard change", e)
+            }
+        }
+    }
+
+    private fun dispatchSyncEvent() {
+        runOnUiThread {
+            try {
+                // Retry mechanism for WebView readiness
+                val handler = android.os.Handler(android.os.Looper.getMainLooper())
+                var attempts = 0
+                val maxAttempts = 10
+                val delayMs = 200L
+                
+                val checkAndDispatch = object : Runnable {
+                    override fun run() {
+                        val webView = findWebView()
+                        if (webView != null) {
+                            webView.evaluateJavascript(
+                                "typeof window !== 'undefined' && window.dispatchEvent ? 'ready' : 'not-ready';"
+                            ) { result ->
+                                if (result?.contains("ready") == true) {
+                                    webView.evaluateJavascript(
+                                        "window.dispatchEvent(new Event('echo-sync-trigger'));",
+                                        null
+                                    )
+                                    android.util.Log.d("Echo", "Sync trigger dispatched to JS")
+                                } else if (attempts < maxAttempts) {
+                                    attempts++
+                                    handler.postDelayed(this, delayMs)
+                                } else {
+                                    android.util.Log.w("Echo", "WebView not ready after max attempts")
+                                }
+                            }
+                        } else if (attempts < maxAttempts) {
+                            attempts++
+                            handler.postDelayed(this, delayMs)
+                        } else {
+                            android.util.Log.w("Echo", "WebView not found after max attempts")
+                        }
+                    }
                 }
+                
+                handler.post(checkAndDispatch)
+            } catch (e: Exception) {
+                android.util.Log.e("Echo", "Failed to dispatch sync event", e)
             }
         }
     }
-    
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<out String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == NOTIFICATION_PERMISSION_CODE) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                Log.d(TAG, "Notification permission granted")
-            }
-        }
-    }
-    
-    inner class EchoBridge {
+
+    class EchoBridge(private val activity: MainActivity) {
         @JavascriptInterface
-        fun getFcmToken(): String? {
-             if (fcmToken != null) return fcmToken
-             
-             // Fallback to SharedPreferences if memory variable is null (e.g. process death)
-             val prefs = getSharedPreferences("EchoPrefs", android.content.Context.MODE_PRIVATE)
-             return prefs.getString("fcm_token", null)
-        }
-        
+        fun getFcmToken(): String? = activity.fcmToken
+
         @JavascriptInterface
         fun wasOpenedFromPush(): Boolean {
-            val result = openedFromPush
-            openedFromPush = false
-            return result
+            // Return the current state without auto-clearing
+            return activity.openedFromPush
         }
+
+        @JavascriptInterface
+        fun clearOpenedFromPush() {
+            // Explicit clear - call this after handling the push
+            activity.openedFromPush = false
+            android.util.Log.d("Echo", "Cleared openedFromPush flag")
+        }
+
+        @JavascriptInterface
+        fun getLastClipboardContent(): String? = activity.lastClipContent
     }
 }
-

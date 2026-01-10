@@ -14,6 +14,18 @@ pub enum AppError {
     BadRequest(String),
 }
 
+impl std::fmt::Display for AppError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Auth(msg) => write!(f, "Auth error: {}", msg),
+            Self::Database(e) => write!(f, "Database error: {}", e),
+            Self::Internal(msg) => write!(f, "Internal error: {}", msg),
+            Self::Conflict(msg) => write!(f, "Conflict: {}", msg),
+            Self::BadRequest(msg) => write!(f, "Bad request: {}", msg),
+        }
+    }
+}
+
 #[derive(Serialize)]
 struct ErrorBody {
     error: String,

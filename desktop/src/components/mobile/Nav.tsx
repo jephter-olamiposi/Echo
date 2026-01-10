@@ -1,53 +1,50 @@
 import React from 'react';
 import { Icons } from '../Icons';
-import { haptic } from '../../utils/haptics';
+import { NavItem } from '../ui/NavItem';
+import { MobileView } from '../../types';
+import { useLanguage } from '../../contexts/LanguageContext';
 
-type MobileView = 'dashboard' | 'history' | 'settings';
+/* ─────────────────────────────────────────────────────────────────────────────
+ * Bottom Navigation
+ * 
+ * Uses NavItem primitive for consistent styling and animations.
+ * ───────────────────────────────────────────────────────────────────────────── */
 
-interface MobileNavProps {
+interface NavProps {
   currentView: MobileView;
   onChange: (view: MobileView) => void;
   badgeCount?: number;
 }
 
-export const Nav: React.FC<MobileNavProps> = ({ currentView, onChange, badgeCount = 0 }) => {
-  const handleNav = (view: MobileView) => {
-    if (view !== currentView) {
-      haptic.selection();
-      onChange(view);
-    }
-  };
+export const Nav: React.FC<NavProps> = ({ currentView, onChange, badgeCount = 0 }) => {
+  const { t } = useLanguage();
 
   return (
-    <nav className="h-20 bg-black/90 backdrop-blur-xl border-t border-white/10 flex justify-around items-center px-2 pb-[env(safe-area-inset-bottom,20px)] pt-2 w-full">
-      <button 
-        className={`flex flex-col items-center justify-center gap-1 w-16 h-full transition-colors ${currentView === 'dashboard' ? 'text-purple-500' : 'text-zinc-500 hover:text-zinc-300'}`}
-        onClick={() => handleNav('dashboard')}
-      >
-        <span className="w-6 h-6">{Icons.home}</span>
-        <span className="text-[10px] font-medium">Home</span>
-      </button>
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-(--color-bg)/90 backdrop-blur-xl border-t border-(--color-border) flex justify-around items-center px-4 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] w-full transition-colors duration-300">
+      <NavItem
+        icon={Icons.home}
+        activeIcon={Icons.homeFilled}
+        label={t('dashboard')}
+        isActive={currentView === 'dashboard'}
+        onClick={() => onChange('dashboard')}
+      />
       
-      <button 
-        className={`relative flex flex-col items-center justify-center gap-1 w-16 h-full transition-colors ${currentView === 'history' ? 'text-purple-500' : 'text-zinc-500 hover:text-zinc-300'}`}
-        onClick={() => handleNav('history')}
-      >
-        <span className="w-6 h-6">{Icons.history}</span>
-        <span className="text-[10px] font-medium">History</span>
-        {badgeCount > 0 && (
-          <span className="absolute top-1 right-2 min-w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1 shadow-sm">
-            {badgeCount > 99 ? '99+' : badgeCount}
-          </span>
-        )}
-      </button>
+      <NavItem
+        icon={Icons.history}
+        activeIcon={Icons.historyFilled}
+        label={t('history')}
+        isActive={currentView === 'history'}
+        onClick={() => onChange('history')}
+        badge={badgeCount}
+      />
       
-      <button 
-        className={`flex flex-col items-center justify-center gap-1 w-16 h-full transition-colors ${currentView === 'settings' ? 'text-purple-500' : 'text-zinc-500 hover:text-zinc-300'}`}
+      <NavItem
+        icon={Icons.settings}
+        activeIcon={Icons.settingsFilled}
+        label={t('settings')}
+        isActive={currentView === 'settings'}
         onClick={() => onChange('settings')}
-      >
-        <span className="w-6 h-6">{Icons.settings}</span>
-        <span className="text-[10px] font-medium">Settings</span>
-      </button>
+      />
     </nav>
   );
 };

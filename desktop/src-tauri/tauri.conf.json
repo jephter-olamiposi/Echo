@@ -13,10 +13,10 @@
     "windows": [
       {
         "title": "Echo",
-        "width": 1000,
-        "height": 700,
-        "minWidth": 800,
-        "minHeight": 600,
+        "width": 1200,
+        "height": 800,
+        "minWidth": 900,
+        "minHeight": 700,
         "decorations": false,
         "transparent": false,
         "resizable": true,
@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* ws://localhost:* https://echo-production-784d.up.railway.app wss://echo-production-784d.up.railway.app https://api.qrserver.com http://10.0.2.2:* http://10.0.3.2:*; img-src 'self' data: https://api.qrserver.com"
     }
   },
   "bundle": {

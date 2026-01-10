@@ -11,23 +11,23 @@ export const Toast: React.FC<ToastProps> = ({ message, type }) => {
     switch(type) {
       case 'success': 
         return {
-          bg: 'bg-zinc-900/95',
+          bg: 'bg-(--color-surface-raised)/95',
           border: 'border-green-500/20',
           iconBg: 'bg-green-500/20 text-green-400',
           shadow: 'shadow-[0_8px_30px_rgb(0,0,0,0.4)] shadow-green-500/10'
         };
       case 'error': 
         return {
-          bg: 'bg-zinc-900/95',
+          bg: 'bg-(--color-surface-raised)/95',
           border: 'border-red-500/20',
           iconBg: 'bg-red-500/20 text-red-400',
           shadow: 'shadow-[0_8px_30px_rgb(0,0,0,0.4)] shadow-red-500/10'
         };
       default: 
         return {
-          bg: 'bg-zinc-900/95',
-          border: 'border-white/10',
-          iconBg: 'bg-white/10 text-white',
+          bg: 'bg-(--color-surface-raised)/95',
+          border: 'border-(--color-border)',
+          iconBg: 'bg-(--color-text-primary)/10 text-(--color-text-primary)',
           shadow: 'shadow-[0_8px_30px_rgb(0,0,0,0.4)]'
         };
     }
@@ -66,7 +66,7 @@ export const Toast: React.FC<ToastProps> = ({ message, type }) => {
         </div>
         
         {/* Message */}
-        <p className="text-[13px] font-bold tracking-tight text-white leading-tight">
+        <p className="text-[13px] font-medium text-(--color-text-primary) leading-tight">
           {message}
         </p>
       </div>

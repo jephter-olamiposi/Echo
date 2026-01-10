@@ -1,3 +1,4 @@
+use crate::error::AppError;
 use crate::models::ClipboardMessage;
 use crate::push::PushClient;
 use dashmap::DashMap;
@@ -89,6 +90,37 @@ impl AppState {
             .or_default()
             .insert(device_id.to_string(), token.to_string());
         tracing::info!(user = %user_id, device = %device_id, "Push token registered");
+
+        // Persist to database (fire-and-forget)
+        let pool = self.pool.clone();
+        let tokens_snapshot: Vec<serde_json::Value> = self
+            .push_tokens
+            .get(&user_id)
+            .map(|t| {
+                t.iter()
+                    .map(|(dev, tok)| {
+                        serde_json::json!({
+                            "device_id": dev,
+                            "token": tok
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        tokio::spawn(async move {
+            let json = serde_json::Value::Array(tokens_snapshot);
+            if let Err(e) = sqlx::query!(
+                "UPDATE users SET push_tokens = $1 WHERE id = $2",
+                json,
+                user_id
+            )
+            .execute(&pool)
+            .await
+            {
+                tracing::warn!(user = %user_id, error = %e, "Failed to persist push token to DB");
+            }
+        });
     }
 
     pub fn get_offline_push_tokens(&self, user_id: &Uuid, exclude_device: &str) -> Vec<String> {
@@ -110,6 +142,76 @@ impl AppState {
                     .collect()
             })
             .unwrap_or_default()
+    }
+
+    /// Remove a push token by its value (used when FCM returns 404/410).
+    pub fn remove_push_token_by_value(&self, user_id: &Uuid, token_value: &str) {
+        if let Some(mut tokens) = self.push_tokens.get_mut(user_id) {
+            tokens.retain(|_device_id, token| token != token_value);
+            tracing::info!(user = %user_id, "Removed invalid push token");
+        }
+
+        // Persist to database
+        let pool = self.pool.clone();
+        let user_id = *user_id;
+        let tokens_snapshot: Vec<serde_json::Value> = self
+            .push_tokens
+            .get(&user_id)
+            .map(|t| {
+                t.iter()
+                    .map(|(dev, tok)| {
+                        serde_json::json!({
+                            "device_id": dev,
+                            "token": tok
+                        })
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        tokio::spawn(async move {
+            let json = serde_json::Value::Array(tokens_snapshot);
+            if let Err(e) = sqlx::query!(
+                "UPDATE users SET push_tokens = $1 WHERE id = $2",
+                json,
+                user_id
+            )
+            .execute(&pool)
+            .await
+            {
+                tracing::warn!(user = %user_id, error = %e, "Failed to persist push token removal to DB");
+            }
+        });
+    }
+
+    /// Load push tokens from database for a user (call on connect if needed).
+    pub async fn load_push_tokens_from_db(&self, user_id: Uuid) {
+        let result = sqlx::query!("SELECT push_tokens FROM users WHERE id = $1", user_id)
+            .fetch_optional(&self.pool)
+            .await;
+
+        match result {
+            Ok(Some(row)) => {
+                if let Some(tokens_json) = row.push_tokens {
+                    if let Some(arr) = tokens_json.as_array() {
+                        let mut entry = self.push_tokens.entry(user_id).or_default();
+                        for item in arr {
+                            if let (Some(dev), Some(tok)) = (
+                                item.get("device_id").and_then(|v| v.as_str()),
+                                item.get("token").and_then(|v| v.as_str()),
+                            ) {
+                                entry.insert(dev.to_string(), tok.to_string());
+                            }
+                        }
+                        tracing::debug!(user = %user_id, count = entry.len(), "Loaded push tokens from DB");
+                    }
+                }
+            }
+            Ok(None) => {}
+            Err(e) => {
+                tracing::warn!(user = %user_id, error = %e, "Failed to load push tokens from DB");
+            }
+        }
     }
 
     pub fn push_client(&self) -> Option<&Arc<PushClient>> {
@@ -159,38 +261,6 @@ impl AppState {
         let mut entry = self.rate_limits.entry(key.to_string()).or_default();
         check_rate_custom(entry.value_mut(), true, max_count, window_secs)
     }
-
-    /// Clean up old rate limiting entries to prevent memory leaks
-    pub fn cleanup_old_rate_limits(&self) {
-        let now = Instant::now();
-        let cleanup_threshold = std::time::Duration::from_secs(3600); // 1 hour
-        let mut keys_to_remove = Vec::new();
-
-        // Collect keys of expired entries
-        for entry in self.rate_limits.iter() {
-            let key = entry.key();
-            let state = entry.value();
-            
-            // Remove entries that haven't been accessed in the last hour
-            if let Some(last_access) = state.last_message {
-                if now.duration_since(last_access) > cleanup_threshold {
-                    keys_to_remove.push(key.clone());
-                }
-            }
-        }
-
-        // Remove expired entries
-        for key in keys_to_remove {
-            self.rate_limits.remove(&key);
-        }
-
-        if !self.rate_limits.is_empty() {
-            tracing::debug!(
-                "Rate limit cleanup completed, {} entries remaining", 
-                self.rate_limits.len()
-            );
-        }
-    }
 }
 
 fn check_rate_custom(
@@ -225,18 +295,48 @@ fn check_rate_custom(
 }
 
 impl AppState {
+    /// Add message to both in-memory cache and database
     pub fn add_to_history(&self, user_id: Uuid, msg: ClipboardMessage) {
+        // Add to in-memory cache for fast access
         let mut entry = self.history.entry(user_id).or_default();
         let history = entry.value_mut();
-        history.insert(0, msg);
+        history.insert(0, msg.clone());
         history.truncate(MAX_HISTORY_SIZE);
+
+        // Persist to database (fire-and-forget for performance)
+        let pool = self.pool.clone();
+        tokio::spawn(async move {
+            use crate::db::ClipboardHistoryRepository;
+            let repo = ClipboardHistoryRepository::new(pool);
+            if let Err(e) = repo.add(user_id, &msg).await {
+                tracing::warn!(user = %user_id, error = %e, "failed to persist history to db");
+            }
+        });
     }
 
+    /// Get history - first try cache, then fall back to database
     pub fn get_history(&self, user_id: &Uuid) -> Vec<ClipboardMessage> {
+        // Return cached history if available
         self.history
             .get(user_id)
             .map(|h| h.value().clone())
             .unwrap_or_default()
+    }
+
+    /// Load history from database into cache (call on user connect)
+    pub async fn load_history_from_db(&self, user_id: Uuid) {
+        use crate::db::ClipboardHistoryRepository;
+        let repo = ClipboardHistoryRepository::new(self.pool.clone());
+        match repo.get(&user_id, MAX_HISTORY_SIZE as i64).await {
+            Ok(msgs) => {
+                let mut entry = self.history.entry(user_id).or_default();
+                *entry.value_mut() = msgs;
+                tracing::debug!(user = %user_id, "loaded history from database");
+            }
+            Err(e) => {
+                tracing::warn!(user = %user_id, error = %e, "failed to load history from db");
+            }
+        }
     }
 
     pub fn get_or_create_channel(&self, user_id: Uuid) -> broadcast::Sender<ClipboardMessage> {
@@ -244,22 +344,19 @@ impl AppState {
             .entry(user_id)
             .or_insert_with(|| {
                 // Calculate dynamic capacity based on active devices
-                let device_count = self.sessions
-                    .get(&user_id)
-                    .map(|s| s.len())
-                    .unwrap_or(1); // At least 1 for the connecting device
-                
+                let device_count = self.sessions.get(&user_id).map(|s| s.len()).unwrap_or(1); // At least 1 for the connecting device
+
                 let capacity = (device_count * CAPACITY_PER_DEVICE)
                     .max(MIN_CHANNEL_CAPACITY)
                     .min(MAX_CHANNEL_CAPACITY);
-                
+
                 tracing::debug!(
-                    user = %user_id, 
-                    devices = device_count, 
+                    user = %user_id,
+                    devices = device_count,
                     capacity = capacity,
                     "creating channel with dynamic capacity"
                 );
-                
+
                 broadcast::channel(capacity).0
             })
             .clone()
@@ -276,6 +373,14 @@ impl AppState {
         } else {
             tracing::debug!(user = %user_id, devices = tx.receiver_count(), "devices connected");
         }
+    }
+
+    pub async fn clear_history(&self, user_id: Uuid) -> Result<(), AppError> {
+        self.history.remove(&user_id);
+
+        // Also clear from database
+        let repo = crate::db::ClipboardHistoryRepository::new(self.pool.clone());
+        repo.clear(&user_id).await
     }
 }
 

@@ -63,3 +63,7 @@ export function getContentTypeIcon(type: ContentType) {
     default: return Icons.text;
   }
 }
+
+// Export error types for easy access
+export * from './AppError';
+export { ToastProvider, useToast } from '../contexts/ToastContext';

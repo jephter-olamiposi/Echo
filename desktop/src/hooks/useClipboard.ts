@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import { Store } from "@tauri-apps/plugin-store";
 import { writeText, readText } from "@tauri-apps/plugin-clipboard-manager";
 import { ClipboardEntry } from "../types";
-import { detectContentType } from "../utils";
+import { detectContentType, useToast } from "../utils";
 import { haptic } from "../utils/haptics";
 
 const HISTORY_STORAGE_KEY = "echo_clipboard_history";
@@ -10,7 +10,7 @@ let storeInstance: Store | null = null;
 
 const getStore = async () => {
   if (!storeInstance) {
-    storeInstance = await Store.load("store.json");
+    storeInstance = await Store.load("history.json");
   }
   return storeInstance;
 };
@@ -18,6 +18,7 @@ const getStore = async () => {
 export function useClipboard() {
   const [history, setHistory] = useState<ClipboardEntry[]>([]);
   const lastSentRef = useRef<string>("");
+  const { showError } = useToast();
 
   // Load history on mount
   useEffect(() => {
@@ -31,6 +32,9 @@ export function useClipboard() {
         }
       } catch (e) {
         console.error("Failed to load history", e);
+        // Silent failure for init is usually better than a toast loop on startup,
+        // but we could log it or show a subtle notification if critical.
+        // For now, let's keep it silent or log to a remote service in a real app.
       }
     };
     init();
@@ -43,6 +47,7 @@ export function useClipboard() {
       await store.save();
     } catch (e) {
       console.error("Failed to save history", e);
+      showError("Failed to save history locally");
     }
   };
 

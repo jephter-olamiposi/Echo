@@ -2,12 +2,13 @@ import React, { useState } from 'react';
 import { apiFetch } from '../../api';
 
 interface RegisterProps {
+  initialEmail?: string;
   onSuccess: (token: string, email: string) => void;
   onSwitchToLogin: () => void;
 }
 
-export const Register: React.FC<RegisterProps> = ({ onSuccess, onSwitchToLogin }) => {
-  const [email, setEmail] = useState('');
+export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess, onSwitchToLogin }) => {
+  const [email, setEmail] = useState(initialEmail);
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -37,31 +38,31 @@ export const Register: React.FC<RegisterProps> = ({ onSuccess, onSwitchToLogin }
   };
 
   return (
-    <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="flex flex-col gap-8 w-full animate-in fade-in slide-in-from-bottom-6 duration-1000">
       <div className="space-y-2">
-        <h1 className="text-3xl font-black tracking-tight text-white">Create account</h1>
-        <p className="text-zinc-500 text-sm">Start syncing across all your devices</p>
+        <h1 className="text-3xl font-semibold text-(--color-text-primary)">Create account</h1>
+        <p className="text-(--color-text-tertiary) text-[14px]">Join Echo to sync your clipboard</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">First Name</label>
+          <div className="space-y-1.5">
+            <label className="text-[13px] font-medium text-(--color-text-secondary) pl-1">First name</label>
             <input
               type="text"
               required
-              className="w-full p-3.5 bg-zinc-900/80 rounded-xl border border-white/10 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all [&:-webkit-autofill]:[box-shadow:0_0_0_1000px_rgb(24_24_27)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white]"
+              className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
               placeholder="John"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
             />
           </div>
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Last Name</label>
+          <div className="space-y-1.5">
+            <label className="text-[13px] font-medium text-(--color-text-secondary) pl-1">Last name</label>
             <input
               type="text"
               required
-              className="w-full p-3.5 bg-zinc-900/80 rounded-xl border border-white/10 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all [&:-webkit-autofill]:[box-shadow:0_0_0_1000px_rgb(24_24_27)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white]"
+              className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
               placeholder="Doe"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
@@ -69,33 +70,33 @@ export const Register: React.FC<RegisterProps> = ({ onSuccess, onSwitchToLogin }
           </div>
         </div>
 
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Email</label>
+        <div className="space-y-1.5">
+          <label className="text-[13px] font-medium text-(--color-text-secondary) pl-1">Email</label>
           <input
             type="email"
             required
-            className="w-full p-3.5 bg-zinc-900/80 rounded-xl border border-white/10 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all [&:-webkit-autofill]:[box-shadow:0_0_0_1000px_rgb(24_24_27)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white]"
+            className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
             placeholder="name@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
 
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Password</label>
+        <div className="space-y-1.5">
+          <label className="text-[13px] font-medium text-(--color-text-secondary) pl-1">Password</label>
           <input
             type="password"
             required
             minLength={8}
-            className="w-full p-3.5 bg-zinc-900/80 rounded-xl border border-white/10 text-white placeholder:text-zinc-600 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all [&:-webkit-autofill]:[box-shadow:0_0_0_1000px_rgb(24_24_27)_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:white]"
+            className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {/* Password strength indicator */}
+          {/* Strength Indicator */}
           {password && (
-            <div className="flex items-center gap-2 mt-2">
-              <div className="flex-1 flex gap-1">
+            <div className="flex items-center justify-between mt-2 px-1">
+              <div className="flex gap-1 w-1/2">
                 {[1, 2, 3, 4].map((level) => {
                   const strength = password.length >= 12 ? 4 : 
                                    password.length >= 10 ? 3 :
@@ -105,31 +106,31 @@ export const Register: React.FC<RegisterProps> = ({ onSuccess, onSwitchToLogin }
                       key={level} 
                       className={`h-1 flex-1 rounded-full transition-colors ${
                         level <= strength 
-                          ? strength === 4 ? 'bg-green-500' 
-                          : strength === 3 ? 'bg-yellow-500'
-                          : strength === 2 ? 'bg-orange-500'
-                          : 'bg-red-500'
-                          : 'bg-zinc-800'
+                          ? strength === 4 ? 'bg-emerald-500' 
+                          : strength === 3 ? 'bg-sky-500'
+                          : strength === 2 ? 'bg-amber-500'
+                          : 'bg-rose-500'
+                          : 'bg-(--color-surface-raised)'
                       }`} 
                     />
                   );
                 })}
               </div>
-              <span className={`text-[10px] font-bold uppercase ${
-                password.length >= 12 ? 'text-green-500' :
-                password.length >= 10 ? 'text-yellow-500' :
-                password.length >= 8 ? 'text-orange-500' : 'text-red-500'
+              <span className={`text-[11px] font-medium ${
+                password.length >= 12 ? 'text-emerald-500' :
+                password.length >= 10 ? 'text-sky-500' :
+                password.length >= 8 ? 'text-amber-500' : 'text-rose-500'
               }`}>
                 {password.length >= 12 ? 'Strong' :
                  password.length >= 10 ? 'Good' :
-                 password.length >= 8 ? 'Fair' : 'Weak'}
+                 password.length >= 8 ? 'Weak' : 'Too short'}
               </span>
             </div>
           )}
         </div>
 
         {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm font-medium text-center">
+          <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-2xl text-red-400 text-[13px] font-semibold text-center animate-shake">
             {error}
           </div>
         )}
@@ -137,18 +138,18 @@ export const Register: React.FC<RegisterProps> = ({ onSuccess, onSwitchToLogin }
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-4 bg-white text-black rounded-xl font-bold text-sm hover:bg-zinc-200 active:scale-[0.98] transition-all shadow-lg shadow-white/10 disabled:opacity-50 mt-2"
+          className="w-full h-12 bg-(--color-text-primary) text-(--color-bg) rounded-xl font-semibold text-[15px] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 mt-2"
         >
-          {loading ? 'Creating account...' : 'Create Account'}
+          {loading ? 'Creating account...' : 'Create account'}
         </button>
       </form>
 
-      <div className="text-center pt-4 border-t border-white/5">
+      <div className="text-center">
         <button
           onClick={onSwitchToLogin}
-          className="text-sm text-zinc-500 hover:text-white transition-colors"
+          className="text-[14px] text-(--color-text-secondary) hover:text-(--color-text-primary) transition-colors"
         >
-          Already have an account? <span className="font-semibold text-purple-400 hover:text-purple-300">Sign in</span>
+          Already have an account? <span className="font-medium text-purple-400 ml-1">Sign in</span>
         </button>
       </div>
     </div>

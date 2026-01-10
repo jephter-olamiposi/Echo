@@ -77,21 +77,21 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
   return (
     <div 
-      className="h-dvh w-full bg-black text-white flex flex-col relative overflow-hidden"
+      className="h-dvh w-full bg-(--color-bg) text-(--color-text-primary) flex flex-col relative overflow-hidden transition-colors duration-300"
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
       {/* Stylish Background - Matching AuthLayout */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-linear-to-br from-purple-900/20 via-black to-blue-900/20" />
+        <div className="absolute inset-0 bg-linear-to-br from-purple-900/20 via-(--color-bg) to-blue-900/20" />
         <div className="absolute top-0 left-0 w-100 h-100 bg-purple-500/20 rounded-full blur-[150px] -translate-x-1/2 -translate-y-1/2" />
         <div className="absolute bottom-0 right-0 w-75 h-75 bg-blue-500/15 rounded-full blur-[120px] translate-x-1/3 translate-y-1/3" />
         
         {/* Grid Pattern */}
         <div className="absolute inset-0 opacity-5" 
           style={{
-            backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+            backgroundImage: 'linear-gradient(var(--color-border) 1px, transparent 1px), linear-gradient(90deg, var(--color-border) 1px, transparent 1px)',
             backgroundSize: '50px 50px'
           }} 
         />
@@ -99,10 +99,10 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
 
       {/* Skip Button - Hidden on last slide */}
       {slide < slides.length - 1 && (
-        <div className="absolute top-0 right-6 z-20" style={{ paddingTop: 'calc(env(safe-area-inset-top, 20px) + 1rem)' }}>
+        <div className="absolute top-0 right-4 z-20 pt-safe">
           <button 
             onClick={handleSkip}
-            className="text-zinc-400 text-sm font-semibold hover:text-white transition-colors px-4 py-2"
+            className="text-(--color-text-secondary) text-[14px] font-medium hover:text-(--color-text-primary) transition-colors p-4"
           >
             Skip
           </button>
@@ -110,29 +110,30 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       )}
 
       {/* Slides Container */}
-      <div className="flex-1 relative px-6 pt-safe">
+      <div className="flex-1 relative">
         <div 
-          className="absolute inset-0 flex transition-transform duration-500 ease-out"
-          style={{ transform: `translateX(-${slide * 100}%)`, paddingTop: 'env(safe-area-inset-top, 20px)' }}
+          className="absolute inset-0 flex transition-transform duration-500 ease-out pt-safe"
+          style={{ transform: `translateX(-${slide * 100}%)` }}
         >
           {slides.map((s, i) => (
-            <div key={i} className="w-full h-full shrink-0 flex flex-col items-center justify-center text-center px-6">
-              {/* Icon Container - No underlying circle */}
-              <div className="relative mb-12">
-                <div className={`w-28 h-28 rounded-3xl bg-linear-to-br ${s.gradient} flex items-center justify-center shadow-2xl border border-white/20`}>
-                  <div className="w-14 h-14 text-white">
+            <div key={i} className="w-full h-full shrink-0 flex flex-col items-center justify-center text-center px-8">
+              {/* Icon Container with outer glow */}
+              <div className="relative mb-14">
+                <div className={`absolute inset-0 blur-2xl opacity-40 rounded-3xl bg-linear-to-br ${s.gradient}`} />
+                <div className={`relative w-32 h-32 rounded-3xl bg-linear-to-br ${s.gradient} flex items-center justify-center shadow-xl border border-white/20 scale-110`}>
+                  <div className="w-16 h-16 text-white drop-shadow-md">
                     {s.icon}
                   </div>
                 </div>
               </div>
 
               {/* Title */}
-              <h1 className="text-4xl font-black mb-4 tracking-tight leading-tight whitespace-pre-line">
+              <h1 className="text-3xl font-semibold mb-5 leading-[1.2] whitespace-pre-line text-(--color-text-primary)">
                 {s.title}
               </h1>
 
               {/* Description */}
-              <p className="text-zinc-400 text-base leading-relaxed max-w-xs mx-auto">
+              <p className="text-(--color-text-tertiary) text-base leading-relaxed max-w-65 mx-auto font-normal">
                 {s.desc}
               </p>
             </div>
@@ -141,9 +142,9 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       </div>
 
       {/* Bottom Controls */}
-      <div className="p-8 pb-12 flex flex-col gap-6 z-10 relative">
+      <div className="px-6 pb-safe pt-4 flex flex-col gap-8 z-10 relative mb-8">
         {/* Pagination Dots */}
-        <div className="flex justify-center gap-2">
+        <div className="flex justify-center gap-2.5">
           {slides.map((_, i) => (
             <button
               key={i}
@@ -151,10 +152,10 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                 setSlide(i);
                 haptic.light();
               }}
-              className={`transition-all duration-300 rounded-full ${
+              className={`transition-all duration-500 rounded-full h-1.5 ${
                 i === slide 
-                  ? `${currentSlide.accentColor} w-8 h-2` 
-                  : "bg-zinc-700 w-2 h-2"
+                  ? `${currentSlide.accentColor} w-8 shadow-[0_0_8px_rgba(168,85,247,0.4)]` 
+                  : "bg-(--color-surface-raised) w-1.5"
               }`}
             />
           ))}
@@ -164,14 +165,14 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         {slide === slides.length - 1 ? (
           <button
             onClick={handleNext}
-            className={`w-full py-4 rounded-2xl bg-linear-to-r ${currentSlide.gradient} text-white font-bold text-lg hover:opacity-90 active:scale-98 transition-all shadow-2xl`}
+            className="w-full h-14 rounded-xl bg-(--color-text-primary) text-(--color-bg) font-semibold text-[16px] hover:opacity-90 active:scale-[0.98] transition-all"
           >
-            Get Started
+            Get started
           </button>
         ) : (
           <button
             onClick={handleNext}
-            className="w-full py-4 rounded-2xl bg-white/10 backdrop-blur-md border border-white/10 text-white font-bold text-lg hover:bg-white/15 active:scale-98 transition-all"
+            className="w-full h-14 rounded-xl bg-(--color-surface) border border-(--color-border) text-(--color-text-primary) font-semibold text-[16px] hover:bg-(--color-surface-raised) active:scale-[0.98] transition-all"
           >
             Next
           </button>

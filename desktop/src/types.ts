@@ -26,7 +26,7 @@ export interface AppState {
   selectedEntry: ClipboardEntry | null;
   encryptionKey: Uint8Array | null;
   keyFingerprint: string | null;
-  toast: { message: string; type: "success" | "error" | "info" } | null;
+  // toast field removed in favor of ToastContext
   view: "onboarding" | "login" | "register" | "main";
   isRefreshing: boolean;
   filterType: ContentType | "all";

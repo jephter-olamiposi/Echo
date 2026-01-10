@@ -20,7 +20,7 @@ use axum::{
 };
 use futures::{SinkExt, StreamExt};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::sync::{Mutex, Semaphore};
+use tokio::sync::Mutex;
 use uuid::Uuid;
 
 const PING_INTERVAL_SECS: u64 = 30;
@@ -99,6 +99,16 @@ pub async fn get_history(
     Json(state.get_history(&user_id))
 }
 
+pub async fn clear_history(
+    AuthUser { user_id }: AuthUser,
+    State(state): State<AppState>,
+) -> impl IntoResponse {
+    match state.clear_history(user_id).await {
+        Ok(_) => StatusCode::OK,
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
     Query(params): Query<WsQuery>,
@@ -164,6 +174,10 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
             }
         }
     }
+
+    // Load history and push tokens from database (ensures persistence across restarts)
+    state.load_history_from_db(user_id).await;
+    state.load_push_tokens_from_db(user_id).await;
     let history = state.get_history(&user_id);
     for mut msg in history {
         if msg.device_id == device_id {
@@ -310,12 +324,21 @@ async fn handle_incoming(
                     if let Some(push_client) = state.push_client() {
                         let push_client = push_client.clone();
                         let semaphore = state.push_semaphore().clone();
+                        let state_clone = state.clone();
                         let device_name =
                             clipboard_msg.device_name.unwrap_or_else(|| "device".into());
                         tokio::spawn(async move {
                             let _permit = semaphore.acquire().await.ok();
                             for token in offline_tokens {
-                                let _ = push_client.notify_sync(&token, &device_name).await;
+                                match push_client.notify_sync(&token, &device_name).await {
+                                    Ok(_) => {}
+                                    Err(crate::push::PushError::InvalidToken) => {
+                                        state_clone.remove_push_token_by_value(&user_id, &token);
+                                    }
+                                    Err(e) => {
+                                        tracing::warn!(error = %e, "Push notification failed");
+                                    }
+                                }
                             }
                         });
                     }
@@ -346,7 +369,11 @@ pub async fn register_push_token(
     }
 
     // Basic token format validation (should contain only alphanumeric and some special chars)
-    if !payload.token.chars().all(|c| c.is_ascii_alphanumeric() || "-_.:".contains(c)) {
+    if !payload
+        .token
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || "-_.:".contains(c))
+    {
         tracing::warn!(user = %user_id, "invalid push token format");
         return Err(AppError::BadRequest("Invalid push token format".into()));
     }

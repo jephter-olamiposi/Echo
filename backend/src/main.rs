@@ -16,10 +16,10 @@ use axum::{
 };
 use sqlx::postgres::PgPoolOptions;
 use std::net::SocketAddr;
-use tower_http::cors::{CorsLayer, Any};
+use tokio::signal;
+use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
-use tokio::signal;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -67,21 +67,34 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/login", post(handler::login))
         .route("/ws", get(handler::ws_handler))
         .route("/protected", get(handler::protected))
-        .route("/history", get(handler::get_history))
+        .route(
+            "/history",
+            get(handler::get_history).delete(handler::clear_history),
+        )
         .route("/push/register", post(handler::register_push_token))
         .layer(TraceLayer::new_for_http())
         .layer(
             CorsLayer::new()
                 .allow_origin(
                     std::env::var("ALLOWED_ORIGINS")
-                        .unwrap_or_else(|_| "http://localhost:1420,http://127.0.0.1:1420,tauri://localhost".to_string())
+                        .unwrap_or_else(|_| {
+                            "http://localhost:1420,http://127.0.0.1:1420,tauri://localhost"
+                                .to_string()
+                        })
                         .split(',')
                         .map(|s| s.trim().parse().unwrap())
-                        .collect::<Vec<_>>()
+                        .collect::<Vec<_>>(),
                 )
-                .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
-                .allow_headers([axum::http::header::CONTENT_TYPE, axum::http::header::AUTHORIZATION])
-                .allow_credentials(true)
+                .allow_methods([
+                    axum::http::Method::GET,
+                    axum::http::Method::POST,
+                    axum::http::Method::DELETE,
+                ])
+                .allow_headers([
+                    axum::http::header::CONTENT_TYPE,
+                    axum::http::header::AUTHORIZATION,
+                ])
+                .allow_credentials(true),
         )
         .with_state(state);
 
@@ -98,7 +111,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing::info!("Server listening on {}", addr);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
-    
+
     // Setup graceful shutdown
     let server = axum::serve(
         listener,
