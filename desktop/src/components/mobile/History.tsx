@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useRef, useEffect } from 'react';
+import React, { useMemo, useState, useRef, useEffect, memo } from 'react';
 import { Icons } from '../Icons';
 import { MobileHeader } from './Header';
 import { 
@@ -12,6 +12,58 @@ import { Skeleton } from '../ui/Skeleton';
 import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { FilterChip } from '../ui/FilterChip';
 import { useLanguage } from '../../contexts/LanguageContext';
+
+// Memoized history item to prevent unnecessary re-renders
+interface HistoryItemProps {
+  entry: ClipboardEntry;
+  onClick: (entry: ClipboardEntry) => void;
+}
+
+const HistoryItem = memo<HistoryItemProps>(({ entry, onClick }) => {
+  const { t } = useLanguage();
+  
+  return (
+    <button 
+      className="group flex items-center gap-3 p-3 w-full text-left bg-(--color-surface-raised) border border-(--color-border) rounded-xl hover:bg-(--color-surface) hover:border-(--color-border-subtle) hover:shadow-md hover:shadow-purple-500/5 active:scale-[0.98] transition-all duration-200 ease-out"
+      onClick={() => onClick(entry)}
+    >
+      {/* Icon */}
+      <div className="relative w-10 h-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
+        <div className="absolute inset-0 bg-linear-to-br from-purple-500/20 to-purple-500/5" />
+        <div className="relative w-4 h-4 text-purple-400">{getContentTypeIcon(entry.contentType)}</div>
+        {entry.pinned && (
+          <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-linear-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30">
+            <div className="w-2 h-2 text-white">{Icons.pin}</div>
+          </div>
+        )}
+      </div>
+      
+      {/* Content */}
+      <div className="flex-1 min-w-0 py-0.5">
+        <span className="block text-[14px] font-medium text-(--color-text-primary) line-clamp-1 mb-0.5 group-hover:text-(--color-text-primary) transition-colors">
+          {truncate(entry.content, 50)}
+        </span>
+        
+        <div className="flex items-center gap-1.5 text-(--color-text-tertiary)">
+          <span className="text-[11px] truncate min-w-0 shrink">
+            {entry.source === 'local' ? t('this_device') : (entry.deviceName || 'Synced')}
+          </span>
+          <span className="text-[10px] opacity-40">•</span>
+          <span className="text-[11px] whitespace-nowrap tabular-nums shrink-0">
+            {formatTime(entry.timestamp)}
+          </span>
+        </div>
+      </div>
+      
+      {/* Chevron */}
+      <div className="text-(--color-text-tertiary) group-hover:text-(--color-text-secondary) group-hover:translate-x-0.5 transition-all">
+        <div className="w-4 h-4">{Icons.chevron}</div>
+      </div>
+    </button>
+  );
+}, (prev, next) => prev.entry.id === next.entry.id && prev.entry.pinned === next.entry.pinned);
+
+HistoryItem.displayName = 'HistoryItem';
 
 interface MobileHistoryProps {
   history: ClipboardEntry[];
@@ -188,48 +240,7 @@ export const History: React.FC<MobileHistoryProps> = ({
           ) : visibleHistory.length > 0 ? (
             <div className="flex flex-col gap-3">
               {visibleHistory.map((entry) => (
-                <button 
-                  key={entry.id}
-                  className="group flex items-center gap-3 p-3 w-full text-left bg-(--color-surface-raised) border border-(--color-border) rounded-xl hover:bg-(--color-surface) hover:border-(--color-border-subtle) hover:shadow-md hover:shadow-purple-500/5 active:scale-[0.98] transition-all duration-200 ease-out"
-                  onClick={() => onItemClick(entry)}
-                >
-                  {/* Icon */}
-                  <div className="relative w-10 h-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
-                    <div className="absolute inset-0 bg-linear-to-br from-purple-500/20 to-purple-500/5" />
-                    <div className="relative w-4 h-4 text-purple-400">{getContentTypeIcon(entry.contentType)}</div>
-                    {entry.pinned && (
-                      <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-linear-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30">
-                        <div className="w-2 h-2 text-white">{Icons.pin}</div>
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Content */}
-                  <div className="flex-1 min-w-0 py-0.5">
-                    <span className="block text-[14px] font-medium text-(--color-text-primary) line-clamp-1 mb-0.5 group-hover:text-(--color-text-primary) transition-colors">
-                      {truncate(entry.content, 50)}
-                    </span>
-                    
-                    <div className="flex items-center gap-1.5 text-(--color-text-tertiary)">
-                      {/* Device Indicator */}
-                      <span className="text-[11px] truncate min-w-0 shrink">
-                        {entry.source === 'local' ? t('this_device') : (entry.deviceName || 'Synced')}
-                      </span>
-                      
-                      <span className="text-[10px] opacity-40">•</span>
-                      
-                      {/* Timestamp */}
-                      <span className="text-[11px] whitespace-nowrap tabular-nums shrink-0">
-                        {formatTime(entry.timestamp)}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* Chevron */}
-                  <div className="text-(--color-text-tertiary) group-hover:text-(--color-text-secondary) group-hover:translate-x-0.5 transition-all">
-                    <div className="w-4 h-4">{Icons.chevron}</div>
-                  </div>
-                </button>
+                <HistoryItem key={entry.id} entry={entry} onClick={onItemClick} />
               ))}
               <div ref={loadMoreRef} className="h-4 w-full" />
             </div>

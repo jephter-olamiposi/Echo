@@ -28,7 +28,11 @@ export const MobileHeader: React.FC<MobileHeaderProps> = ({
     >
       <div className="min-w-10 flex items-start">
         {showBack && (
-          <button className="p-2 -ml-2 rounded-full hover:bg-(--color-surface-raised) active:scale-95 transition-all text-(--color-text-primary)" onClick={onBack}>
+          <button 
+            className="p-2 -ml-2 rounded-full hover:bg-(--color-surface-raised) active:scale-95 transition-all text-(--color-text-primary)" 
+            onClick={onBack}
+            aria-label="Go back"
+          >
             {Icons.back}
           </button>
         )}

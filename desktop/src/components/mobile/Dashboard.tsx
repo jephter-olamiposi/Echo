@@ -25,6 +25,8 @@ interface MobileDashboardProps {
   isLoading?: boolean;
   isRefreshing?: boolean;
   connected: boolean;
+  syncing?: boolean;
+  queuedCount?: number;
   history: ClipboardEntry[];
   devices: LinkedDevice[];
   onCopy: (text: string) => void;
@@ -41,6 +43,8 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
   isLoading,
   isRefreshing,
   connected,
+  syncing,
+  queuedCount,
   history,
   devices,
   onShowDevices,
@@ -88,7 +92,7 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
           </div>
         </div>
 
-        <div className="flex flex-col gap-8 max-w-xl mx-auto w-full p-6 pt-2">
+        <div className="flex flex-col gap-8 w-full px-4 pt-2">
           {/* Hero Status */}
           <div className="flex justify-center py-6">
             {isLoading ? (
@@ -115,6 +119,25 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
                   {connected ? t('ready_to_sync') : t('waiting_for_device')}
                 </h2>
                 <StatusBadge status={connected ? 'online' : 'offline'} />
+                {/* Syncing indicator */}
+                {syncing && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 animate-pulse">
+                    <div className="w-3 h-3 text-purple-400 animate-spin">
+                      {Icons.sync}
+                    </div>
+                    <span className="text-[12px] text-purple-400 font-medium">
+                      {t('syncing')}...
+                    </span>
+                  </div>
+                )}
+                {/* Queued items indicator */}
+                {!connected && queuedCount && queuedCount > 0 && (
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+                    <span className="text-[12px] text-amber-400 font-medium">
+                      {queuedCount} {t('pending_sync')}
+                    </span>
+                  </div>
+                )}
               </div>
             )}
           </div>

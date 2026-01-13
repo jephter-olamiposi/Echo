@@ -1,3 +1,7 @@
+//! Firebase Cloud Messaging (FCM) push notifications.
+//!
+//! Uses data-only messages for background sync support.
+
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
 use serde::{Deserialize, Serialize};
 use serde_json::json;

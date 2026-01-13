@@ -5,13 +5,15 @@ mod desktop {
     use std::hash::{Hash, Hasher};
     use std::sync::{Arc, Mutex};
     use std::thread;
-    use std::time::Duration;
+    use std::time::{Duration, Instant};
     use tauri::{AppHandle, Emitter, Listener};
 
-    const POLL_INTERVAL_MS: u64 = 500;
+    // Adaptive polling: fast when active, slow when idle
+    const FAST_POLL_MS: u64 = 300;
+    const SLOW_POLL_MS: u64 = 1000;
+    const IDLE_THRESHOLD_SECS: u64 = 60;
     const INIT_RETRY_SECS: u64 = 5;
 
-    // Store the hash of the content we just wrote from remote, to ignore it when reading back
     type IgnoredHash = Arc<Mutex<Option<u64>>>;
 
     fn calculate_hash(t: &str) -> u64 {
@@ -39,10 +41,18 @@ mod desktop {
             match Clipboard::new() {
                 Ok(mut clipboard) => {
                     let mut last_text = clipboard.get_text().unwrap_or_default();
-                    eprintln!("[clipboard] monitor started");
+                    let mut last_change = Instant::now();
+                    eprintln!("[clipboard] monitor started (adaptive polling)");
 
                     loop {
-                        thread::sleep(Duration::from_millis(POLL_INTERVAL_MS));
+                        // Adaptive polling: fast after recent activity, slow when idle
+                        let idle_secs = last_change.elapsed().as_secs();
+                        let poll_ms = if idle_secs < IDLE_THRESHOLD_SECS {
+                            FAST_POLL_MS
+                        } else {
+                            SLOW_POLL_MS
+                        };
+                        thread::sleep(Duration::from_millis(poll_ms));
 
                         match clipboard.get_text() {
                             Ok(current) if current != last_text && !current.is_empty() => {
@@ -54,24 +64,22 @@ mod desktop {
                                     if let Some(ignored) = *guard {
                                         if ignored == current_hash {
                                             eprintln!("[clipboard] skipped echoed content");
-                                            *guard = None; // Reset after ignoring
+                                            *guard = None;
                                             last_text = current;
                                             continue;
                                         }
                                     }
-                                    // Clear ignore if we saw something else (desync protection)
                                     *guard = None;
                                 }
 
                                 last_text = current.clone();
+                                last_change = Instant::now(); // Reset activity timer
                                 if let Err(e) = app.emit("clipboard-change", current) {
                                     eprintln!("[clipboard] emit error: {e}");
                                 }
                             }
                             Ok(_) => {}
-                            Err(_) => {
-                                // Non-text content (images, files) - silently ignore
-                            }
+                            Err(_) => {}
                         }
                     }
                 }

@@ -11,6 +11,7 @@ export function useKeys() {
   const [fingerprint, setFingerprint] = useState<string | null>(null);
   const [linkUri, setLinkUri] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
+  const [needsKeySetup, setNeedsKeySetup] = useState(false);
 
   // Generate Fingerprint
   const generateFingerprint = async (key: Uint8Array) => {
@@ -37,27 +38,39 @@ export function useKeys() {
   const saveKey = useCallback(async (key: Uint8Array) => {
     await saveEncryptionKey(key);
     setEncryptionKey(key);
+    setNeedsKeySetup(false);
     await generateFingerprint(key);
     generateLink(key);
   }, []);
 
+  // Generate a new key (for "Start Fresh" option)
+  const createNewKey = useCallback(async () => {
+    const key = generateSecretKey();
+    await saveKey(key);
+    return key;
+  }, [saveKey]);
+
   const initKeys = useCallback(async () => {
     try {
-      let key = await loadEncryptionKey();
+      const key = await loadEncryptionKey();
 
       if (!key) {
-        key = await generateSecretKey();
-        await saveEncryptionKey(key);
+        // No key found - user needs to set up (scan, import, or create new)
+        setNeedsKeySetup(true);
+        setIsReady(true);
+        return null;
       }
 
       setEncryptionKey(key);
+      setNeedsKeySetup(false);
       await generateFingerprint(key);
       generateLink(key);
       setIsReady(true);
       return key;
     } catch (e) {
       console.error("Key init failed", e);
-      setIsReady(true); // Ready but failed?
+      setNeedsKeySetup(true);
+      setIsReady(true);
       return null;
     }
   }, []);
@@ -72,8 +85,18 @@ export function useKeys() {
       fingerprint,
       linkUri,
       saveKey,
+      createNewKey,
+      needsKeySetup,
       isReady,
     }),
-    [encryptionKey, fingerprint, linkUri, saveKey, isReady]
+    [
+      encryptionKey,
+      fingerprint,
+      linkUri,
+      saveKey,
+      createNewKey,
+      needsKeySetup,
+      isReady,
+    ]
   );
 }

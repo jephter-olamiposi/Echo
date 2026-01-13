@@ -1,3 +1,5 @@
+//! Domain models and DTOs for the Echo API.
+
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
 

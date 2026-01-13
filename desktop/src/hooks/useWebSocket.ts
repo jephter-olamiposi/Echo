@@ -40,6 +40,7 @@ export interface UseWebSocketOptions {
 
 export interface UseWebSocketReturn {
   connected: boolean;
+  queuedCount: number;
   connect: () => void;
   disconnect: () => void;
   send: (content: string) => void;
@@ -59,6 +60,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
   } = options;
 
   const [connected, setConnected] = useState(false);
+  const [queuedCount, setQueuedCount] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
@@ -270,6 +272,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
           sendRef.current?.(msg);
         }
       }
+      setQueuedCount(0); // Clear queue count after flush
     };
 
     ws.onmessage = handleMessage;
@@ -316,15 +319,18 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     };
 
     const handleVisibility = () => {
-      if (
-        document.visibilityState === "visible" &&
-        !connected &&
-        navigator.onLine
-      ) {
-        console.log("[ws] App visible; attempting reconnect");
-        cleanup();
-        retriesRef.current = 0;
-        connect();
+      if (document.visibilityState === "visible" && navigator.onLine) {
+        // Always reconnect immediately on resume for instant sync
+        // This is important for mobile where WebSocket may have been killed
+        const ws = wsRef.current;
+        const isConnected = ws && ws.readyState === WebSocket.OPEN;
+
+        if (!isConnected) {
+          console.log("[ws] App visible; instant reconnect for mobile sync");
+          cleanup();
+          retriesRef.current = 0;
+          connect();
+        }
       }
     };
 
@@ -337,7 +343,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       window.removeEventListener("offline", handleOffline);
       document.removeEventListener("visibilitychange", handleVisibility);
     };
-  }, [connect, cleanup, connected, updateConnectionState]);
+  }, [connect, cleanup, updateConnectionState]);
 
   const disconnect = useCallback(() => {
     intentionalCloseRef.current = true;
@@ -358,6 +364,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
         messageQueueRef.current.shift();
       }
       messageQueueRef.current.push(content);
+      setQueuedCount(messageQueueRef.current.length);
       return;
     }
 
@@ -399,6 +406,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
   return {
     connected,
+    queuedCount,
     connect,
     disconnect,
     send,

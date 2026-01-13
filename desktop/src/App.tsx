@@ -15,6 +15,7 @@ import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
 import { Onboarding } from "./components/auth/Onboarding";
 import { AuthLayout } from "./components/auth/AuthLayout";
+import { DeviceSetup } from "./components/auth/DeviceSetup";
 import { ErrorBoundary } from "./components/shared/ErrorBoundary";
 import { 
   importKey, 
@@ -23,7 +24,7 @@ import {
   generateLinkUri
 } from "./crypto";
 import { config } from "./config";
-import { getAuthToken, saveAuthToken, removeAuthToken } from "./api";
+import { getAuthToken, saveAuthToken, removeAuthToken, fetchClipboardHistory } from "./api";
 
 import { AppState, MobileView, LinkedDevice, ClipboardEntry, ContentType } from "./types";
 import { ScanningOverlay } from "./components/mobile/ScanningOverlay";
@@ -31,6 +32,7 @@ import { useClipboard } from "./hooks/useClipboard";
 import { useKeys } from "./hooks/useKeys";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { useWebSocket } from "./hooks/useWebSocket";
+import { useLatest } from "./hooks/useLatest";
 import { useToast, ToastProvider } from "./utils";
 
 
@@ -73,6 +75,7 @@ function AppContent() {
   const [selectedEntry, setSelectedEntry] = useState<ClipboardEntry | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
+  const [isMobilePlatform, setIsMobilePlatform] = useState(false);
   const [backgroundModeEnabled, setBackgroundModeEnabled] = useState(() => {
     return localStorage.getItem("echo_background_mode") === "true";
   });
@@ -86,9 +89,12 @@ function AppContent() {
   // Lock to prevent infinite loops when we write to clipboard from a remote message
   const isRemoteUpdateRef = useRef(false);
   
-  // Track push notification sync state
+  // Track push notification sync state - for cold starts only
   const isSyncingFromPushRef = useRef(false);
-  const hasSyncedLatestRef = useRef(false);
+
+  // Refs for accessing current values (avoids stale closures in callbacks)
+  const clipboardRef = useLatest(clipboard);
+  const connectedRef = useLatest(connected);
 
   const handleDeviceJoin = useCallback((device: LinkedDevice) => {
       setDevices(prev => {
@@ -106,43 +112,39 @@ function AppContent() {
       }
   }, [deviceId, showToast]);
 
+  // Helper to copy content to OS clipboard with proper locking
+  const copyToOsClipboard = useCallback(async (content: string) => {
+    try {
+      isRemoteUpdateRef.current = true;
+      const { emit } = await import("@tauri-apps/api/event");
+      await emit("clipboard-remote-write", content);
+      await clipboard.copyToClipboard(content);
+      // Reset lock after a safety delay
+      setTimeout(() => { isRemoteUpdateRef.current = false; }, 1000);
+      return true;
+    } catch (e) {
+      console.error("Failed to copy to OS clipboard:", e);
+      isRemoteUpdateRef.current = false;
+      return false;
+    }
+  }, [clipboard]);
+
   const handleIncomingCopy = useCallback(async (entry: ClipboardEntry, isHistory?: boolean) => {
     // Always add to local history UI
     clipboard.addEntry(entry.content, 'remote', entry.deviceName);
 
     if (!isHistory) {
-      try {
-        // Set lock before writing to OS clipboard
-        isRemoteUpdateRef.current = true;
-        
-        const { emit } = await import("@tauri-apps/api/event");
-        await emit("clipboard-remote-write", entry.content);
-        await clipboard.copyToClipboard(entry.content);
-        
-        // Reset lock after a safety delay (enough for event to fire)
-        setTimeout(() => {
-            isRemoteUpdateRef.current = false;
-        }, 1000);
-      } catch (e) {
-        console.error("Failed to process remote copy:", e);
-        isRemoteUpdateRef.current = false;
-      }
-    } else {
-        // Check if this is a "Tap to Sync" event
-        if (isSyncingFromPushRef.current && !hasSyncedLatestRef.current) {
-             console.log("[App] Syncing latest history item to clipboard from push");
-             hasSyncedLatestRef.current = true;
-             
-             // Trigger the copy
-             // We use the same lock mechanism as above to be safe
-             isRemoteUpdateRef.current = true;
-             clipboard.copyToClipboard(entry.content).then(() => {
-                 setTimeout(() => { isRemoteUpdateRef.current = false; }, 1000);
-             });
-        }
+      // Live message - always copy to OS clipboard
+      await copyToOsClipboard(entry.content);
+    } else if (isSyncingFromPushRef.current) {
+      // History replay during a push-triggered sync (cold start)
+      // Copy the first history item (which is the most recent from server)
+      console.log("[App] Cold start sync: copying first history item to clipboard");
+      isSyncingFromPushRef.current = false; // Only sync once
+      await copyToOsClipboard(entry.content);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Normal history replay (not from push) - just add to UI, don't copy
+  }, [clipboard, copyToOsClipboard]);
 
   const handleDeviceLeave = useCallback((id: string) => {
     setDevices(prev => prev.filter(d => d.id !== id || d.isCurrentDevice));
@@ -160,45 +162,62 @@ function AppContent() {
     onError: (msg) => showError(msg),
   });
 
+  // Keep wsRef synced (useLatest pattern)
+  const wsRef = useLatest(ws);
+
   usePushNotifications({
     token,
     deviceId,
     isConnected: connected,
-    onSyncRequest: () => {
-      console.log("[App] Sync request received from push");
+    onSyncRequest: async () => {
+      const isConnected = connectedRef.current;
+      console.log("[App] Sync request received from push, connected:", isConnected);
       
-      // Mark intention to sync
-      isSyncingFromPushRef.current = true;
-      hasSyncedLatestRef.current = false;
-      
-      // Extended timeout (15s) for emulator/slow network
-      setTimeout(() => {
-        isSyncingFromPushRef.current = false;
-      }, 15000);
-
-      if (token) {
-        showToast("Syncing from notification...", "info");
-        ws.connect();
+      if (isConnected) {
+        // WARM START: Already connected, sync from local history
+        // The latest remote entry in our history is the newest clipboard from other devices
+        const latestRemote = clipboardRef.current.getLatestRemoteEntry();
+        if (latestRemote) {
+          console.log("[App] Warm start sync: copying latest remote entry to clipboard");
+          showToast("Syncing clipboard...", "info");
+          isRemoteUpdateRef.current = true;
+          try {
+            const { emit } = await import("@tauri-apps/api/event");
+            await emit("clipboard-remote-write", latestRemote.content);
+            await clipboardRef.current.copyToClipboard(latestRemote.content);
+            setTimeout(() => { isRemoteUpdateRef.current = false; }, 1000);
+            showToast("Clipboard synced!", "success");
+          } catch (e) {
+            console.error("[App] Warm start sync failed:", e);
+            isRemoteUpdateRef.current = false;
+          }
+        } else {
+          console.log("[App] No remote entries in history to sync");
+          showToast("No clipboard to sync", "info");
+        }
       } else {
-        console.log("[App] Token not ready, sync will happen on auto-connect");
-        // The token useEffect will trigger ws.connect() naturally.
-        // We just leave the flag true so it catches the history when it eventually connects.
+        // COLD START: Need to reconnect, the first history item will be synced
+        console.log("[App] Cold start sync: setting flag and reconnecting");
+        isSyncingFromPushRef.current = true;
+        
+        // Timeout to reset flag if sync doesn't happen
+        setTimeout(() => {
+          isSyncingFromPushRef.current = false;
+        }, 15000);
+
+        if (token && wsRef.current) {
+          showToast("Syncing from notification...", "info");
+          wsRef.current.connect();
+        } else {
+          console.log("[App] Token or ws not ready, sync will happen on auto-connect");
+        }
       }
     }
   });
 
-  // Ensure we don't clear the flag too aggressively if connection drops
-  // The refs needs to persist until we actually get the message or timeout.
-
-  // Refs for accessing current values in polling interval (avoids stale closures)
-  const clipboardRef = useRef(clipboard);
-  const wsRef = useRef(ws);
-  const deviceNameRef = useRef(deviceName);
-  const keysRef = useRef(keys);
-  useEffect(() => { clipboardRef.current = clipboard; }, [clipboard]);
-  useEffect(() => { wsRef.current = ws; }, [ws]);
-  useEffect(() => { deviceNameRef.current = deviceName; }, [deviceName]);
-  useEffect(() => { keysRef.current = keys; }, [keys]);
+  // Additional refs for polling intervals (avoids stale closures)
+  const deviceNameRef = useLatest(deviceName);
+  const keysRef = useLatest(keys);
 
   // Initialize secure token and auth state
   useEffect(() => {
@@ -246,6 +265,10 @@ function AppContent() {
         } catch (e) {
            console.warn("Failed to detect platform:", e);
         }
+
+        // Detect if we're on a mobile platform (not just small screen)
+        const isMobile = platform === 'android' || platform === 'ios';
+        setIsMobilePlatform(isMobile);
 
         let name = "Echo Device";
         if (platform === 'android') {
@@ -362,7 +385,10 @@ function AppContent() {
         
         if (platform === 'android') {
           // Android: Listen for native clipboard change events from MainActivity.kt
-          console.log("[Android] Setting up native clipboard listener");
+          // PLUS fallback polling since the native listener is unreliable on many devices
+          console.log("[Android] Setting up native clipboard listener + fallback polling");
+          
+          let lastPolledText = '';
           
           nativeClipboardHandler = (e: Event) => {
             const customEvent = e as CustomEvent<string>;
@@ -375,22 +401,52 @@ function AppContent() {
             
             if (content && typeof content === 'string') {
               console.log("[Android] Native clipboard change detected");
+              lastPolledText = content; // Update to avoid duplicate from polling
               const wasAdded = clipboardRef.current.addEntry(content, 'local', deviceNameRef.current);
+              // Always call ws.send() - it will queue if not connected and send when reconnected
               if (wasAdded && keysRef.current.encryptionKey) {
                 wsRef.current.send(content);
+                showToast(`Synced: ${content.substring(0, 30)}${content.length > 30 ? '...' : ''}`, 'success');
               }
             }
           };
           
           window.addEventListener('native-clipboard-change', nativeClipboardHandler);
           
-          // Also check on resume for any missed changes
+          // Fallback polling for unreliable native listener (poll every 1s when visible)
+          const pollClipboard = async () => {
+            if (!keysRef.current.encryptionKey) return;
+            if (document.visibilityState !== 'visible') return;
+            
+            try {
+              const text = await clipboardRef.current.readFromClipboard();
+              if (text && text !== lastPolledText && !isRemoteUpdateRef.current) {
+                lastPolledText = text;
+                console.log("[Android] Polling detected clipboard change");
+                const wasAdded = clipboardRef.current.addEntry(text, 'local', deviceNameRef.current);
+                if (wasAdded && keysRef.current.encryptionKey) {
+                  wsRef.current.send(text);
+                  showToast(`Synced: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`, 'success');
+                }
+              }
+            } catch (e) {
+              // Ignore read errors
+            }
+          };
+          
+          // Poll every 1 second as fallback
+          interval = setInterval(pollClipboard, 1000);
+          
+          // Also check immediately on resume for any missed changes
           const checkOnResume = async () => {
             const text = await clipboardRef.current.readFromClipboard();
-            if (text && !isRemoteUpdateRef.current) {
+            if (text && text !== lastPolledText && !isRemoteUpdateRef.current) {
+              lastPolledText = text;
               const wasAdded = clipboardRef.current.addEntry(text, 'local', deviceNameRef.current);
+              // Always call ws.send() - it will queue if not connected
               if (wasAdded && keysRef.current.encryptionKey) {
                 wsRef.current.send(text);
+                showToast(`Synced: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`, 'success');
               }
             }
           };
@@ -406,7 +462,7 @@ function AppContent() {
           console.log("[iOS] Starting adaptive clipboard polling");
           
           let lastChangeTime = Date.now();
-          let currentInterval = 2000; // Start fast
+          let currentInterval = 500; // Start very fast (500ms)
           
           const poll = async () => {
             if (!keysRef.current.encryptionKey) return;
@@ -414,23 +470,25 @@ function AppContent() {
             const text = await clipboardRef.current.readFromClipboard();
             if (text && !isRemoteUpdateRef.current) {
               const wasAdded = clipboardRef.current.addEntry(text, 'local', deviceNameRef.current);
+              // Always call ws.send() - it will queue if not connected and send when reconnected
               if (wasAdded && keysRef.current.encryptionKey) {
                 lastChangeTime = Date.now();
-                currentInterval = 2000; // Speed up on activity
+                currentInterval = 500; // Speed up on activity
                 wsRef.current.send(text);
+                showToast(`Synced: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`, 'success');
               }
             }
             
-            // Adaptive slowdown
+            // Adaptive slowdown - more aggressive when active
             const idleTime = Date.now() - lastChangeTime;
             if (document.visibilityState === 'hidden') {
-              currentInterval = 30000; // Very slow when backgrounded
+              currentInterval = 15000; // Slower when backgrounded (was 30s)
             } else if (idleTime > 120000) {
-              currentInterval = 10000; // Slow after 2 min idle
+              currentInterval = 5000; // Medium after 2 min idle (was 10s)
             } else if (idleTime > 30000) {
-              currentInterval = 5000; // Medium after 30s idle
+              currentInterval = 2000; // Faster after 30s idle (was 5s)
             } else {
-              currentInterval = 2000; // Fast when active
+              currentInterval = 500; // Very fast when active (was 2s)
             }
           };
           
@@ -548,9 +606,40 @@ function AppContent() {
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    ws.connect();
-    await new Promise(r => setTimeout(r, 1000));
-    setIsRefreshing(false);
+    try {
+      // Reconnect WebSocket to ensure live connection
+      ws.connect();
+      
+      // Fetch history from server
+      const serverHistory = await fetchClipboardHistory();
+      
+      if (Array.isArray(serverHistory) && serverHistory.length > 0) {
+        // Decrypt and add any new entries from server
+        for (const msg of serverHistory) {
+          // Skip messages from this device
+          if (msg.device_id === deviceId) continue;
+          
+          // Skip non-encrypted or system messages
+          if (!msg.encrypted || !msg.nonce) continue;
+          if (!keys.encryptionKey) continue;
+          
+          try {
+            // Import decrypt function
+            const { decrypt } = await import('./crypto');
+            const content = decrypt(msg.content, msg.nonce, keys.encryptionKey);
+            
+            // Add to local history (addEntry will dedupe)
+            clipboard.addEntry(content, 'remote', msg.device_name);
+          } catch (e) {
+            console.warn('[Refresh] Failed to decrypt message:', e);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('[Refresh] Error:', e);
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleManualKeySync = async () => {
@@ -674,17 +763,55 @@ function AppContent() {
     setViewState("login");
   };
 
+  // Handle device setup actions
+  const handleDeviceSetupImportKey = async (keyString: string) => {
+    try {
+      const key = importKey(keyString);
+      await keys.saveKey(key);
+      showToast("Device linked successfully!", "success");
+    } catch (e) {
+      console.error("Failed to import key:", e);
+      showToast("Invalid encryption key", "error");
+    }
+  };
+
+  const handleDeviceSetupCreateNew = async () => {
+    await keys.createNewKey();
+    showToast("New encryption key created", "success");
+  };
+
   if (view === "onboarding") return <ErrorBoundary><Onboarding onComplete={handleOnboardingComplete} /></ErrorBoundary>;
   if (view === "login") return <ErrorBoundary><AuthLayout><Login initialEmail={email || ""} onSuccess={handleAuthSuccess} onSwitchToRegister={() => setViewState("register")} /></AuthLayout></ErrorBoundary>;
   if (view === "register") return <ErrorBoundary><AuthLayout><Register initialEmail={email || ""} onSuccess={handleAuthSuccess} onSwitchToLogin={() => setViewState("login")} /></AuthLayout></ErrorBoundary>;
+  
+  // Show device setup if logged in but no encryption key
+  if (view === "main" && keys.needsKeySetup) {
+    return (
+      <ErrorBoundary>
+        {isScanning && <ScanningOverlay onCancel={handleCancelScan} />}
+        {!isScanning && (
+          <AuthLayout>
+            <DeviceSetup
+              onScanQR={handleScanQR}
+              onImportKey={handleDeviceSetupImportKey}
+              onCreateNew={handleDeviceSetupCreateNew}
+              isScanning={isScanning}
+            />
+          </AuthLayout>
+        )}
+      </ErrorBoundary>
+    );
+  }
 
   return (
     <ErrorBoundary>
       {isScanning && <ScanningOverlay onCancel={handleCancelScan} />}
       
       <div className={`transition-opacity duration-300 ${isScanning ? 'opacity-0' : 'opacity-100'}`}>
-        <div className="block md:hidden h-dvh w-full">
-          <MobileLayout 
+        {/* Mobile Layout - show for mobile platforms regardless of screen size */}
+        {isMobilePlatform && (
+          <div className="h-dvh w-full">
+            <MobileLayout 
             history={clipboard.history}
             devices={devices}
             mobileView={mobileView}
@@ -695,6 +822,8 @@ function AppContent() {
             isLoading={isLoading}
             isRefreshing={isRefreshing}
             email={email || ""}
+            syncing={!connected && ws.queuedCount > 0}
+            queuedCount={ws.queuedCount}
             onCopy={clipboard.copyToClipboard}
             onDelete={clipboard.deleteEntry}
             onClearHistory={() => setShowClearConfirm(true)}
@@ -710,10 +839,13 @@ function AppContent() {
             onPin={clipboard.togglePin}
             onRefresh={handleRefresh}
           />
-        </div>
+          </div>
+        )}
 
-        <div className="hidden md:flex flex-row h-screen w-full overflow-hidden bg-(--color-bg) text-(--color-text-primary)"> 
-          <Sidebar 
+        {/* Desktop Layout - show for desktop platforms */}
+        {!isMobilePlatform && (
+          <div className="flex flex-row h-screen w-full overflow-hidden bg-(--color-bg) text-(--color-text-primary)"> 
+            <Sidebar 
             history={clipboard.history}
             searchQuery={searchQuery}
             filterType={filterType}
@@ -755,7 +887,8 @@ function AppContent() {
              onLogout={handleLogout}
              onBack={() => setSelectedEntry(null)}
           />
-        </div>
+          </div>
+        )}
       </div>
 
       <Modal
@@ -787,7 +920,12 @@ function AppContent() {
       >
         <div className="flex flex-col items-center gap-5">
           <div className="p-4 bg-white rounded-2xl">
-            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(derivedState.linkUri || "")}`} alt="QR" width={200} height={200} />
+            <img 
+              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(derivedState.linkUri || "")}`} 
+              alt="QR code for device pairing - scan with Echo mobile app" 
+              width={200} 
+              height={200} 
+            />
           </div>
           <div className="w-full bg-(--color-surface-raised) p-3 rounded-xl border border-(--color-border) flex items-center gap-2">
             <code className="text-[12px] text-(--color-text-tertiary) truncate flex-1 font-mono">{keys.encryptionKey ? exportKey(keys.encryptionKey) : ""}</code>

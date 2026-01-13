@@ -184,6 +184,12 @@
   --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   --shadow-glow-purple: 0 0 30px rgba(168, 85, 247, 0.15);
 
+  /* Mobile Background Gradients - Dark theme */
+  --mobile-gradient-from: rgba(88, 28, 135, 0.2); /* purple-900/20 */
+  --mobile-gradient-to: rgba(30, 58, 138, 0.2);   /* blue-900/20 */
+  --mobile-glow-primary: rgba(168, 85, 247, 0.2); /* purple-500/20 */
+  --mobile-glow-secondary: rgba(59, 130, 246, 0.15); /* blue-500/15 */
+
   /* ─────────────────────────────────────────────────────────────────────────
    * Transitions & Animations
    * ───────────────────────────────────────────────────────────────────────── */
@@ -208,30 +214,36 @@
 }
 
 :root[data-theme="light"] {
-  /* Backgrounds - Premium Off-White/Slate */
-  --color-bg: #f8fafc; /* Slate 50 */
+  /* Backgrounds - Warm Off-White for easier eye comfort */
+  --color-bg: #fafaf9; /* Stone 50 - warmer than slate */
   --color-bg-subtle: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-raised: #f1f5f9; /* Slate 100 */
-  --color-surface-overlay: rgba(255, 255, 255, 0.85);
-  --color-highlight: rgba(255, 255, 255, 0.6);
+  --color-surface-raised: #f5f5f4; /* Stone 100 - warm gray */
+  --color-surface-overlay: rgba(255, 255, 255, 0.92);
+  --color-highlight: rgba(255, 255, 255, 0.7);
 
-  /* Borders - Softer */
-  --color-border: #e2e8f0; /* Slate 200 */
-  --color-border-subtle: #f1f5f9; /* Slate 100 */
-  --color-border-muted: #f8fafc; /* Slate 50 */
-  --color-border-focus: rgba(168, 85, 247, 0.4);
+  /* Borders - Warmer tones */
+  --color-border: #e7e5e4; /* Stone 200 */
+  --color-border-subtle: #f5f5f4; /* Stone 100 */
+  --color-border-muted: #fafaf9; /* Stone 50 */
+  --color-border-focus: rgba(147, 51, 234, 0.35); /* Purple 600 */
 
-  /* Text - High Contrast but Soft */
-  --color-text-primary: #0f172a; /* Slate 900 (stronger than 800) */
-  --color-text-secondary: #475569; /* Slate 600 (darker than 500) */
-  --color-text-tertiary: #64748b; /* Slate 500 (darker than 400) */
-  --color-text-muted: #94a3b8; /* Slate 400 (visible on white) */
+  /* Text - Warm grays for less harsh contrast */
+  --color-text-primary: #1c1917; /* Stone 900 - warm black */
+  --color-text-secondary: #57534e; /* Stone 600 */
+  --color-text-tertiary: #78716c; /* Stone 500 */
+  --color-text-muted: #a8a29e; /* Stone 400 */
   --color-text-inverse: #ffffff;
 
-  /* Shadows - More diffuse for light mode */
-  --shadow-sm: 0 1px 2px 0 rgba(148, 163, 184, 0.1);
-  --shadow-md: 0 4px 6px -1px rgba(148, 163, 184, 0.1), 0 2px 4px -2px rgba(148, 163, 184, 0.06);
-  --shadow-lg: 0 10px 15px -3px rgba(148, 163, 184, 0.1), 0 4px 6px -4px rgba(148, 163, 184, 0.05);
-  --shadow-xl: 0 20px 25px -5px rgba(148, 163, 184, 0.1), 0 10px 10px -5px rgba(148, 163, 184, 0.04);
+  /* Shadows - Warmer and softer */
+  --shadow-sm: 0 1px 2px 0 rgba(120, 113, 108, 0.08);
+  --shadow-md: 0 4px 6px -1px rgba(120, 113, 108, 0.08), 0 2px 4px -2px rgba(120, 113, 108, 0.04);
+  --shadow-lg: 0 10px 15px -3px rgba(120, 113, 108, 0.08), 0 4px 6px -4px rgba(120, 113, 108, 0.03);
+  --shadow-xl: 0 20px 25px -5px rgba(120, 113, 108, 0.08), 0 10px 10px -5px rgba(120, 113, 108, 0.02);
+
+  /* Mobile Background Gradients - Light theme (softer, eye-friendly) */
+  --mobile-gradient-from: rgba(243, 232, 255, 0.6); /* purple-100/60 */
+  --mobile-gradient-to: rgba(219, 234, 254, 0.5);   /* blue-100/50 */
+  --mobile-glow-primary: rgba(192, 132, 252, 0.15); /* purple-400/15 */
+  --mobile-glow-secondary: rgba(96, 165, 250, 0.1); /* blue-400/10 */
 }

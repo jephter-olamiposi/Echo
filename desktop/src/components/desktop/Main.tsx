@@ -181,10 +181,19 @@ export const Main: React.FC<DesktopMainProps> = ({
           </div>
           
           <div className="flex items-center gap-4 shrink-0">
-             <button className="w-9 h-9 flex items-center justify-center rounded-xl bg-(--color-surface-raised) border border-(--color-border) text-(--color-text-muted) hover:text-(--color-text-primary) hover:bg-(--color-surface) transition-all">
+             <button 
+               className="w-9 h-9 flex items-center justify-center rounded-xl bg-(--color-surface-raised) border border-(--color-border) text-(--color-text-muted) hover:text-(--color-text-primary) hover:bg-(--color-surface) transition-all"
+               aria-label="Help"
+               title="Help"
+             >
                <div className="w-5 h-5">{Icons.info}</div>
              </button>
-             <button className="w-9 h-9 flex items-center justify-center rounded-xl bg-(--color-surface-raised) border border-(--color-border) text-(--color-text-muted) hover:text-(--color-text-primary) hover:bg-(--color-surface) transition-all" onClick={onLinkDevice}>
+             <button 
+               className="w-9 h-9 flex items-center justify-center rounded-xl bg-(--color-surface-raised) border border-(--color-border) text-(--color-text-muted) hover:text-(--color-text-primary) hover:bg-(--color-surface) transition-all" 
+               onClick={onLinkDevice}
+               aria-label="Link new device"
+               title="Link new device"
+             >
                <div className="w-5 h-5">{Icons.link}</div>
              </button>
              <button 

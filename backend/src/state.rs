@@ -1,3 +1,8 @@
+//! Application state with concurrent collections and broadcast channels.
+//!
+//! Uses DashMap for lock-free concurrent access (3-5x faster than RwLock<HashMap>).
+//! See `benches/rate_limiting.rs` for benchmarks.
+
 use crate::error::AppError;
 use crate::models::ClipboardMessage;
 use crate::push::PushClient;
@@ -228,6 +233,7 @@ impl AppState {
     }
 }
 
+/// Token bucket rate limiting. Returns true if allowed.
 fn check_rate_custom(
     state: &mut RateLimitState,
     ignore_interval: bool,
@@ -304,13 +310,12 @@ impl AppState {
         }
     }
 
+    /// Get or create a broadcast channel for a user.
     pub fn get_or_create_channel(&self, user_id: Uuid) -> broadcast::Sender<ClipboardMessage> {
         self.hub
             .entry(user_id)
             .or_insert_with(|| {
-                // Calculate dynamic capacity based on active devices
-                let device_count = self.sessions.get(&user_id).map(|s| s.len()).unwrap_or(1); // At least 1 for the connecting device
-
+                let device_count = self.sessions.get(&user_id).map(|s| s.len()).unwrap_or(1);
                 let capacity = (device_count * CAPACITY_PER_DEVICE)
                     .clamp(MIN_CHANNEL_CAPACITY, MAX_CHANNEL_CAPACITY);
 
@@ -318,7 +323,7 @@ impl AppState {
                     user = %user_id,
                     devices = device_count,
                     capacity = capacity,
-                    "creating channel with dynamic capacity"
+                    "creating channel"
                 );
 
                 broadcast::channel(capacity).0

@@ -1,69 +1,110 @@
+//! Unified error types with HTTP status code mapping.
+
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     Json,
 };
 use serde::Serialize;
+use thiserror::Error;
 
-#[derive(Debug)]
+///
+/// All handlers return `Result<T, AppError>` for consistent error handling.
+#[derive(Debug, Error)]
 pub enum AppError {
+    /// Authentication/authorization failure (401 Unauthorized)
+    #[error("Authentication error: {0}")]
     Auth(String),
-    Database(sqlx::Error),
+
+    /// Database operation failure (500 Internal Server Error)
+    #[error("Database error: {0}")]
+    Database(#[from] sqlx::Error),
+
+    /// Internal server error (500 Internal Server Error)
+    #[error("Internal error: {0}")]
     Internal(String),
+
+    /// Resource conflict (409 Conflict)
+    #[error("Conflict: {0}")]
     Conflict(String),
+
+    /// Invalid request data (400 Bad Request)
+    #[error("Bad request: {0}")]
     BadRequest(String),
+
+    /// JWT token error (500 Internal Server Error)
+    #[error("Token error: {0}")]
+    Token(#[from] jsonwebtoken::errors::Error),
+
+    /// Async task panicked (500 Internal Server Error)
+    #[error("Task error: {0}")]
+    Task(#[from] tokio::task::JoinError),
 }
 
-impl std::fmt::Display for AppError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Auth(msg) => write!(f, "Auth error: {}", msg),
-            Self::Database(e) => write!(f, "Database error: {}", e),
-            Self::Internal(msg) => write!(f, "Internal error: {}", msg),
-            Self::Conflict(msg) => write!(f, "Conflict: {}", msg),
-            Self::BadRequest(msg) => write!(f, "Bad request: {}", msg),
-        }
-    }
-}
-
+/// JSON response body for errors
 #[derive(Serialize)]
 struct ErrorBody {
     error: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    code: Option<String>,
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let (status, message) = match self {
-            Self::Auth(msg) => (StatusCode::UNAUTHORIZED, msg),
+        let (status, message, code) = match &self {
+            Self::Auth(msg) => (StatusCode::UNAUTHORIZED, msg.clone(), Some("AUTH_ERROR")),
             Self::Database(e) => {
-                tracing::error!("Database error: {:?}", e);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Database error".into())
+                tracing::error!(error = %e, "Database error");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Database error".into(),
+                    Some("DB_ERROR"),
+                )
             }
             Self::Internal(msg) => {
-                tracing::error!("Internal error: {}", msg);
-                (StatusCode::INTERNAL_SERVER_ERROR, "Internal error".into())
+                tracing::error!(error = %msg, "Internal error");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal error".into(),
+                    Some("INTERNAL_ERROR"),
+                )
             }
-            Self::Conflict(msg) => (StatusCode::CONFLICT, msg),
-            Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg),
+            Self::Conflict(msg) => (StatusCode::CONFLICT, msg.clone(), Some("CONFLICT")),
+            Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone(), Some("BAD_REQUEST")),
+            Self::Token(e) => {
+                tracing::error!(error = %e, "Token error");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Token error".into(),
+                    Some("TOKEN_ERROR"),
+                )
+            }
+            Self::Task(e) => {
+                tracing::error!(error = %e, "Task error");
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Internal error".into(),
+                    Some("TASK_ERROR"),
+                )
+            }
         };
-        (status, Json(ErrorBody { error: message })).into_response()
+
+        (
+            status,
+            Json(ErrorBody {
+                error: message,
+                code: code.map(String::from),
+            }),
+        )
+            .into_response()
     }
 }
 
-impl From<sqlx::Error> for AppError {
-    fn from(err: sqlx::Error) -> Self {
-        Self::Database(err)
-    }
-}
-
-impl From<jsonwebtoken::errors::Error> for AppError {
-    fn from(err: jsonwebtoken::errors::Error) -> Self {
-        Self::Internal(err.to_string())
-    }
-}
-
-impl From<tokio::task::JoinError> for AppError {
-    fn from(err: tokio::task::JoinError) -> Self {
-        Self::Internal(err.to_string())
-    }
-}
+/// Result type alias for handlers.
+///
+/// Convenience type to reduce boilerplate. Usage:
+/// ```ignore
+/// async fn my_handler() -> AppResult<impl IntoResponse> { ... }
+/// ```
+#[allow(dead_code)]
+pub type AppResult<T> = Result<T, AppError>;

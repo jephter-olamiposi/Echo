@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Icons } from '../Icons';
 import { 
   formatTime, 
@@ -7,6 +7,75 @@ import {
 } from '../../utils';
 import { ClipboardEntry, ContentType } from '../../types';
 import { useTheme } from '../../contexts/ThemeContext';
+
+// Memoized sidebar entry item
+interface SidebarItemProps {
+  entry: ClipboardEntry;
+  isSelected: boolean;
+  onSelect: (entry: ClipboardEntry) => void;
+  onCopy: (text: string) => void;
+}
+
+const SidebarItem = memo<SidebarItemProps>(({ entry, isSelected, onSelect, onCopy }) => (
+  <button
+    onClick={() => onSelect(entry)}
+    className={`group w-full text-left p-3 rounded-xl transition-all border relative ${
+      isSelected
+        ? "bg-(--color-surface-raised) border-(--color-border)"
+        : "bg-transparent border-transparent hover:bg-(--color-surface-raised)/50"
+    }`}
+  >
+    <div className="flex items-start gap-3">
+      <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border transition-colors ${
+        isSelected
+          ? "bg-purple-500/20 border-purple-500/30 text-purple-400"
+          : "bg-(--color-surface-raised) border-(--color-border) text-(--color-text-secondary) group-hover:text-(--color-text-primary)"
+      }`}>
+        <div className="w-3.5 h-3.5">{getContentTypeIcon(entry.contentType)}</div>
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center justify-between mb-0.5">
+          <span className={`text-[11px] font-medium ${
+            isSelected ? "text-purple-400" : "text-(--color-text-secondary)"
+          }`}>
+            {entry.contentType.charAt(0).toUpperCase() + entry.contentType.slice(1)}
+          </span>
+          <div className="flex items-center gap-1.5">
+            {entry.pinned && (
+              <div className="w-3 h-3 text-purple-400 transform -rotate-45" title="Pinned">
+                {Icons.pin}
+              </div>
+            )}
+            <span className="text-[10px] text-(--color-text-tertiary)">{formatTime(entry.timestamp)}</span>
+          </div>
+        </div>
+        <p className={`text-xs line-clamp-2 leading-relaxed transition-colors ${
+          isSelected ? "text-(--color-text-primary)" : "text-(--color-text-muted) group-hover:text-(--color-text-secondary)"
+        }`}>
+          {truncate(entry.content, 100)}
+        </p>
+      </div>
+    </div>
+    
+    {/* Copy Button Overlay */}
+    <div 
+      className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-(--color-surface) text-(--color-text-muted) hover:text-(--color-text-primary)"
+      onClick={(e) => {
+        e.stopPropagation();
+        onCopy(entry.content);
+      }}
+      title="Copy"
+    >
+      <div className="w-3 h-3">{Icons.copy}</div>
+    </div>
+  </button>
+), (prev, next) => 
+  prev.entry.id === next.entry.id && 
+  prev.entry.pinned === next.entry.pinned && 
+  prev.isSelected === next.isSelected
+);
+
+SidebarItem.displayName = 'SidebarItem';
 
 interface DesktopSidebarProps {
   history: ClipboardEntry[];
@@ -205,65 +274,13 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
               </h3>
               <div className="space-y-1">
                 {items.map((entry) => (
-                  <button
+                  <SidebarItem
                     key={entry.id}
-                    onClick={() => onSelectEntry(entry)}
-                    className={`group w-full text-left p-3 rounded-xl transition-all border relative ${
-                      selectedEntryId === entry.id
-                        ? "bg-(--color-surface-raised) border-(--color-border)"
-                        : "bg-transparent border-transparent hover:bg-(--color-surface-raised)/50"
-                    }`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border transition-colors ${
-                        selectedEntryId === entry.id
-                          ? "bg-purple-500/20 border-purple-500/30 text-purple-400"
-                          : "bg-(--color-surface-raised) border-(--color-border) text-(--color-text-secondary) group-hover:text-(--color-text-primary)"
-                      }`}>
-                        <div className="w-3.5 h-3.5">{getContentTypeIcon(entry.contentType)}</div>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-0.5">
-                          <span className={`text-[11px] font-medium ${
-                            selectedEntryId === entry.id ? "text-purple-400" : "text-(--color-text-secondary)"
-                          }`}>
-                            {entry.contentType.charAt(0).toUpperCase() + entry.contentType.slice(1)}
-                          </span>
-                          <div className="flex items-center gap-1.5">
-                            {/* Only show inline pin if we are NOT in the Pinned section, or keep it consistent? 
-                                User asked for top sort. We can remove the inline pin if it's redundant, but good to keep state visible. 
-                                Actually, if it's in "Pinned" section, header implies it. But let's keep it minimal. */}
-                             {/* Re-using the inline pin logic from previous step if desired, or removing it from here since it's grouped.
-                                 Let's keep the inline icon but maybe simplified, or rely on group. 
-                                 For now, I will keep the inline indicator as it's good feedback. */ }
-                            {entry.pinned && (
-                              <div className="w-3 h-3 text-purple-400 transform -rotate-45" title="Pinned">
-                                {Icons.pin}
-                              </div>
-                            )}
-                            <span className="text-[10px] text-(--color-text-tertiary)">{formatTime(entry.timestamp)}</span>
-                          </div>
-                        </div>
-                        <p className={`text-xs line-clamp-2 leading-relaxed transition-colors ${
-                          selectedEntryId === entry.id ? "text-(--color-text-primary)" : "text-(--color-text-muted) group-hover:text-(--color-text-secondary)"
-                        }`}>
-                          {truncate(entry.content, 100)}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    {/* Copy Button Overlay */}
-                    <div 
-                      className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-(--color-surface) text-(--color-text-muted) hover:text-(--color-text-primary)"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onCopyConstructor(entry.content);
-                      }}
-                      title="Copy"
-                    >
-                      <div className="w-3 h-3">{Icons.copy}</div>
-                    </div>
-                  </button>
+                    entry={entry}
+                    isSelected={selectedEntryId === entry.id}
+                    onSelect={onSelectEntry}
+                    onCopy={onCopyConstructor}
+                  />
                 ))}
               </div>
             </div>

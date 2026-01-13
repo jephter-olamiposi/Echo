@@ -47,10 +47,12 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <label className="text-[13px] font-medium text-(--color-text-secondary) pl-1">First name</label>
+            <label htmlFor="register-firstname" className="text-[13px] font-medium text-(--color-text-secondary) pl-1">First name</label>
             <input
+              id="register-firstname"
               type="text"
               required
+              autoComplete="given-name"
               className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
               placeholder="John"
               value={firstName}
@@ -58,10 +60,12 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
             />
           </div>
           <div className="space-y-1.5">
-            <label className="text-[13px] font-medium text-(--color-text-secondary) pl-1">Last name</label>
+            <label htmlFor="register-lastname" className="text-[13px] font-medium text-(--color-text-secondary) pl-1">Last name</label>
             <input
+              id="register-lastname"
               type="text"
               required
+              autoComplete="family-name"
               className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
               placeholder="Doe"
               value={lastName}
@@ -71,10 +75,12 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[13px] font-medium text-(--color-text-secondary) pl-1">Email</label>
+          <label htmlFor="register-email" className="text-[13px] font-medium text-(--color-text-secondary) pl-1">Email</label>
           <input
+            id="register-email"
             type="email"
             required
+            autoComplete="email"
             className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
             placeholder="name@example.com"
             value={email}
@@ -83,11 +89,13 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
         </div>
 
         <div className="space-y-1.5">
-          <label className="text-[13px] font-medium text-(--color-text-secondary) pl-1">Password</label>
+          <label htmlFor="register-password" className="text-[13px] font-medium text-(--color-text-secondary) pl-1">Password</label>
           <input
+            id="register-password"
             type="password"
             required
             minLength={8}
+            autoComplete="new-password"
             className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
             placeholder="••••••••"
             value={password}

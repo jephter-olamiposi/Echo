@@ -1,3 +1,5 @@
+//! Password hashing (Argon2) and JWT token management.
+
 use crate::error::AppError;
 use crate::models::Claims;
 use argon2::{

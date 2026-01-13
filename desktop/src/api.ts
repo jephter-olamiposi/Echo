@@ -3,6 +3,19 @@ import { Store } from "@tauri-apps/plugin-store";
 import { fetch } from "@tauri-apps/plugin-http";
 import { AppError, ErrorType } from "./utils/AppError";
 
+// Declare EchoBridge for Android integration
+declare global {
+  interface Window {
+    EchoBridge?: {
+      saveAuthToken(token: string): void;
+      clearAuthToken(): void;
+      getFcmToken?(): string | null;
+      wasOpenedFromPush?(): boolean;
+      clearOpenedFromPush?(): void;
+    };
+  }
+}
+
 const AUTH_STORE_PATH = "echo-auth.json";
 const TOKEN_KEY = "auth_token";
 
@@ -15,6 +28,15 @@ export async function saveAuthToken(token: string): Promise<void> {
   const store = await getAuthStore();
   await store.set(TOKEN_KEY, token);
   await store.save();
+
+  // Also save to Android SharedPreferences for background sync
+  if (window.EchoBridge?.saveAuthToken) {
+    try {
+      window.EchoBridge.saveAuthToken(token);
+    } catch (e) {
+      console.warn("Failed to save token to Android SharedPreferences:", e);
+    }
+  }
 }
 
 export async function getAuthToken(): Promise<string | null> {
@@ -31,6 +53,18 @@ export async function removeAuthToken(): Promise<void> {
     const store = await getAuthStore();
     await store.delete(TOKEN_KEY);
     await store.save();
+
+    // Also clear from Android SharedPreferences
+    if (window.EchoBridge?.clearAuthToken) {
+      try {
+        window.EchoBridge.clearAuthToken();
+      } catch (e) {
+        console.warn(
+          "Failed to clear token from Android SharedPreferences:",
+          e
+        );
+      }
+    }
   } catch {
     // Ignore errors during token removal
   }
@@ -100,4 +134,9 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
 
     throw AppError.from(err);
   }
+}
+
+// Fetch clipboard history from server
+export async function fetchClipboardHistory(): Promise<any[]> {
+  return apiFetch("/history", { method: "GET" });
 }

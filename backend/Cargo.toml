@@ -43,3 +43,18 @@ futures = "0.3.31"
 
 # HTTP Client for FCM Push Notifications
 reqwest = { version = "0.12", features = ["json"] }
+
+# Better error handling
+thiserror = "2.0"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+tokio-test = "0.4"
+
+[[bench]]
+name = "rate_limiting"
+harness = false
+
+[[bench]]
+name = "broadcast"
+harness = false

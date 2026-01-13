@@ -37,4 +37,12 @@ tauri-plugin-notification = "2"
 arboard = "3.4"
 tauri-plugin-single-instance = "2"
 
+# Release optimizations for smaller APK size
+[profile.release]
+lto = true            # Link-time optimization
+strip = true          # Strip debug symbols
+codegen-units = 1     # Better optimization (slower compile)
+panic = "abort"       # Smaller binary, no unwinding
+opt-level = "z"       # Optimize for size
+
 

@@ -23,7 +23,7 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-const PING_INTERVAL_SECS: u64 = 30;
+const PING_INTERVAL_SECS: u64 = 15; // Reduced from 30 for faster dead connection detection
 const MAX_CLIPBOARD_SIZE: usize = 10 * 1024 * 1024; // 10MB
 const MAX_DEVICE_NAME_SIZE: usize = 256;
 const MAX_PUSH_TOKEN_SIZE: usize = 512;
@@ -344,7 +344,7 @@ async fn handle_incoming(
                     }
                 }
             }
-            Message::Pong(_) => tracing::debug!(device = %device_id, "pong received"),
+            Message::Pong(_) => tracing::trace!(device = %device_id, "pong received"),
             Message::Close(_) => break,
             _ => {}
         }

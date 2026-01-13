@@ -151,6 +151,14 @@ export function useClipboard() {
     haptic.medium();
   }, []);
 
+  // Get the most recent entry from a remote device (for tap-to-sync)
+  const getLatestRemoteEntry = useCallback((): ClipboardEntry | null => {
+    const remoteEntries = history.filter((entry) => entry.source === "remote");
+    if (remoteEntries.length === 0) return null;
+    // History is already sorted newest-first
+    return remoteEntries[0];
+  }, [history]);
+
   return useMemo(
     () => ({
       history,
@@ -160,6 +168,7 @@ export function useClipboard() {
       togglePin,
       clearHistory,
       readFromClipboard,
+      getLatestRemoteEntry,
     }),
     [
       history,
@@ -169,6 +178,7 @@ export function useClipboard() {
       togglePin,
       clearHistory,
       readFromClipboard,
+      getLatestRemoteEntry,
     ]
   );
 }

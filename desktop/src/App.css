@@ -1,6 +1,10 @@
 @import "./tokens.css";
 @import "tailwindcss";
 
+/* Tailwind v4: Explicit source paths for production builds */
+@source "../index.html";
+@source "./**/*.{js,ts,jsx,tsx}";
+
 @theme {
   --color-primary: #8A2BE2;
 }

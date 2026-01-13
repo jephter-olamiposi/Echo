@@ -1,11 +1,5 @@
 import React from 'react';
 
-/* ─────────────────────────────────────────────────────────────────────────────
- * SettingsGroup Component
- * 
- * Groups related settings rows with a section header.
- * Follows iOS Settings pattern with dividers between rows.
- * ───────────────────────────────────────────────────────────────────────────── */
 
 export interface SettingsGroupProps {
   label: string;

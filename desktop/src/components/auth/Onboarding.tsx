@@ -82,13 +82,22 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Stylish Background - Matching AuthLayout */}
+      {/* Stylish Background - Theme Adaptive */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute inset-0 bg-linear-to-br from-purple-900/20 via-(--color-bg) to-blue-900/20" />
-        <div className="absolute top-0 left-0 w-100 h-100 bg-purple-500/20 rounded-full blur-[150px] -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute bottom-0 right-0 w-75 h-75 bg-blue-500/15 rounded-full blur-[120px] translate-x-1/3 translate-y-1/3" />
-        
-        {/* Grid Pattern */}
+        <div 
+          className="absolute inset-0 transition-colors duration-300" 
+          style={{
+            background: 'linear-gradient(to bottom right, var(--mobile-gradient-from), var(--color-bg), var(--mobile-gradient-to))'
+          }}
+        />
+        <div 
+          className="absolute top-0 left-0 w-[25rem] h-[25rem] rounded-full blur-[150px] -translate-x-1/2 -translate-y-1/2 transition-colors duration-300"
+          style={{ backgroundColor: 'var(--mobile-glow-primary)' }}
+        />
+        <div 
+          className="absolute bottom-0 right-0 w-[18.75rem] h-[18.75rem] rounded-full blur-[120px] translate-x-1/3 translate-y-1/3 transition-colors duration-300"
+          style={{ backgroundColor: 'var(--mobile-glow-secondary)' }}
+        />
         <div className="absolute inset-0 opacity-5" 
           style={{
             backgroundImage: 'linear-gradient(var(--color-border) 1px, transparent 1px), linear-gradient(90deg, var(--color-border) 1px, transparent 1px)',

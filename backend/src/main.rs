@@ -1,3 +1,5 @@
+//! Echo backend - real-time clipboard sync server.
+
 mod auth;
 mod db;
 mod error;

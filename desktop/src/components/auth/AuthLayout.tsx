@@ -7,9 +7,20 @@ export const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       {/* Left Panel - Branding & Features */}
       <div className="hidden md:flex flex-1 flex-col justify-between p-12 relative overflow-hidden" data-tauri-drag-region>
         {/* Dynamic Background */}
-        <div className="absolute inset-0 bg-linear-to-br from-purple-900/20 via-(--color-bg) to-blue-900/20" />
-        <div className="absolute top-0 left-0 w-125 h-125 bg-purple-500/20 rounded-full blur-[150px] -translate-x-1/2 -translate-y-1/2" />
-        <div className="absolute bottom-0 right-0 w-100 h-100 bg-blue-500/15 rounded-full blur-[120px] translate-x-1/3 translate-y-1/3" />
+        <div 
+          className="absolute inset-0 transition-colors duration-300" 
+          style={{
+            background: 'linear-gradient(to bottom right, var(--mobile-gradient-from), var(--color-bg), var(--mobile-gradient-to))'
+          }}
+        />
+        <div 
+          className="absolute top-0 left-0 w-[31.25rem] h-[31.25rem] rounded-full blur-[150px] -translate-x-1/2 -translate-y-1/2 transition-colors duration-300"
+          style={{ backgroundColor: 'var(--mobile-glow-primary)' }}
+        />
+        <div 
+          className="absolute bottom-0 right-0 w-[25rem] h-[25rem] rounded-full blur-[120px] translate-x-1/3 translate-y-1/3 transition-colors duration-300"
+          style={{ backgroundColor: 'var(--mobile-glow-secondary)' }}
+        />
         
         {/* Grid Pattern Overlay */}
         <div className="absolute inset-0 opacity-5" 
@@ -67,8 +78,14 @@ export const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }
       <div className="flex-1 md:max-w-xl flex flex-col md:flex-row md:items-center md:justify-center relative bg-(--color-bg) md:bg-transparent">
         {/* Mobile Background Elements */}
         <div className="md:hidden absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 right-0 w-80 h-80 bg-purple-600/10 rounded-full blur-[120px] translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 left-0 w-80 h-80 bg-blue-600/10 rounded-full blur-[120px] -translate-x-1/2 translate-y-1/2" />
+          <div 
+            className="absolute top-0 right-0 w-80 h-80 rounded-full blur-[120px] translate-x-1/2 -translate-y-1/2 transition-colors duration-300"
+            style={{ backgroundColor: 'var(--mobile-glow-primary)' }}
+          />
+          <div 
+            className="absolute bottom-0 left-0 w-80 h-80 rounded-full blur-[120px] -translate-x-1/2 translate-y-1/2 transition-colors duration-300"
+            style={{ backgroundColor: 'var(--mobile-glow-secondary)' }}
+          />
         </div>
         
         {/* Mobile Layout Container */}

@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* ws://localhost:* https://echo-production-784d.up.railway.app wss://echo-production-784d.up.railway.app https://api.qrserver.com http://10.0.2.2:* http://10.0.3.2:*; img-src 'self' data: https://api.qrserver.com"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* ws://localhost:* https://echo-backend-bkbw.onrender.com wss://echo-backend-bkbw.onrender.com https://api.qrserver.com http://10.0.2.2:* http://10.0.3.2:*; img-src 'self' data: https://api.qrserver.com"
     }
   },
   "bundle": {

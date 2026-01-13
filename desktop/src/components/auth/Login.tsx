@@ -45,10 +45,12 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
 
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-2">
-          <label className="text-[13px] font-medium text-(--color-text-secondary) pl-1">Email</label>
+          <label htmlFor="login-email" className="text-[13px] font-medium text-(--color-text-secondary) pl-1">Email</label>
           <input
+            id="login-email"
             type="email"
             required
+            autoComplete="email"
             className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
             placeholder="name@example.com"
             value={email}
@@ -58,15 +60,17 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
 
         <div className="space-y-2">
           <div className="flex justify-between items-center px-1">
-            <label className="text-[13px] font-medium text-(--color-text-secondary)">Password</label>
+            <label htmlFor="login-password" className="text-[13px] font-medium text-(--color-text-secondary)">Password</label>
             <button type="button" className="text-[13px] text-purple-400 hover:text-purple-300 transition-colors">
               Forgot?
             </button>
           </div>
           <div className="relative">
             <input
+              id="login-password"
               type={showPassword ? "text" : "password"}
               required
+              autoComplete="current-password"
               className="w-full h-12 px-4 pr-12 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
               placeholder="••••••••"
               value={password}
@@ -77,6 +81,7 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
               onClick={() => setShowPassword(!showPassword)}
               className="absolute right-3 top-1/2 -translate-y-1/2 w-6 h-6 text-(--color-text-tertiary) hover:text-(--color-text-primary) transition-colors"
               tabIndex={-1}
+              aria-label={showPassword ? "Hide password" : "Show password"}
             >
               {showPassword ? Icons.eyeOff : Icons.eye}
             </button>

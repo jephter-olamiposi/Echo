@@ -52,6 +52,8 @@ export const translations = {
     preferences: "Preferences",
     support: "Support",
     copy: "Copy",
+    syncing: "Syncing",
+    pending_sync: "pending sync",
   },
   Spanish: {
     dashboard: "Panel",
@@ -105,6 +107,8 @@ export const translations = {
       "Copia texto en cualquier dispositivo vinculado y aparecerá aquí.",
     delete: "Eliminar",
     copy: "Copiar",
+    syncing: "Sincronizando",
+    pending_sync: "pendiente de sincronizar",
   },
   French: {
     dashboard: "Tableau de bord",
@@ -158,6 +162,8 @@ export const translations = {
       "Copiez du texte sur un appareil lié pour le voir apparaître ici.",
     delete: "Supprimer",
     copy: "Copier",
+    syncing: "Synchronisation",
+    pending_sync: "en attente de synchronisation",
   },
   German: {
     dashboard: "Übersicht",
@@ -210,6 +216,8 @@ export const translations = {
     copy_tip: "Kopieren Sie Text auf einem verbundenen Gerät.",
     delete: "Löschen",
     copy: "Kopieren",
+    syncing: "Synchronisiert",
+    pending_sync: "ausstehende Synchronisation",
   },
   Chinese: {
     dashboard: "仪表板",
@@ -262,6 +270,8 @@ export const translations = {
     copy_tip: "在任何关联设备上复制文本，它将显示在这里。",
     delete: "删除",
     copy: "复制",
+    syncing: "同步中",
+    pending_sync: "待同步",
   },
 };
 

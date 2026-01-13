@@ -5,15 +5,7 @@ import {
   requestPermission,
 } from "@tauri-apps/plugin-notification";
 
-declare global {
-  interface Window {
-    EchoBridge?: {
-      getFcmToken(): string | null;
-      wasOpenedFromPush(): boolean;
-      clearOpenedFromPush(): void;
-    };
-  }
-}
+// EchoBridge type is declared in api.ts
 
 interface UsePushNotificationsOptions {
   token: string | null;
@@ -32,9 +24,13 @@ export function usePushNotifications({
 
   const registerPushToken = useCallback(
     async (fcmToken: string) => {
-      if (!token) return;
+      if (!token) {
+        console.log("[Push] No auth token, skipping registration");
+        return false;
+      }
 
       try {
+        console.log("[Push] Registering FCM token with backend...");
         await apiFetch("/push/register", {
           method: "POST",
           body: JSON.stringify({
@@ -43,28 +39,43 @@ export function usePushNotifications({
           }),
         });
         hasRegistered.current = true;
+        console.log("[Push] Token registered successfully");
+        return true;
       } catch (error) {
         console.error("[Push] Error registering token:", error);
+        return false;
       }
     },
     [token, deviceId]
   );
 
+  // Reset registration when auth/device changes
   useEffect(() => {
     hasRegistered.current = false;
   }, [token, deviceId]);
 
+  // Main registration effect - runs when connected
   useEffect(() => {
-    if (!token || !isConnected || hasRegistered.current) return;
+    if (!token || !isConnected || hasRegistered.current) {
+      console.log("[Push] Skip init:", {
+        token: !!token,
+        isConnected,
+        hasRegistered: hasRegistered.current,
+      });
+      return;
+    }
 
     const initPush = async () => {
       try {
         const { type } = await import("@tauri-apps/plugin-os");
         const platform = type();
 
-        if (platform !== "android" && platform !== "ios") return;
+        if (platform !== "android" && platform !== "ios") {
+          console.log("[Push] Not a mobile platform, skipping");
+          return;
+        }
 
-        // REQUEST PERMISSION HERE
+        // Request notification permission
         let permission = await isPermissionGranted();
         if (!permission) {
           permission = (await requestPermission()) === "granted";
@@ -75,55 +86,36 @@ export function usePushNotifications({
           return;
         }
 
-        const checkForBridge = async (
-          retries = 0
-        ): Promise<NonNullable<Window["EchoBridge"]>> => {
-          if (window.EchoBridge) return window.EchoBridge;
+        // Wait for bridge with simple polling
+        let bridge = window.EchoBridge;
+        let attempts = 0;
+        while (!bridge && attempts < 20) {
+          await new Promise((r) => setTimeout(r, 250));
+          bridge = window.EchoBridge;
+          attempts++;
+        }
 
-          if (retries > 20) throw new Error("Bridge not ready after timeout");
+        if (!bridge) {
+          console.warn("[Push] Bridge not available after timeout");
+          return;
+        }
 
-          return new Promise((resolve) => {
-            const onBridgeReady = () => {
-              window.removeEventListener("EchoBridgeReady", onBridgeReady);
-              resolve(window.EchoBridge!);
-            };
+        // Get FCM token with retries
+        let fcmToken = bridge.getFcmToken?.();
+        let tokenAttempts = 0;
+        while (!fcmToken && tokenAttempts < 5) {
+          console.log(
+            `[Push] Waiting for FCM token (attempt ${tokenAttempts + 1}/5)`
+          );
+          await new Promise((r) => setTimeout(r, 1000));
+          fcmToken = bridge.getFcmToken?.();
+          tokenAttempts++;
+        }
 
-            setTimeout(async () => {
-              if (window.EchoBridge) resolve(window.EchoBridge);
-              else resolve(await checkForBridge(retries + 1));
-            }, 250);
-
-            window.addEventListener("EchoBridgeReady", onBridgeReady);
-          });
-        };
-
-        const bridge = await checkForBridge().catch((e) => {
-          console.warn("[Push] Bridge check failed:", e);
-          return null;
-        });
-
-        if (!bridge) return;
-
-        const fcmToken = bridge.getFcmToken?.();
         if (fcmToken) {
           await registerPushToken(fcmToken);
         } else {
-          // Retry with exponential backoff (1s, 2s, 4s, 8s, 16s)
-          const retryGetToken = async (attempt = 0, maxAttempts = 5) => {
-            if (attempt >= maxAttempts) {
-              console.warn("[Push] FCM token not available after max retries");
-              return;
-            }
-            const delay = Math.pow(2, attempt) * 1000;
-            await new Promise((r) => setTimeout(r, delay));
-            const token = bridge.getFcmToken?.();
-            if (token) {
-              registerPushToken(token);
-            } else {
-              retryGetToken(attempt + 1, maxAttempts);
-            }
-          };
-          retryGetToken();
+          console.warn("[Push] FCM token not available after retries");
         }
       } catch (error) {
         console.error("[Push] Error initializing:", error);
@@ -133,32 +125,31 @@ export function usePushNotifications({
     initPush();
   }, [token, isConnected, registerPushToken]);
 
+  // Handle sync requests from push notifications
   useEffect(() => {
     if (!onSyncRequest) return;
 
+    // Check for cold start from push
     const checkPushOpen = () => {
       const bridge = window.EchoBridge;
-      if (bridge && bridge.wasOpenedFromPush?.()) {
+      if (bridge?.wasOpenedFromPush?.()) {
         console.log("[Push] Cold start from notification");
         onSyncRequest();
         bridge.clearOpenedFromPush?.();
       }
     };
 
-    // Check on mount (for cold start)
     checkPushOpen();
 
-    // Listen for warm start event from Android
+    // Listen for warm start event
     const handleSyncTrigger = () => {
       console.log("[Push] Warm start sync triggered");
       onSyncRequest();
     };
 
     window.addEventListener("echo-sync-trigger", handleSyncTrigger);
-
-    return () => {
+    return () =>
       window.removeEventListener("echo-sync-trigger", handleSyncTrigger);
-    };
   }, [onSyncRequest]);
 
   return { registerPushToken };

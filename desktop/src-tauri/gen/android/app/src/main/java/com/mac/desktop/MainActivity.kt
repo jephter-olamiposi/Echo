@@ -44,6 +44,21 @@ class MainActivity : TauriActivity() {
         
         val prefs = getSharedPreferences("echo_fcm", Context.MODE_PRIVATE)
         fcmToken = prefs.getString("token", null)
+        android.util.Log.d("Echo", "Loaded FCM token from prefs: ${if (fcmToken != null) "found" else "null"}")
+        
+        // Proactively fetch FCM token if not cached
+        if (fcmToken == null) {
+            com.google.firebase.messaging.FirebaseMessaging.getInstance().token
+                .addOnSuccessListener { token ->
+                    android.util.Log.d("Echo", "Fetched new FCM token")
+                    fcmToken = token
+                    prefs.edit().putString("token", token).apply()
+                    notifyFcmToken(token)
+                }
+                .addOnFailureListener { e ->
+                    android.util.Log.e("Echo", "Failed to fetch FCM token", e)
+                }
+        }
         
         if (intent?.hasExtra("google.message_id") == true) {
             openedFromPush = true
@@ -117,14 +132,37 @@ class MainActivity : TauriActivity() {
     }
 
     private fun setupJavaScriptBridge() {
-        runOnUiThread {
-            try {
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        var attempts = 0
+        val maxAttempts = 20
+        val delayMs = 250L
+        
+        val trySetup = object : Runnable {
+            override fun run() {
                 val webView = findWebView()
-                webView?.addJavascriptInterface(EchoBridge(this), "EchoBridge")
-            } catch (e: Exception) {
-                android.util.Log.e("Echo", "Failed to setup JS bridge", e)
+                if (webView != null) {
+                    try {
+                        webView.addJavascriptInterface(EchoBridge(this@MainActivity), "EchoBridge")
+                        android.util.Log.d("Echo", "JS bridge setup complete")
+                        
+                        // Dispatch event to notify JS that bridge is ready
+                        webView.evaluateJavascript(
+                            "window.dispatchEvent(new Event('EchoBridgeReady'));",
+                            null
+                        )
+                    } catch (e: Exception) {
+                        android.util.Log.e("Echo", "Failed to setup JS bridge", e)
+                    }
+                } else if (attempts < maxAttempts) {
+                    attempts++
+                    handler.postDelayed(this, delayMs)
+                } else {
+                    android.util.Log.w("Echo", "WebView not found for JS bridge after max attempts")
+                }
             }
         }
+        
+        handler.post(trySetup)
     }
     
     private fun notifyFcmToken(token: String) {
@@ -248,5 +286,25 @@ class MainActivity : TauriActivity() {
 
         @JavascriptInterface
         fun getLastClipboardContent(): String? = activity.lastClipContent
+
+        @JavascriptInterface
+        fun saveAuthToken(token: String) {
+            // Save to SharedPreferences for background sync access
+            activity.getSharedPreferences("echo_auth", Context.MODE_PRIVATE)
+                .edit()
+                .putString("jwt_token", token)
+                .putString("api_url", "https://echo-backend-bkbw.onrender.com")
+                .apply()
+            android.util.Log.d("Echo", "Auth token saved to SharedPreferences for background sync")
+        }
+
+        @JavascriptInterface
+        fun clearAuthToken() {
+            activity.getSharedPreferences("echo_auth", Context.MODE_PRIVATE)
+                .edit()
+                .clear()
+                .apply()
+            android.util.Log.d("Echo", "Auth token cleared from SharedPreferences")
+        }
     }
 }

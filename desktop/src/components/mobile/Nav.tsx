@@ -20,7 +20,7 @@ export const Nav: React.FC<NavProps> = ({ currentView, onChange, badgeCount = 0 
   const { t } = useLanguage();
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-(--color-bg)/90 backdrop-blur-xl border-t border-(--color-border) flex justify-around items-center px-4 pt-2 pb-[calc(env(safe-area-inset-bottom,0px)+0.5rem)] w-full transition-colors duration-300">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 bg-(--color-bg)/90 backdrop-blur-xl border-t border-(--color-border) flex justify-around items-center px-4 pt-1.5 landscape:pt-1 pb-[calc(env(safe-area-inset-bottom,0px)+0.25rem)] w-full transition-colors duration-300">
       <NavItem
         icon={Icons.home}
         activeIcon={Icons.homeFilled}

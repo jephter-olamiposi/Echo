@@ -1,3 +1,5 @@
+//! JWT authentication extractor for Axum handlers.
+
 use axum::{
     extract::{FromRef, FromRequestParts},
     http::request::Parts,

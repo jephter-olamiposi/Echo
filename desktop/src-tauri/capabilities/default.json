@@ -15,8 +15,8 @@
         { "url": "http://10.0.3.2:3000/*" },
         { "url": "http://192.168.1.157:3000/*" },
         { "url": "https://api.qrserver.com/*" },
-        { "url": "https://echo-production-784d.up.railway.app/*" },
-        { "url": "wss://echo-production-784d.up.railway.app/*" }
+        { "url": "https://echo-backend-bkbw.onrender.com/*" },
+        { "url": "wss://echo-backend-bkbw.onrender.com/*" }
       ]
     },
     "haptics:allow-vibrate",

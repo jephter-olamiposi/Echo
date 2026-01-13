@@ -1,3 +1,5 @@
+//! PostgreSQL repository layer using SQLx.
+
 use crate::error::AppError;
 use crate::models::ClipboardMessage;
 use sqlx::PgPool;
