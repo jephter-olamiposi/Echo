@@ -1,14 +1,13 @@
 import React, { memo } from 'react';
 import { Icons } from '../Icons';
-import { 
-  formatTime, 
-  truncate, 
+import {
+  formatTime,
+  truncate,
   getContentTypeIcon
 } from '../../utils';
 import { ClipboardEntry, ContentType } from '../../types';
 import { useTheme } from '../../contexts/ThemeContext';
 
-// Memoized sidebar entry item
 interface SidebarItemProps {
   entry: ClipboardEntry;
   isSelected: boolean;
@@ -19,25 +18,22 @@ interface SidebarItemProps {
 const SidebarItem = memo<SidebarItemProps>(({ entry, isSelected, onSelect, onCopy }) => (
   <button
     onClick={() => onSelect(entry)}
-    className={`group w-full text-left p-3 rounded-xl transition-all border relative ${
-      isSelected
-        ? "bg-(--color-surface-raised) border-(--color-border)"
-        : "bg-transparent border-transparent hover:bg-(--color-surface-raised)/50"
-    }`}
+    className={`group w-full text-left p-3 rounded-2xl transition-all border relative ${isSelected
+      ? "bg-white/10 border-white/15 backdrop-blur-xl shadow-lg"
+      : "bg-transparent border-transparent hover:bg-white/5"
+      }`}
   >
     <div className="flex items-start gap-3">
-      <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border transition-colors ${
-        isSelected
-          ? "bg-purple-500/20 border-purple-500/30 text-purple-400"
-          : "bg-(--color-surface-raised) border-(--color-border) text-(--color-text-secondary) group-hover:text-(--color-text-primary)"
-      }`}>
+      <div className={`mt-0.5 w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border transition-colors ${isSelected
+        ? "bg-purple-500/20 border-purple-500/30 text-purple-400"
+        : "bg-white/5 border-white/5 text-(--color-text-secondary) group-hover:text-(--color-text-primary)"
+        }`}>
         <div className="w-3.5 h-3.5">{getContentTypeIcon(entry.contentType)}</div>
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-0.5">
-          <span className={`text-[11px] font-medium ${
-            isSelected ? "text-purple-400" : "text-(--color-text-secondary)"
-          }`}>
+          <span className={`text-[11px] font-medium ${isSelected ? "text-purple-400" : "text-(--color-text-secondary)"
+            }`}>
             {entry.contentType.charAt(0).toUpperCase() + entry.contentType.slice(1)}
           </span>
           <div className="flex items-center gap-1.5">
@@ -49,16 +45,14 @@ const SidebarItem = memo<SidebarItemProps>(({ entry, isSelected, onSelect, onCop
             <span className="text-[10px] text-(--color-text-tertiary)">{formatTime(entry.timestamp)}</span>
           </div>
         </div>
-        <p className={`text-xs line-clamp-2 leading-relaxed transition-colors ${
-          isSelected ? "text-(--color-text-primary)" : "text-(--color-text-muted) group-hover:text-(--color-text-secondary)"
-        }`}>
+        <p className={`text-xs line-clamp-2 leading-relaxed transition-colors ${isSelected ? "text-(--color-text-primary)" : "text-(--color-text-muted) group-hover:text-(--color-text-secondary)"
+          }`}>
           {truncate(entry.content, 100)}
         </p>
       </div>
     </div>
-    
-    {/* Copy Button Overlay */}
-    <div 
+
+    <div
       className="absolute bottom-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md hover:bg-(--color-surface) text-(--color-text-muted) hover:text-(--color-text-primary)"
       onClick={(e) => {
         e.stopPropagation();
@@ -69,9 +63,9 @@ const SidebarItem = memo<SidebarItemProps>(({ entry, isSelected, onSelect, onCop
       <div className="w-3 h-3">{Icons.copy}</div>
     </div>
   </button>
-), (prev, next) => 
-  prev.entry.id === next.entry.id && 
-  prev.entry.pinned === next.entry.pinned && 
+), (prev, next) =>
+  prev.entry.id === next.entry.id &&
+  prev.entry.pinned === next.entry.pinned &&
   prev.isSelected === next.isSelected
 );
 
@@ -110,7 +104,7 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
 
   const entrySections = React.useMemo(() => {
     const sections: { title: string; items: ClipboardEntry[] }[] = [];
-    
+
     // 1. Separate Pinned items
     const pinnedItems = filteredHistory.filter(item => item.pinned);
     const unpinnedItems = filteredHistory.filter(item => !item.pinned);
@@ -155,78 +149,47 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
     <aside className="w-80 h-screen bg-(--color-bg) border-r border-(--color-border) flex flex-col overflow-hidden relative transition-colors duration-300">
       {/* App Branding - Draggable */}
       {/* App Branding - Draggable */}
-      <div className="px-5 py-4 border-b border-(--color-border) bg-(--color-surface)/50 backdrop-blur-xl z-20" data-tauri-drag-region>
+      {/* App Branding - Draggable */}
+      <div className="px-5 py-4 border-b border-(--color-glass-border) bg-(--color-glass-surface) backdrop-blur-3xl z-20" data-tauri-drag-region>
         <div className="flex items-center justify-between" data-tauri-drag-region>
-          
           <div className="flex items-center gap-4" data-tauri-drag-region>
-            {/* Traffic Lights (macOS style window controls) */}
+            {/* Traffic Lights */}
             <div className="flex items-center gap-2" data-tauri-drag-region>
-              <button 
-                onClick={async () => {
-                  const { getCurrentWindow } = await import('@tauri-apps/api/window');
-                  getCurrentWindow().close();
-                }}
-                className="w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-110 active:brightness-90 transition-all flex items-center justify-center group relative shadow-inner"
-                title="Close"
-              >
-                <div className="w-1 h-1 bg-black/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-              <button 
-                onClick={async () => {
-                  const { getCurrentWindow } = await import('@tauri-apps/api/window');
-                  getCurrentWindow().minimize();
-                }}
-                className="w-3 h-3 rounded-full bg-[#febc2e] hover:brightness-110 active:brightness-90 transition-all flex items-center justify-center group relative shadow-inner"
-                title="Minimize"
-              >
-                <div className="w-1.5 h-px bg-black/20 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
-              <button 
-                onClick={async () => {
-                  const { getCurrentWindow } = await import('@tauri-apps/api/window');
-                  const win = getCurrentWindow();
-                  const isMaximized = await win.isMaximized();
-                  isMaximized ? win.unmaximize() : win.maximize();
-                }}
-                className="w-3 h-3 rounded-full bg-[#28c840] hover:brightness-110 active:brightness-90 transition-all flex items-center justify-center group relative shadow-inner"
-                title="Maximize"
-              >
-                <div className="w-1.5 h-1.5 border border-black/20 rounded-[1px] opacity-0 group-hover:opacity-100 transition-opacity" />
-              </button>
+              <button onClick={async () => (await import('@tauri-apps/api/window')).getCurrentWindow().close()} className="w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-110 active:brightness-90 transition-all shadow-inner" aria-label="Close" />
+              <button onClick={async () => (await import('@tauri-apps/api/window')).getCurrentWindow().minimize()} className="w-3 h-3 rounded-full bg-[#febc2e] hover:brightness-110 active:brightness-90 transition-all shadow-inner" aria-label="Minimize" />
+              <button onClick={async () => {
+                const win = (await import('@tauri-apps/api/window')).getCurrentWindow();
+                (await win.isMaximized()) ? win.unmaximize() : win.maximize();
+              }} className="w-3 h-3 rounded-full bg-[#28c840] hover:brightness-110 active:brightness-90 transition-all shadow-inner" aria-label="Maximize" />
             </div>
 
-            {/* Logo & Brand - Moved to Left */}
-            <div className="flex items-center gap-2.5 pl-2 border-l border-(--color-border)" data-tauri-drag-region>
-              <div className="w-6 h-6 rounded-lg bg-linear-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/20">
+            {/* Logo & Brand */}
+            <div className="flex items-center gap-2.5 pl-2 border-l border-(--color-glass-border)" data-tauri-drag-region>
+              <div className="w-6 h-6 rounded-lg bg-linear-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30 rotate-3">
                 <div className="w-3.5 h-3.5 text-white">{Icons.logo || Icons.sync}</div>
               </div>
               <span className="text-[14px] font-bold text-(--color-text-primary) tracking-tight">Echo</span>
             </div>
           </div>
 
-          {/* Theme Toggle - Moved to Right */}
           <button
-            onClick={() => {
-              const next = theme === 'dark' ? 'light' : 'dark';
-              setTheme(next);
-            }}
-            className="w-8 h-8 rounded-lg text-(--color-text-secondary) hover:text-(--color-text-primary) hover:bg-(--color-surface-raised) flex items-center justify-center transition-all active:scale-95"
-            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+            className="w-8 h-8 rounded-lg text-(--color-text-secondary) hover:text-(--color-text-primary) hover:bg-(--color-highlight) flex items-center justify-center transition-all active:scale-95 border border-(--color-glass-border)"
+            title="Switch theme"
           >
             <div className="w-4 h-4">{theme === 'dark' ? Icons.sun : Icons.moon}</div>
           </button>
         </div>
       </div>
 
-      {/* Search & Filter */}
-      <div className="p-4 space-y-3 bg-(--color-surface)/30">
+      <div className="p-4 space-y-3 bg-white/2">
         <div className="relative group">
           <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-(--color-text-muted) group-focus-within:text-purple-400 transition-colors">
             <div className="w-3.5 h-3.5">{Icons.search}</div>
           </div>
           <input
             type="text"
-            className="w-full bg-(--color-surface-raised) border border-(--color-border) rounded-xl py-2 pl-9 pr-4 text-xs text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/10 focus:border-purple-500/20 transition-all"
+            className="w-full bg-(--color-glass-surface) border border-(--color-glass-border) rounded-xl py-2 pl-9 pr-4 text-xs text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all font-medium"
             placeholder="Search history..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
@@ -241,21 +204,20 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
           )}
         </div>
 
-        <div className="flex gap-1.5 p-1 bg-(--color-surface-raised) rounded-xl border border-(--color-border)">
+        <div className="flex gap-1.5 p-1 bg-(--color-bg-subtle) rounded-xl border border-(--color-glass-border)">
           {(["all", "text", "url", "code"] as const).map((type) => {
             const label = type === "all" ? "All" : type === "url" ? "URLs" : type.charAt(0).toUpperCase() + type.slice(1);
             return (
-            <button
-              key={type}
-              onClick={() => onFilterChange(type)}
-              className={`flex-1 py-1.5 rounded-lg text-[12px] font-medium transition-all ${
-                filterType === type 
-                  ? "bg-(--color-surface) text-(--color-text-primary) shadow-xs" 
-                  : "text-(--color-text-secondary) hover:text-(--color-text-primary)"
-              }`}
-            >
-              {label}
-            </button>
+              <button
+                key={type}
+                onClick={() => onFilterChange(type)}
+                className={`flex-1 py-1.5 rounded-lg text-[11px] font-bold tracking-tight uppercase transition-all ${filterType === type
+                  ? "bg-(--color-glass-surface) text-(--color-text-primary) shadow-sm ring-1 ring-(--color-glass-border)"
+                  : "text-(--color-text-tertiary) hover:text-(--color-text-primary)"
+                  }`}
+              >
+                {label}
+              </button>
             );
           })}
         </div>
@@ -266,9 +228,8 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
         {entrySections.length > 0 ? (
           entrySections.map(({ title, items }) => (
             <div key={title} className="mt-5 first:mt-2">
-              <h3 className={`px-3 mb-2 text-[12px] font-medium ${
-                title === "Pinned" ? "text-purple-400" : "text-(--color-text-tertiary)"
-              }`}>
+              <h3 className={`px-3 mb-2 text-[12px] font-medium ${title === "Pinned" ? "text-purple-400" : "text-(--color-text-tertiary)"
+                }`}>
                 {title === "Pinned" && <span className="inline-block mr-1.5">{Icons.pin}</span>}
                 {title}
               </h3>

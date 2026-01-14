@@ -51,7 +51,7 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
             type="email"
             required
             autoComplete="email"
-            className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
+            className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/40 focus:bg-white/10 transition-all shadow-inner"
             placeholder="name@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -61,7 +61,7 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
         <div className="space-y-2">
           <div className="flex justify-between items-center px-1">
             <label htmlFor="login-password" className="text-[13px] font-medium text-(--color-text-secondary)">Password</label>
-            <button type="button" className="text-[13px] text-purple-400 hover:text-purple-300 transition-colors">
+            <button type="button" className="text-[13px] text-purple-400 hover:text-purple-300 transition-colors font-medium">
               Forgot?
             </button>
           </div>
@@ -71,7 +71,7 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
               type={showPassword ? "text" : "password"}
               required
               autoComplete="current-password"
-              className="w-full h-12 px-4 pr-12 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
+              className="w-full h-12 px-4 pr-12 bg-white/5 border border-white/10 rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/40 focus:bg-white/10 transition-all shadow-inner"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -89,7 +89,7 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
         </div>
 
         {error && (
-          <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-2xl text-red-400 text-[13px] font-bold text-center animate-shake">
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-[13px] font-medium text-center animate-shake">
             {error}
           </div>
         )}
@@ -97,7 +97,7 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-12 bg-(--color-text-primary) text-(--color-bg) rounded-xl font-semibold text-[15px] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50"
+          className="w-full h-12 bg-(--color-text-primary) text-(--color-bg) rounded-xl font-bold text-[15px] hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-50 shadow-lg shadow-purple-500/10"
         >
           {loading ? 'Signing in...' : 'Sign in'}
         </button>

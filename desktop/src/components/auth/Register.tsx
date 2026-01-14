@@ -22,11 +22,11 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
     try {
       const data = await apiFetch('/register', {
         method: 'POST',
-        body: JSON.stringify({ 
-          email, 
-          password, 
-          first_name: firstName, 
-          last_name: lastName 
+        body: JSON.stringify({
+          email,
+          password,
+          first_name: firstName,
+          last_name: lastName
         }),
       });
       onSuccess(data.token, email);
@@ -53,7 +53,7 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
               type="text"
               required
               autoComplete="given-name"
-              className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
+              className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/40 focus:bg-white/10 transition-all shadow-inner"
               placeholder="John"
               value={firstName}
               onChange={(e) => setFirstName(e.target.value)}
@@ -66,7 +66,7 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
               type="text"
               required
               autoComplete="family-name"
-              className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
+              className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/40 focus:bg-white/10 transition-all shadow-inner"
               placeholder="Doe"
               value={lastName}
               onChange={(e) => setLastName(e.target.value)}
@@ -81,7 +81,7 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
             type="email"
             required
             autoComplete="email"
-            className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
+            className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/40 focus:bg-white/10 transition-all shadow-inner"
             placeholder="name@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -96,7 +96,7 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
             required
             minLength={8}
             autoComplete="new-password"
-            className="w-full h-12 px-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/30 transition-all"
+            className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/40 focus:bg-white/10 transition-all shadow-inner"
             placeholder="••••••••"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -104,41 +104,39 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
           {/* Strength Indicator */}
           {password && (
             <div className="flex items-center justify-between mt-2 px-1">
-              <div className="flex gap-1 w-1/2">
+              <div className="flex gap-1.5 w-1/2">
                 {[1, 2, 3, 4].map((level) => {
-                  const strength = password.length >= 12 ? 4 : 
-                                   password.length >= 10 ? 3 :
-                                   password.length >= 8 ? 2 : 1;
+                  const strength = password.length >= 12 ? 4 :
+                    password.length >= 10 ? 3 :
+                      password.length >= 8 ? 2 : 1;
                   return (
-                    <div 
-                      key={level} 
-                      className={`h-1 flex-1 rounded-full transition-colors ${
-                        level <= strength 
-                          ? strength === 4 ? 'bg-emerald-500' 
-                          : strength === 3 ? 'bg-sky-500'
-                          : strength === 2 ? 'bg-amber-500'
-                          : 'bg-rose-500'
-                          : 'bg-(--color-surface-raised)'
-                      }`} 
+                    <div
+                      key={level}
+                      className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${level <= strength
+                          ? strength === 4 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]'
+                            : strength === 3 ? 'bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.4)]'
+                              : strength === 2 ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]'
+                                : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]'
+                          : 'bg-white/5'
+                        }`}
                     />
                   );
                 })}
               </div>
-              <span className={`text-[11px] font-medium ${
-                password.length >= 12 ? 'text-emerald-500' :
-                password.length >= 10 ? 'text-sky-500' :
-                password.length >= 8 ? 'text-amber-500' : 'text-rose-500'
-              }`}>
+              <span className={`text-[11px] font-bold tracking-wider uppercase ${password.length >= 12 ? 'text-emerald-500' :
+                  password.length >= 10 ? 'text-sky-500' :
+                    password.length >= 8 ? 'text-amber-500' : 'text-rose-500'
+                }`}>
                 {password.length >= 12 ? 'Strong' :
-                 password.length >= 10 ? 'Good' :
-                 password.length >= 8 ? 'Weak' : 'Too short'}
+                  password.length >= 10 ? 'Good' :
+                    password.length >= 8 ? 'Weak' : 'Too short'}
               </span>
             </div>
           )}
         </div>
 
         {error && (
-          <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-2xl text-red-400 text-[13px] font-semibold text-center animate-shake">
+          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-[13px] font-medium text-center animate-shake">
             {error}
           </div>
         )}
@@ -146,7 +144,7 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-12 bg-(--color-text-primary) text-(--color-bg) rounded-xl font-semibold text-[15px] hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-50 mt-2"
+          className="w-full h-12 bg-(--color-text-primary) text-(--color-bg) rounded-xl font-bold text-[15px] hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-50 mt-2 shadow-lg shadow-purple-500/10"
         >
           {loading ? 'Creating account...' : 'Create account'}
         </button>

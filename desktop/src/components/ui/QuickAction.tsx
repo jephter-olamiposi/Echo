@@ -1,12 +1,6 @@
 import React from 'react';
 import { haptic } from '../../utils/haptics';
 
-/* ─────────────────────────────────────────────────────────────────────────────
- * QuickAction Component
- * 
- * Action tile with icon and label for dashboard quick actions.
- * ───────────────────────────────────────────────────────────────────────────── */
-
 export interface QuickActionProps {
   icon: React.ReactNode;
   iconBg: string;
@@ -14,19 +8,19 @@ export interface QuickActionProps {
   onClick: () => void;
 }
 
-export const QuickAction: React.FC<QuickActionProps> = ({ 
-  icon, 
-  iconBg, 
-  label, 
-  onClick 
+export const QuickAction: React.FC<QuickActionProps> = ({
+  icon,
+  iconBg,
+  label,
+  onClick
 }) => (
-  <button 
-    className="flex flex-col items-center justify-center gap-2.5 p-4 bg-(--color-surface-raised) border border-(--color-border) rounded-xl active:scale-[0.98] active:bg-(--color-surface) hover:border-(--color-border-focus) hover:shadow-lg hover:shadow-purple-500/5 transition-all duration-200"
+  <button
+    className="flex flex-col items-center justify-center gap-3 p-5 bg-(--color-glass-surface) backdrop-blur-3xl border border-(--color-glass-border) rounded-3xl active:scale-[0.96] active:bg-(--color-highlight) hover:border-(--color-border-focus) transition-all duration-300 group shadow-lg shadow-(--color-glass-shadow)"
     onClick={() => { haptic.light(); onClick(); }}
   >
-    <div className={`w-10 h-10 flex items-center justify-center rounded-xl ${iconBg}`}>
-      <div className="w-5 h-5">{icon}</div>
+    <div className={`w-12 h-12 flex items-center justify-center rounded-2xl ${iconBg} bg-(--color-glass-surface) border border-(--color-glass-border) shadow-inner group-active:scale-95 transition-transform duration-300`}>
+      <div className="w-6 h-6">{icon}</div>
     </div>
-    <span className="text-[13px] font-medium text-(--color-text-secondary)">{label}</span>
+    <span className="text-[14px] font-bold text-(--color-glass-text-muted) group-hover:text-(--color-glass-text) transition-colors tracking-tight">{label}</span>
   </button>
 );

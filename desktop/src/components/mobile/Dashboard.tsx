@@ -63,26 +63,26 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
 
   return (
     <div className="flex flex-col h-full w-full bg-transparent text-(--color-text-primary) overflow-hidden transition-colors duration-300">
-      <MobileHeader 
+      <MobileHeader
         centerAction={<span className="text-[17px] font-semibold text-(--color-text-primary)">Echo</span>}
-        className="bg-transparent backdrop-blur-md sticky top-0 z-10" 
+        className="bg-transparent backdrop-blur-md sticky top-0 z-10"
       />
 
-      <div 
+      <div
         ref={containerRef}
         className="flex-1 overflow-y-auto custom-scrollbar pb-32! relative"
       >
         {/* Pull to Refresh Indicator */}
-        <div 
+        <div
           className="absolute top-0 left-0 w-full flex items-center justify-center pointer-events-none z-40"
           style={{ height: `${pullHeight}px` }}
         >
-          <div 
+          <div
             className={`p-2 rounded-full bg-(--color-surface-raised) border border-(--color-border) shadow-xl mt-12 transition-all duration-300 ${activeRefreshing ? 'animate-pulse ring-4 ring-purple-500/20' : ''}`}
-            style={{ 
+            style={{
               opacity: Math.min(pullHeight / 50, 1),
-              transform: activeRefreshing 
-                ? 'scale(1.1)' 
+              transform: activeRefreshing
+                ? 'scale(1.1)'
                 : `translateY(${Math.min(pullHeight * 0.2, 20)}px) rotate(${pullHeight * 3}deg) scale(${Math.min(pullHeight / 60, 1)})`,
             }}
           >
@@ -103,12 +103,11 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
               </div>
             ) : (
               <div className="flex flex-col items-center gap-3">
-                <div 
-                  className={`w-20 h-20 rounded-3xl flex items-center justify-center border-2 transition-all duration-500 ${
-                    connected 
-                      ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.15)]' 
+                <div
+                  className={`w-20 h-20 rounded-3xl flex items-center justify-center border-2 transition-all duration-500 ${connected
+                      ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.15)]'
                       : 'bg-(--color-surface) text-(--color-text-tertiary) border-(--color-border)'
-                  }`} 
+                    }`}
                   onClick={() => haptic.medium()}
                 >
                   <div className="w-10 h-10 flex items-center justify-center">
@@ -174,7 +173,7 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
                 {latestItem.content.length > 100 ? '...' : ''}
               </p>
               <div className="flex gap-3">
-                <CopyButton 
+                <CopyButton
                   content={latestItem.content}
                   onCopy={onCopy}
                   className="flex-1 flex items-center justify-center gap-2 h-12 rounded-xl text-[15px] font-medium bg-(--color-text-primary) text-(--color-bg) active:scale-[0.98] transition-all hover:opacity-90"
@@ -183,10 +182,10 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
                   {t('copy')}
                 </CopyButton>
                 <Button
-                  variant="secondary"
+                  variant="danger"
                   size="md"
+                  square
                   icon={Icons.trash}
-                  className="w-12 text-red-500!"
                   onClick={() => { haptic.medium(); onDelete(latestItem.id); }}
                   aria-label={t('delete')}
                 />
@@ -207,11 +206,11 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
                 {t('view_all')}
               </Button>
             </div>
-            
+
             {history.length > 0 ? (
               <Card variant="default" padding="none" className="divide-y divide-(--color-border) overflow-hidden">
                 {history.slice(0, 3).map((item) => (
-                  <button 
+                  <button
                     key={item.id}
                     className="flex justify-between items-center min-h-14 px-4 w-full text-left active:bg-(--color-surface-raised) transition-colors"
                     onClick={() => { haptic.light(); onViewAllHistory(); }}
@@ -237,29 +236,29 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
           <div className="flex flex-col gap-4">
             <h3 className="text-[13px] font-medium text-(--color-text-tertiary) pl-1">{t('quick_actions')}</h3>
             <div className="grid grid-cols-2 gap-3">
-              <QuickAction 
-                icon={Icons.qr} 
-                iconBg="bg-emerald-500/15 text-emerald-400" 
-                label={t('scan_qr')} 
-                onClick={onScanQR} 
+              <QuickAction
+                icon={Icons.qr}
+                iconBg="bg-emerald-500/15 text-emerald-400"
+                label={t('scan_qr')}
+                onClick={onScanQR}
               />
-              <QuickAction 
-                icon={Icons.shield} 
-                iconBg="bg-amber-500/15 text-amber-400" 
-                label={t('enter_key')} 
-                onClick={onEnterKey} 
+              <QuickAction
+                icon={Icons.shield}
+                iconBg="bg-amber-500/15 text-amber-400"
+                label={t('enter_key')}
+                onClick={onEnterKey}
               />
-              <QuickAction 
-                icon={Icons.code} 
-                iconBg="bg-sky-500/15 text-sky-400" 
+              <QuickAction
+                icon={Icons.code}
+                iconBg="bg-sky-500/15 text-sky-400"
                 label={t('show_pairing_code')}
-                onClick={onShowPairingCode} 
+                onClick={onShowPairingCode}
               />
-              <QuickAction 
-                icon={Icons.devices} 
-                iconBg="bg-purple-500/15 text-purple-400" 
-                label={t('devices')} 
-                onClick={onShowDevices} 
+              <QuickAction
+                icon={Icons.devices}
+                iconBg="bg-purple-500/15 text-purple-400"
+                label={t('devices')}
+                onClick={onShowDevices}
               />
             </div>
           </div>

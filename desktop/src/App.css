@@ -31,77 +31,234 @@ body,
     transition: background-color 0.3s ease, color 0.3s ease;
   }
 
+
   /* Safe Area Utilities */
   .pt-safe {
     padding-top: env(safe-area-inset-top, 0px);
   }
+
   .pb-safe {
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
+
   .pl-safe {
     padding-left: env(safe-area-inset-left, 0px);
   }
+
   .pr-safe {
     padding-right: env(safe-area-inset-right, 0px);
   }
+
   .mt-safe {
     margin-top: env(safe-area-inset-top, 0px);
   }
+
   .mb-safe {
     margin-bottom: env(safe-area-inset-bottom, 0px);
   }
+
   .h-safe-screen {
     height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
   }
 }
 
-/* Big Tech: Dynamic Mesh Background */
-.mesh-background {
+/* ─────────────────────────────────────────────────────────────────────────
+ * Premium Mesh Gradient Background System
+ * Modern, multi-color gradient backgrounds with floating orbs
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.mesh-gradient-bg {
   position: fixed;
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(at 0% 0%, hsla(273, 67%, 50%, 0.15) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, hsla(220, 100%, 50%, 0.1) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, hsla(273, 67%, 50%, 0.15) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, hsla(220, 100%, 50%, 0.1) 0px, transparent 50%);
-  filter: blur(80px);
+    radial-gradient(at 0% 0%, var(--mesh-gradient-1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, var(--mesh-gradient-2) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, var(--mesh-gradient-3) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, var(--mesh-gradient-4) 0px, transparent 50%),
+    radial-gradient(at 50% 50%, var(--mesh-gradient-5) 0px, transparent 50%);
   background-color: var(--color-bg);
+  filter: blur(80px);
 }
 
-body.scan-active,
-body.scan-active .mesh-background {
-  background-color: transparent !important;
-  background: transparent !important;
+.mesh-gradient-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3%3Cfilter id='noiseFilter'%3%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3%3C/filter%3%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3%3C/svg%3");
 }
 
-.mesh-orb {
+/* Floating Gradient Orbs */
+.gradient-orb {
   position: absolute;
   border-radius: 9999px;
-  filter: blur(120px);
-  opacity: 0.3;
-  animation: orb-float 20s infinite ease-in-out;
+  filter: blur(100px);
+  opacity: 0.6;
+  pointer-events: none;
+  will-change: transform;
 }
 
-@keyframes orb-float {
-  0%, 100% { transform: translate(0, 0) scale(1); }
-  33% { transform: translate(30px, -50px) scale(1.1); }
-  66% { transform: translate(-20px, 20px) scale(0.9); }
+.gradient-orb-1 {
+  width: 400px;
+  height: 400px;
+  background: var(--orb-color-1);
+  top: -10%;
+  left: -5%;
+  animation: orb-float-1 25s infinite ease-in-out;
 }
 
-/* Premium Glassmorphism */
-.glass {
-  @apply bg-(--color-surface-raised) backdrop-blur-2xl border border-(--color-border) shadow-xl;
-  background-image: radial-gradient(at top left, var(--color-surface-overlay), transparent);
+.gradient-orb-2 {
+  width: 350px;
+  height: 350px;
+  background: var(--orb-color-2);
+  top: 40%;
+  right: -10%;
+  animation: orb-float-2 20s infinite ease-in-out;
 }
 
-.glass-dark {
-  @apply bg-(--color-surface-overlay) backdrop-blur-3xl border border-(--color-border) shadow-xl;
+.gradient-orb-3 {
+  width: 300px;
+  height: 300px;
+  background: var(--orb-color-3);
+  bottom: -5%;
+  left: 30%;
+  animation: orb-float-3 30s infinite ease-in-out;
 }
 
-/* Smooth Spring Transitions */
-.spring-transition {
-  transition: all 0.5s var(--spring-easing);
+/* Orb Float Animations */
+@keyframes orb-float-1 {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(50px, -80px) scale(1.1);
+  }
+
+  66% {
+    transform: translate(-30px, 40px) scale(0.9);
+  }
+}
+
+@keyframes orb-float-2 {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(-60px, 50px) scale(1.15);
+  }
+
+  66% {
+    transform: translate(40px, -30px) scale(0.85);
+  }
+}
+
+@keyframes orb-float-3 {
+
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+
+  33% {
+    transform: translate(70px, 60px) scale(0.9);
+  }
+
+  66% {
+    transform: translate(-50px, -40px) scale(1.1);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+ * Decorative Glass Elements
+ * Floating geometric shapes for premium UI depth
+ * ───────────────────────────────────────────────────────────────────────── */
+
+.glass-shape {
+  position: absolute;
+  backdrop-filter: blur(8px);
+  background: linear-gradient(135deg,
+      var(--color-glass-surface),
+      var(--color-highlight));
+  border: 1px solid var(--color-glass-border);
+  box-shadow: 0 8px 32px 0 var(--color-glass-shadow);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.shape-sphere {
+  border-radius: 50%;
+}
+
+.shape-ring {
+  border-radius: 50%;
+  background: transparent;
+  border-width: 12px;
+  border-style: solid;
+  border-color: var(--color-glass-border);
+  box-shadow: inset 0 0 15px var(--color-glass-shadow);
+}
+
+.shape-cube {
+  border-radius: 12px;
+}
+
+.float-slow {
+  animation: float-slow 25s infinite ease-in-out;
+}
+
+.float-medium {
+  animation: float-medium 18s infinite ease-in-out;
+}
+
+.rotate-slow {
+  animation: rotate-slow 40s infinite linear;
+}
+
+@keyframes float-slow {
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(30px, -40px);
+  }
+}
+
+@keyframes float-medium {
+
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+
+  50% {
+    transform: translate(-25px, 35px);
+  }
+}
+
+@keyframes rotate-slow {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+body.scan-active {
+  background-color: transparent !important;
+  background: transparent !important;
 }
 
 /* Custom Scrollbar for premium feel */
@@ -115,71 +272,4 @@ body.scan-active .mesh-background {
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
   @apply bg-(--color-border-subtle) rounded-full hover:bg-(--color-border) transition-colors;
-}
-
-/* ... */
-
-/* Focus Ring Utility */
-.focus-ring:focus {
-  @apply outline-none ring-2 ring-purple-500/50 ring-offset-2 ring-offset-(--color-bg);
-}
-
-/* Fingerprint Display */
-.fingerprint {
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--color-text-tertiary);
-  background: var(--color-bg-surface);
-  padding: 2px 6px;
-  border-radius: 4px;
-  border: 1px solid var(--color-border-subtle);
-}
-
-/* Key Display & Input Styles */
-.key-display-wrapper {
-  margin-top: var(--space-4);
-  width: 100%;
-}
-
-.key-display {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  background: var(--color-bg-surface);
-  padding: var(--space-2);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-  margin-top: var(--space-2);
-}
-
-.key-display code {
-  flex: 1;
-  font-family: var(--font-mono);
-  font-size: var(--text-xs);
-  color: var(--color-text-secondary);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.key-display .btn {
-  flex-shrink: 0;
-}
-
-/* Modal Input Styles */
-.modal-body .input {
-  width: 100%;
-  background: var(--color-bg-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  font-family: var(--font-mono);
-  font-size: var(--text-sm);
-  transition: border-color var(--transition-fast);
-}
-
-.modal-body .input:focus {
-  outline: none;
-  border-color: var(--color-primary);
 }

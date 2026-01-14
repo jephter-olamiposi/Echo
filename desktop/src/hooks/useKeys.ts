@@ -4,6 +4,7 @@ import {
   exportKey,
   saveEncryptionKey,
   loadEncryptionKey,
+  clearEncryptionKey,
 } from "../crypto";
 
 export function useKeys() {
@@ -75,6 +76,15 @@ export function useKeys() {
     }
   }, []);
 
+  // Clear all key material (for Logout)
+  const clearKeys = useCallback(async () => {
+    await clearEncryptionKey();
+    setEncryptionKey(null);
+    setFingerprint(null);
+    setLinkUri(null);
+    setNeedsKeySetup(true);
+  }, []);
+
   useEffect(() => {
     initKeys();
   }, [initKeys]);
@@ -86,6 +96,7 @@ export function useKeys() {
       linkUri,
       saveKey,
       createNewKey,
+      clearKeys,
       needsKeySetup,
       isReady,
     }),
@@ -95,6 +106,7 @@ export function useKeys() {
       linkUri,
       saveKey,
       createNewKey,
+      clearKeys,
       needsKeySetup,
       isReady,
     ]

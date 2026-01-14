@@ -28,7 +28,7 @@ export const Nav: React.FC<NavProps> = ({ currentView, onChange, badgeCount = 0 
         isActive={currentView === 'dashboard'}
         onClick={() => onChange('dashboard')}
       />
-      
+
       <NavItem
         icon={Icons.history}
         activeIcon={Icons.historyFilled}
@@ -37,7 +37,7 @@ export const Nav: React.FC<NavProps> = ({ currentView, onChange, badgeCount = 0 
         onClick={() => onChange('history')}
         badge={badgeCount}
       />
-      
+
       <NavItem
         icon={Icons.settings}
         activeIcon={Icons.settingsFilled}

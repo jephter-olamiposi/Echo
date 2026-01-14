@@ -12,16 +12,26 @@
    * Typography Scale
    * Use semantic names in components: var(--font-body), var(--font-title)
    * ───────────────────────────────────────────────────────────────────────── */
-  --font-2xs: 0.625rem;    /* 10px - Overline, fine print */
-  --font-xs: 0.6875rem;    /* 11px - Badges, timestamps */
-  --font-sm: 0.75rem;      /* 12px - Captions, labels */
-  --font-base: 0.8125rem;  /* 13px - Small body text */
-  --font-md: 0.875rem;     /* 14px - Default body */
-  --font-lg: 0.9375rem;    /* 15px - Large body, buttons */
-  --font-xl: 1rem;         /* 16px - Subheadings */
-  --font-2xl: 1.0625rem;   /* 17px - Section titles */
-  --font-3xl: 1.25rem;     /* 20px - Page titles */
-  --font-4xl: 1.5rem;      /* 24px - Hero headings */
+  --font-2xs: 0.625rem;
+  /* 10px - Overline, fine print */
+  --font-xs: 0.6875rem;
+  /* 11px - Badges, timestamps */
+  --font-sm: 0.75rem;
+  /* 12px - Captions, labels */
+  --font-base: 0.8125rem;
+  /* 13px - Small body text */
+  --font-md: 0.875rem;
+  /* 14px - Default body */
+  --font-lg: 0.9375rem;
+  /* 15px - Large body, buttons */
+  --font-xl: 1rem;
+  /* 16px - Subheadings */
+  --font-2xl: 1.0625rem;
+  /* 17px - Section titles */
+  --font-3xl: 1.25rem;
+  /* 20px - Page titles */
+  --font-4xl: 1.5rem;
+  /* 24px - Hero headings */
 
   /* Semantic Typography */
   --font-body: var(--font-md);
@@ -51,51 +61,80 @@
    * ───────────────────────────────────────────────────────────────────────── */
   --space-0: 0;
   --space-px: 1px;
-  --space-0-5: 0.125rem;   /* 2px */
-  --space-1: 0.25rem;      /* 4px */
-  --space-1-5: 0.375rem;   /* 6px */
-  --space-2: 0.5rem;       /* 8px */
-  --space-2-5: 0.625rem;   /* 10px */
-  --space-3: 0.75rem;      /* 12px */
-  --space-3-5: 0.875rem;   /* 14px */
-  --space-4: 1rem;         /* 16px */
-  --space-5: 1.25rem;      /* 20px */
-  --space-6: 1.5rem;       /* 24px */
-  --space-7: 1.75rem;      /* 28px */
-  --space-8: 2rem;         /* 32px */
-  --space-9: 2.25rem;      /* 36px */
-  --space-10: 2.5rem;      /* 40px */
-  --space-12: 3rem;        /* 48px */
-  --space-14: 3.5rem;      /* 56px */
-  --space-16: 4rem;        /* 64px */
-  --space-20: 5rem;        /* 80px */
+  --space-0-5: 0.125rem;
+  /* 2px */
+  --space-1: 0.25rem;
+  /* 4px */
+  --space-1-5: 0.375rem;
+  /* 6px */
+  --space-2: 0.5rem;
+  /* 8px */
+  --space-2-5: 0.625rem;
+  /* 10px */
+  --space-3: 0.75rem;
+  /* 12px */
+  --space-3-5: 0.875rem;
+  /* 14px */
+  --space-4: 1rem;
+  /* 16px */
+  --space-5: 1.25rem;
+  /* 20px */
+  --space-6: 1.5rem;
+  /* 24px */
+  --space-7: 1.75rem;
+  /* 28px */
+  --space-8: 2rem;
+  /* 32px */
+  --space-9: 2.25rem;
+  /* 36px */
+  --space-10: 2.5rem;
+  /* 40px */
+  --space-12: 3rem;
+  /* 48px */
+  --space-14: 3.5rem;
+  /* 56px */
+  --space-16: 4rem;
+  /* 64px */
+  --space-20: 5rem;
+  /* 80px */
 
   /* ─────────────────────────────────────────────────────────────────────────
    * Touch Targets (Apple HIG / Material Design)
    * Minimum interactive element sizes
    * ───────────────────────────────────────────────────────────────────────── */
-  --touch-min: 2.75rem;    /* 44px - Absolute minimum (iOS HIG) */
-  --touch-sm: 2.25rem;     /* 36px - Small buttons (use sparingly) */
-  --touch-md: 3rem;        /* 48px - Standard buttons */
-  --touch-lg: 3.5rem;      /* 56px - Settings rows, primary CTAs */
+  --touch-min: 2.75rem;
+  /* 44px - Absolute minimum (iOS HIG) */
+  --touch-sm: 2.25rem;
+  /* 36px - Small buttons (use sparingly) */
+  --touch-md: 3rem;
+  /* 48px - Standard buttons */
+  --touch-lg: 3.5rem;
+  /* 56px - Settings rows, primary CTAs */
 
   /* ─────────────────────────────────────────────────────────────────────────
    * Border Radius
    * ───────────────────────────────────────────────────────────────────────── */
   --radius-none: 0;
-  --radius-sm: 0.375rem;   /* 6px - Chips, small badges */
-  --radius-md: 0.5rem;     /* 8px - Buttons, inputs */
-  --radius-lg: 0.75rem;    /* 12px - Cards, modals */
-  --radius-xl: 1rem;       /* 16px - Large cards */
-  --radius-2xl: 1.25rem;   /* 20px - Bottom sheets */
-  --radius-3xl: 1.5rem;    /* 24px - Hero cards */
-  --radius-full: 9999px;   /* Circular */
+  --radius-sm: 0.375rem;
+  /* 6px - Chips, small badges */
+  --radius-md: 0.5rem;
+  /* 8px - Buttons, inputs */
+  --radius-lg: 0.75rem;
+  /* 12px - Cards, modals */
+  --radius-xl: 1rem;
+  /* 16px - Large cards */
+  --radius-2xl: 1.25rem;
+  /* 20px - Bottom sheets */
+  --radius-3xl: 1.5rem;
+  /* 24px - Hero cards */
+  --radius-full: 9999px;
+  /* Circular */
 
   /* ─────────────────────────────────────────────────────────────────────────
    * Colors - Primitives
    * Raw color values - avoid using directly in components
    * ───────────────────────────────────────────────────────────────────────── */
-  
+
   /* Neutrals (Zinc palette) */
   --gray-50: #fafafa;
   --gray-100: #f4f4f5;
@@ -136,12 +175,14 @@
   /* ─────────────────────────────────────────────────────────────────────────
    * Colors - Semantic (USE THESE IN COMPONENTS)
    * ───────────────────────────────────────────────────────────────────────── */
-  
+
   /* Backgrounds */
-  --color-bg: #0f0716; /* Very dark purple-black base for better blending */
+  --color-bg: #0f0716;
+  /* Very dark purple-black base for better blending */
   --color-bg-subtle: var(--gray-950);
   --color-surface: var(--gray-900);
-  --color-surface-raised: rgba(39, 39, 42, 0.8); /* Semi-transparent for glass effect */
+  --color-surface-raised: rgba(39, 39, 42, 0.8);
+  /* Semi-transparent for glass effect */
   --color-surface-overlay: rgba(24, 24, 27, 0.95);
   --color-highlight: rgba(255, 255, 255, 0.05);
 
@@ -153,9 +194,12 @@
 
   /* Text */
   --color-text-primary: #ffffff;
-  --color-text-secondary: var(--gray-300); /* Lighter than 400 */
-  --color-text-tertiary: var(--gray-400); /* Lighter than 500 */
-  --color-text-muted: var(--gray-500); /* Lighter than 600 */
+  --color-text-secondary: var(--gray-300);
+  /* Lighter than 400 */
+  --color-text-tertiary: var(--gray-400);
+  /* Lighter than 500 */
+  --color-text-muted: var(--gray-500);
+  /* Lighter than 600 */
   --color-text-inverse: #000000;
 
   /* Interactive */
@@ -185,10 +229,37 @@
   --shadow-glow-purple: 0 0 30px rgba(168, 85, 247, 0.15);
 
   /* Mobile Background Gradients - Dark theme */
-  --mobile-gradient-from: rgba(88, 28, 135, 0.2); /* purple-900/20 */
-  --mobile-gradient-to: rgba(30, 58, 138, 0.2);   /* blue-900/20 */
-  --mobile-glow-primary: rgba(168, 85, 247, 0.2); /* purple-500/20 */
-  --mobile-glow-secondary: rgba(59, 130, 246, 0.15); /* blue-500/15 */
+  --mobile-gradient-from: rgba(88, 28, 135, 0.2);
+  /* purple-900/20 */
+  --mobile-gradient-to: rgba(30, 58, 138, 0.2);
+  /* blue-900/20 */
+  --mobile-glow-primary: rgba(168, 85, 247, 0.2);
+  /* purple-500/20 */
+  --mobile-glow-secondary: rgba(59, 130, 246, 0.15);
+  /* blue-500/15 */
+
+  /* ─────────────────────────────────────────────────────────────────────────
+   * Premium Mesh Gradient Colors - Dark Theme
+   * Multi-point gradient system for modern, eye-catching backgrounds
+   * ───────────────────────────────────────────────────────────────────────── */
+  --mesh-gradient-1: rgba(107, 33, 168, 0.4);
+  /* Deep Purple - #6B21A8 */
+  --mesh-gradient-2: rgba(59, 130, 246, 0.35);
+  /* Electric Blue - #3B82F6 */
+  --mesh-gradient-3: rgba(236, 72, 153, 0.3);
+  /* Vibrant Magenta - #EC4899 */
+  --mesh-gradient-4: rgba(20, 184, 166, 0.25);
+  /* Teal - #14B8A6 */
+  --mesh-gradient-5: rgba(168, 85, 247, 0.2);
+  /* Soft Purple - #A855F7 */
+
+  /* Floating Orb Colors */
+  --orb-color-1: rgba(139, 92, 246, 0.3);
+  /* Violet */
+  --orb-color-2: rgba(59, 130, 246, 0.25);
+  /* Blue */
+  --orb-color-3: rgba(236, 72, 153, 0.2);
+  /* Pink */
 
   /* ─────────────────────────────────────────────────────────────────────────
    * Transitions & Animations
@@ -197,7 +268,7 @@
   --duration-normal: 200ms;
   --duration-slow: 300ms;
   --duration-slower: 500ms;
-  
+
   --ease-default: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-in: cubic-bezier(0.4, 0, 1, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
@@ -211,39 +282,61 @@
   --z-modal: 150;
   --z-toast: 200;
   --z-tooltip: 250;
+  /* Glass System - Dark (Default) */
+  --color-glass-surface: rgba(255, 255, 255, 0.05);
+  --color-glass-border: rgba(255, 255, 255, 0.1);
+  --color-glass-text: #ffffff;
+  --color-glass-text-muted: rgba(255, 255, 255, 0.4);
+  --color-glass-shadow: rgba(0, 0, 0, 0.2);
 }
 
 :root[data-theme="light"] {
-  /* Backgrounds - Warm Off-White for easier eye comfort */
-  --color-bg: #fafaf9; /* Stone 50 - warmer than slate */
+  /* ... existing light mode vars ... */
+  --color-bg: #fafaf9;
   --color-bg-subtle: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-raised: #f5f5f4; /* Stone 100 - warm gray */
+  --color-surface-raised: #f5f5f4;
   --color-surface-overlay: rgba(255, 255, 255, 0.92);
   --color-highlight: rgba(255, 255, 255, 0.7);
 
-  /* Borders - Warmer tones */
-  --color-border: #e7e5e4; /* Stone 200 */
-  --color-border-subtle: #f5f5f4; /* Stone 100 */
-  --color-border-muted: #fafaf9; /* Stone 50 */
-  --color-border-focus: rgba(147, 51, 234, 0.35); /* Purple 600 */
+  --color-border: #e7e5e4;
+  --color-border-subtle: #f5f5f4;
+  --color-border-muted: #fafaf9;
+  --color-border-focus: rgba(147, 51, 234, 0.35);
 
-  /* Text - Warm grays for less harsh contrast */
-  --color-text-primary: #1c1917; /* Stone 900 - warm black */
-  --color-text-secondary: #57534e; /* Stone 600 */
-  --color-text-tertiary: #78716c; /* Stone 500 */
-  --color-text-muted: #a8a29e; /* Stone 400 */
+  --color-text-primary: #1c1917;
+  --color-text-secondary: #57534e;
+  --color-text-tertiary: #78716c;
+  --color-text-muted: #a8a29e;
   --color-text-inverse: #ffffff;
 
-  /* Shadows - Warmer and softer */
   --shadow-sm: 0 1px 2px 0 rgba(120, 113, 108, 0.08);
   --shadow-md: 0 4px 6px -1px rgba(120, 113, 108, 0.08), 0 2px 4px -2px rgba(120, 113, 108, 0.04);
   --shadow-lg: 0 10px 15px -3px rgba(120, 113, 108, 0.08), 0 4px 6px -4px rgba(120, 113, 108, 0.03);
   --shadow-xl: 0 20px 25px -5px rgba(120, 113, 108, 0.08), 0 10px 10px -5px rgba(120, 113, 108, 0.02);
 
-  /* Mobile Background Gradients - Light theme (softer, eye-friendly) */
-  --mobile-gradient-from: rgba(243, 232, 255, 0.6); /* purple-100/60 */
-  --mobile-gradient-to: rgba(219, 234, 254, 0.5);   /* blue-100/50 */
-  --mobile-glow-primary: rgba(192, 132, 252, 0.15); /* purple-400/15 */
-  --mobile-glow-secondary: rgba(96, 165, 250, 0.1); /* blue-400/10 */
+  --mobile-gradient-from: rgba(243, 232, 255, 0.6);
+  --mobile-gradient-to: rgba(219, 234, 254, 0.5);
+  --mobile-glow-primary: rgba(192, 132, 252, 0.15);
+  --mobile-glow-secondary: rgba(96, 165, 250, 0.1);
+
+  --mesh-gradient-1: rgba(233, 213, 255, 0.7);
+  --mesh-gradient-2: rgba(186, 230, 253, 0.6);
+  --mesh-gradient-3: rgba(251, 207, 232, 0.5);
+  --mesh-gradient-4: rgba(167, 243, 208, 0.5);
+  --mesh-gradient-5: rgba(196, 181, 253, 0.4);
+
+  --orb-color-1: rgba(192, 132, 252, 0.25);
+  --orb-color-2: rgba(96, 165, 250, 0.2);
+  --orb-color-3: rgba(244, 114, 182, 0.18);
+
+  /* Glass System - Light */
+  --color-glass-surface: rgba(255, 255, 255, 0.75);
+  --color-glass-border: rgba(0, 0, 0, 0.06);
+  --color-glass-text: var(--color-text-primary);
+  --color-glass-text-muted: var(--color-text-secondary);
+  --color-glass-shadow: rgba(120, 113, 108, 0.1);
+
+  /* Overwrite interactive colors for light mode if needed */
+  --color-primary-subtle: rgba(168, 85, 247, 0.1);
 }

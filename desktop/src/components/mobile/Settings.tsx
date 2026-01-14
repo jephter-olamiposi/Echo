@@ -34,7 +34,6 @@ interface SettingsRowProps {
   destructive?: boolean;
 }
 
-/** Single settings row - 56px height for good touch target */
 const SettingsRow: React.FC<SettingsRowProps> = ({
   icon,
   iconBg,
@@ -44,20 +43,20 @@ const SettingsRow: React.FC<SettingsRowProps> = ({
   destructive = false,
 }) => (
   <button
-    className="flex items-center gap-3 px-4 min-h-14 w-full text-left active:bg-(--color-bg-tertiary) transition-colors"
+    className="flex items-center gap-3 px-4 min-h-[60px] w-full text-left active:bg-(--color-highlight) transition-all active:scale-[0.98]"
     onClick={() => { haptic.light(); onClick(); }}
   >
-    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${iconBg}`}>
-      <div className="w-4.5 h-4.5">{icon}</div>
+    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${iconBg} bg-(--color-glass-surface) border border-(--color-glass-border) shadow-sm`}>
+      <div className="w-5 h-5">{icon}</div>
     </div>
-    <span className={`flex-1 text-[16px] font-normal ${destructive ? 'text-red-400' : 'text-(--color-text-primary)'}`}>
+    <span className={`flex-1 text-[16px] font-semibold tracking-tight ${destructive ? 'text-red-400' : 'text-(--color-text-primary)'}`}>
       {label}
     </span>
     {value && (
-      <span className="text-[15px] text-(--color-text-tertiary)">{value}</span>
+      <span className="text-[14px] font-medium text-(--color-text-tertiary)">{value}</span>
     )}
     {!destructive && (
-      <div className="w-4 h-4 text-(--color-text-tertiary) ml-1">{Icons.chevron}</div>
+      <div className="w-4 h-4 text-(--color-text-muted) ml-1">{Icons.chevron}</div>
     )}
   </button>
 );
@@ -67,13 +66,12 @@ interface SettingsGroupProps {
   children: React.ReactNode;
 }
 
-/** Groups related settings with a label */
 const SettingsGroup: React.FC<SettingsGroupProps> = ({ label, children }) => (
   <div className="flex flex-col">
-    <h3 className="text-[13px] font-semibold text-(--color-text-tertiary) px-4 pb-2">
+    <h3 className="text-[12px] font-bold text-(--color-text-muted) px-5 pb-3 uppercase tracking-widest">
       {label}
     </h3>
-    <div className="bg-(--color-bg-secondary) rounded-xl overflow-hidden divide-y divide-(--color-border)">
+    <div className="bg-(--color-glass-surface) backdrop-blur-xl rounded-[2rem] border border-(--color-glass-border) overflow-hidden divide-y divide-(--color-border) shadow-xl shadow-(--color-glass-shadow)">
       {children}
     </div>
   </div>
@@ -97,7 +95,7 @@ export const Settings: React.FC<MobileSettingsProps> = ({
 }) => {
   const { theme } = useTheme();
   const { language } = useLanguage();
-  
+
   const themeLabel = theme === 'dark' ? 'Dark' : theme === 'light' ? 'Light' : 'System';
 
   // Support link handlers
@@ -115,14 +113,14 @@ export const Settings: React.FC<MobileSettingsProps> = ({
     haptic.light();
     await openUrl('https://echo.app/report');
   };
-  
+
   return (
     <div className="flex flex-col h-full w-full bg-transparent text-(--color-text-primary) overflow-hidden transition-colors duration-300">
       <MobileHeader title="Settings" className="bg-transparent backdrop-blur-md sticky top-0 z-10" />
 
       <div className="flex-1 overflow-y-auto pb-32">
         <div className="px-4 py-6 flex flex-col gap-8">
-          
+
           {/* Account Header */}
           <div className="flex flex-col items-center py-4">
             {/* Avatar with first letter */}

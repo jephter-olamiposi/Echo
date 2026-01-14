@@ -9,12 +9,11 @@ const MSG_HANDSHAKE = "handshake";
 const MSG_PRESENCE_JOIN = "__JOIN__";
 const MSG_PRESENCE_LEAVE = "__LEAVE__";
 
-// Reconnection config - Production balanced
 const MAX_RETRIES = 8;
-const BASE_DELAY_MS = 500; // Fast but not aggressive
-const MAX_DELAY_MS = 10000; // Cap at 10s
-const PING_INTERVAL_MS = 20000; // 20s keep-alive
-const MAX_QUEUE = 200; // Cap queued messages while offline to avoid memory growth
+const BASE_DELAY_MS = 500;
+const MAX_DELAY_MS = 10000;
+const PING_INTERVAL_MS = 20000;
+const MAX_QUEUE = 200;
 
 interface ServerMessage {
   device_id: string;
@@ -43,6 +42,7 @@ export interface UseWebSocketReturn {
   queuedCount: number;
   connect: () => void;
   disconnect: () => void;
+  reconnect: () => void;
   send: (content: string) => void;
 }
 
@@ -69,7 +69,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const intentionalCloseRef = useRef(false);
 
-  // Stable refs for callbacks to avoid reconnect loops
   const onConnectionChangeRef = useRef(onConnectionChange);
   const onIncomingCopyRef = useRef(onIncomingCopy);
   const onDeviceJoinRef = useRef(onDeviceJoin);
@@ -102,7 +101,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
   }, []);
 
   // Add network status listeners
-  const connectRef = useRef<() => void>(() => {});
+  const connectRef = useRef<() => void>(() => { });
   const messageQueueRef = useRef<string[]>([]);
   const sendRef = useRef<((content: string) => void) | null>(null);
 
@@ -133,8 +132,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     const delay = Math.floor(jittered);
 
     console.log(
-      `[ws] Reconnecting in ${delay}ms (attempt ${
-        retriesRef.current + 1
+      `[ws] Reconnecting in ${delay}ms (attempt ${retriesRef.current + 1
       }/${MAX_RETRIES})`
     );
 
@@ -409,6 +407,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     queuedCount,
     connect,
     disconnect,
+    reconnect: connect,
     send,
   };
 }

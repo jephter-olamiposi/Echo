@@ -64,27 +64,28 @@ export const Modal: React.FC<ModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-150 flex items-end md:items-center justify-center p-0 md:p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="modal-title"
     >
       {/* Backdrop */}
-      <div 
+      <div
         className="absolute inset-0 bg-(--color-surface-overlay) backdrop-blur-sm animate-in fade-in duration-300"
         onClick={onClose}
         aria-hidden="true"
       />
-      
+
       {/* Modal Container */}
-      <div 
+      <div
         className={`
           relative w-full ${sizeClasses[size]}
-          bg-(--color-surface-raised)/95 backdrop-blur-2xl 
-          border-t md:border border-(--color-border) 
+          bg-(--color-surface-raised)/90 backdrop-blur-3xl 
+          border-t md:border border-white/10
           rounded-t-3xl md:rounded-2xl 
-          shadow-xl overflow-hidden 
+          shadow-[0_40px_80px_-20px_rgba(0,0,0,0.4)]
+          overflow-hidden 
           animate-in slide-in-from-bottom md:zoom-in-95 
           duration-300 md:duration-200
           ${className}
@@ -94,14 +95,14 @@ export const Modal: React.FC<ModalProps> = ({
         {/* Header */}
         <div className="p-6 pb-2 md:pb-6">
           <div className="flex items-center justify-between mb-2">
-            <h2 
-              id="modal-title" 
-              className="text-xl font-semibold text-(--color-text-primary) tracking-tight"
+            <h2
+              id="modal-title"
+              className="text-xl font-bold text-(--color-text-primary) tracking-tight"
             >
               {title}
             </h2>
-            <button 
-              className="p-2 -mr-2 text-(--color-text-muted) hover:text-(--color-text-primary) hover:bg-(--color-surface)/5 rounded-full transition-colors"
+            <button
+              className="p-2 -mr-2 text-(--color-text-muted) hover:text-(--color-text-primary) hover:bg-white/5 rounded-full transition-colors"
               onClick={onClose}
               aria-label="Close modal"
             >
@@ -109,11 +110,11 @@ export const Modal: React.FC<ModalProps> = ({
             </button>
           </div>
           {description && (
-            <p className="text-sm text-(--color-text-secondary) leading-relaxed mb-6">
+            <p className="text-sm text-(--color-text-tertiary) leading-relaxed mb-6 font-medium">
               {description}
             </p>
           )}
-          
+
           {/* Content */}
           <div className="mt-4">
             {children}
@@ -122,7 +123,7 @@ export const Modal: React.FC<ModalProps> = ({
 
         {/* Footer */}
         {footer && (
-          <div className="bg-(--color-surface-raised)/30 border-t border-(--color-border) p-6 md:p-4 flex md:justify-end gap-3 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] md:pb-4">
+          <div className="bg-white/5 border-t border-white/5 p-6 md:p-4 flex md:justify-end gap-3 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] md:pb-4">
             {footer}
           </div>
         )}

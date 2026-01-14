@@ -1,9 +1,9 @@
 import React, { useMemo, useState, useRef, useEffect, memo } from 'react';
 import { Icons } from '../Icons';
 import { MobileHeader } from './Header';
-import { 
-  formatTime, 
-  truncate, 
+import {
+  formatTime,
+  truncate,
   getContentTypeIcon
 } from '../../utils';
 import { ClipboardEntry } from '../../types';
@@ -13,7 +13,6 @@ import { usePullToRefresh } from '../../hooks/usePullToRefresh';
 import { FilterChip } from '../ui/FilterChip';
 import { useLanguage } from '../../contexts/LanguageContext';
 
-// Memoized history item to prevent unnecessary re-renders
 interface HistoryItemProps {
   entry: ClipboardEntry;
   onClick: (entry: ClipboardEntry) => void;
@@ -21,49 +20,43 @@ interface HistoryItemProps {
 
 const HistoryItem = memo<HistoryItemProps>(({ entry, onClick }) => {
   const { t } = useLanguage();
-  
+
   return (
-    <button 
-      className="group flex items-center gap-3 p-3 w-full text-left bg-(--color-surface-raised) border border-(--color-border) rounded-xl hover:bg-(--color-surface) hover:border-(--color-border-subtle) hover:shadow-md hover:shadow-purple-500/5 active:scale-[0.98] transition-all duration-200 ease-out"
+    <button
+      className="group flex items-center gap-4 p-4 w-full text-left bg-(--color-glass-surface) backdrop-blur-3xl border border-(--color-glass-border) rounded-[1.5rem] hover:bg-(--color-highlight) hover:border-(--color-border-focus) active:scale-[0.98] transition-all duration-300 ease-out shadow-lg shadow-(--color-glass-shadow)"
       onClick={() => onClick(entry)}
     >
-      {/* Icon */}
-      <div className="relative w-10 h-10 rounded-lg flex items-center justify-center shrink-0 overflow-hidden">
-        <div className="absolute inset-0 bg-linear-to-br from-purple-500/20 to-purple-500/5" />
-        <div className="relative w-4 h-4 text-purple-400">{getContentTypeIcon(entry.contentType)}</div>
+      <div className="relative w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 overflow-hidden bg-purple-500/10 border border-purple-500/20 group-hover:scale-105 transition-transform duration-500">
+        <div className="relative w-6 h-6 text-purple-400 flex items-center justify-center [&_svg]:w-full [&_svg]:h-full">{getContentTypeIcon(entry.contentType)}</div>
         {entry.pinned && (
-          <div className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-linear-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30">
-            <div className="w-2 h-2 text-white">{Icons.pin}</div>
+          <div className="absolute -top-1 -right-1 w-5 h-5 bg-linear-to-br from-amber-400 to-orange-500 rounded-full flex items-center justify-center shadow-lg shadow-amber-500/30">
+            <div className="w-2.5 h-2.5 text-white">{Icons.pin}</div>
           </div>
         )}
       </div>
-      
-      {/* Content */}
+
       <div className="flex-1 min-w-0 py-0.5">
-        <span className="block text-[14px] font-medium text-(--color-text-primary) line-clamp-1 mb-0.5 group-hover:text-(--color-text-primary) transition-colors">
+        <span className="block text-[15px] font-bold text-(--color-text-primary) line-clamp-1 mb-1 group-hover:text-purple-400 transition-colors tracking-tight">
           {truncate(entry.content, 50)}
         </span>
-        
-        <div className="flex items-center gap-1.5 text-(--color-text-tertiary)">
-          <span className="text-[11px] truncate min-w-0 shrink">
+
+        <div className="flex items-center gap-2 text-(--color-text-muted) font-medium tracking-tight">
+          <span className="text-[12px] truncate min-w-0 shrink">
             {entry.source === 'local' ? t('this_device') : (entry.deviceName || 'Synced')}
           </span>
-          <span className="text-[10px] opacity-40">•</span>
-          <span className="text-[11px] whitespace-nowrap tabular-nums shrink-0">
+          <span className="text-[10px] opacity-20">•</span>
+          <span className="text-[12px] whitespace-nowrap tabular-nums shrink-0">
             {formatTime(entry.timestamp)}
           </span>
         </div>
       </div>
-      
-      {/* Chevron */}
-      <div className="text-(--color-text-tertiary) group-hover:text-(--color-text-secondary) group-hover:translate-x-0.5 transition-all">
-        <div className="w-4 h-4">{Icons.chevron}</div>
+
+      <div className="text-(--color-text-muted) group-hover:text-purple-400 group-hover:translate-x-1 transition-all">
+        <div className="w-6 h-6 flex items-center justify-center [&_svg]:w-full [&_svg]:h-full">{Icons.chevron}</div>
       </div>
     </button>
   );
 }, (prev, next) => prev.entry.id === next.entry.id && prev.entry.pinned === next.entry.pinned);
-
-HistoryItem.displayName = 'HistoryItem';
 
 interface MobileHistoryProps {
   history: ClipboardEntry[];
@@ -75,7 +68,7 @@ interface MobileHistoryProps {
   onFilterChange: (type: any) => void;
   onClearHistory: () => void;
   onBack: () => void;
-  onItemClick: (entry: ClipboardEntry) => void; 
+  onItemClick: (entry: ClipboardEntry) => void;
   deviceCount: number;
   onRefresh: () => Promise<void>;
 }
@@ -105,7 +98,7 @@ export const History: React.FC<MobileHistoryProps> = ({
 
   const [page, setPage] = useState(1);
   const ITEMS_PER_PAGE = 20;
-  
+
   const visibleHistory = useMemo(() => {
     return filteredHistory.slice(0, page * ITEMS_PER_PAGE);
   }, [filteredHistory, page]);
@@ -140,11 +133,11 @@ export const History: React.FC<MobileHistoryProps> = ({
     <div className="flex flex-col h-full bg-transparent w-full transition-colors duration-300">
       {/* Sticky Header */}
       <div className="shrink-0 z-30 bg-transparent backdrop-blur-2xl border-b border-(--color-border) sticky top-0 transition-colors duration-300">
-        <MobileHeader 
+        <MobileHeader
           title={t('history')}
           showBack={true}
           onBack={onBack}
-          className="bg-transparent! border-none! px-1" 
+          className="bg-transparent! border-none! px-1"
           rightAction={
             history.length > 0 ? (
               <button
@@ -152,12 +145,12 @@ export const History: React.FC<MobileHistoryProps> = ({
                 onClick={onClearHistory}
                 title="Clear history"
               >
-                <div className="w-5 h-5">{Icons.trash}</div>
+                <div className="w-6 h-6 flex items-center justify-center [&_svg]:w-full [&_svg]:h-full">{Icons.trash}</div>
               </button>
             ) : null
           }
         />
-        
+
         {/* Search Input */}
         <div className="px-4 pb-4">
           <div className="relative group">
@@ -166,15 +159,15 @@ export const History: React.FC<MobileHistoryProps> = ({
               <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none text-(--color-text-tertiary) group-focus-within:text-purple-400 transition-colors duration-300">
                 <div className="w-5 h-5">{Icons.search}</div>
               </div>
-              <input 
-                type="text" 
+              <input
+                type="text"
                 className="w-full h-12 bg-(--color-surface) border border-(--color-border) rounded-xl pl-12 pr-12 text-[15px] text-(--color-text-primary) font-medium placeholder-(--color-text-muted) focus:outline-none focus:border-purple-500/50 focus:bg-(--color-surface-raised) transition-all duration-300"
-                placeholder={t('search_items')} 
+                placeholder={t('search_items')}
                 value={searchQuery}
                 onChange={(e) => onSearchChange(e.target.value)}
               />
               {searchQuery && (
-                <button 
+                <button
                   className="absolute inset-y-0 right-3 flex items-center text-(--color-text-tertiary) hover:text-(--color-text-primary) active:scale-90 transition-all"
                   onClick={() => onSearchChange("")}
                 >
@@ -205,16 +198,16 @@ export const History: React.FC<MobileHistoryProps> = ({
       {/* Scrollable Content */}
       <div ref={containerRef} className="flex-1 overflow-y-auto custom-scrollbar relative bg-transparent pb-32!">
         {/* Pull to Refresh */}
-        <div 
-          className="absolute top-0 left-0 right-0 flex justify-center overflow-hidden pointer-events-none z-10" 
+        <div
+          className="absolute top-0 left-0 right-0 flex justify-center overflow-hidden pointer-events-none z-10"
           style={{ height: `${pullHeight}px` }}
         >
-          <div 
+          <div
             className={`flex items-center justify-center w-12 h-12 rounded-full bg-(--color-surface-raised) border border-(--color-border) shadow-xl mt-8 transition-all duration-300 ${activeRefreshing ? 'ring-4 ring-purple-500/30' : ''}`}
-            style={{ 
+            style={{
               opacity: Math.min(pullHeight / 50, 1),
-              transform: activeRefreshing 
-                ? 'scale(1.1)' 
+              transform: activeRefreshing
+                ? 'scale(1.1)'
                 : `translateY(${Math.min(pullHeight * 0.2, 20)}px) rotate(${pullHeight * 3}deg) scale(${Math.min(pullHeight / 60, 1)})`,
             }}
           >
@@ -227,15 +220,15 @@ export const History: React.FC<MobileHistoryProps> = ({
         <div className="p-4 space-y-3">
           {isLoading ? (
             <div className="flex flex-col gap-3">
-               {[1, 2, 3, 4, 5].map((i) => (
-                 <div key={i} className="flex items-center gap-4 p-4 bg-(--color-surface-raised) rounded-2xl border border-(--color-border)">
-                   <Skeleton variant="circular" className="w-12 h-12 shrink-0 rounded-xl!" />
-                   <div className="flex-1 min-w-0 flex flex-col gap-2.5">
-                      <Skeleton variant="text" className="w-4/5 h-4 rounded!" />
-                      <Skeleton variant="text" className="w-2/5 h-3 rounded!" />
-                   </div>
-                 </div>
-               ))}
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-4 p-4 bg-(--color-surface-raised) rounded-2xl border border-(--color-border)">
+                  <Skeleton variant="circular" className="w-12 h-12 shrink-0 rounded-xl!" />
+                  <div className="flex-1 min-w-0 flex flex-col gap-2.5">
+                    <Skeleton variant="text" className="w-4/5 h-4 rounded!" />
+                    <Skeleton variant="text" className="w-2/5 h-3 rounded!" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : visibleHistory.length > 0 ? (
             <div className="flex flex-col gap-3">
@@ -246,7 +239,7 @@ export const History: React.FC<MobileHistoryProps> = ({
             </div>
           ) : (
             <div className="pt-20 pb-20">
-              <EmptyState 
+              <EmptyState
                 title={searchQuery ? t('no_matches_found') : t('no_history')}
                 description={searchQuery ? t('adjust_filters') : t('copy_tip')}
               />
