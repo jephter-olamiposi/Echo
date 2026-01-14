@@ -30,3 +30,20 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Tauri build artifacts
+src-tauri/target/
+src-tauri/gen/
+src-tauri/build/
+
+# Android/iOS build outputs
+gen/
+android/app/build/
+ios/build/
+*.apk
+*.aab
+*.ipa
+
+# Tauri WiX (Windows installer)
+*.wixobj
+*.wixpdb

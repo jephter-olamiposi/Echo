@@ -1,189 +1,105 @@
-# 📋 Echo
+# Echo
 
-**Universal Clipboard Sync** — Copy on one device, paste on any other. Instantly.
+[![Rust](https://img.shields.io/badge/backend-Rust-orange?logo=rust)](https://www.rust-lang.org/)
+[![Tauri](https://img.shields.io/badge/desktop-Tauri-24C8DB?logo=tauri)](https://tauri.app/)
+[![React](https://img.shields.io/badge/frontend-React-61DAFB?logo=react)](https://reactjs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-![Rust](https://img.shields.io/badge/Rust-000000?style=flat&logo=rust&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat&logo=typescript&logoColor=white)
-![Tauri](https://img.shields.io/badge/Tauri_v2-FFC131?style=flat&logo=tauri&logoColor=black)
-![React](https://img.shields.io/badge/React_19-20232A?style=flat&logo=react&logoColor=61DAFB)
-![Android](https://img.shields.io/badge/Android-3DDC84?style=flat&logo=android&logoColor=white)
-![iOS](https://img.shields.io/badge/iOS-000000?style=flat&logo=apple&logoColor=white)
+Echo is a cross-platform system for real-time clipboard synchronization across Desktop and Mobile devices. The architecture is optimized for sub-100ms latency and implements client-side end-to-end encryption (E2EE) as a core primitive.
 
-## ✨ Features
+## ⚙️ System Specifications
 
-- 🔄 **Real-time Sync** — Clipboard changes sync instantly across all devices via WebSockets.
-- 📱 **Mobile Support** — Native Android and iOS apps built with Tauri v2.
-- 🔔 **Tap to Sync** — Smart push notifications (FCM) explicitly sync clipboard data on mobile to bypass background restrictions.
-- 🔐 **End-to-End Encryption** — Optional AES-256-GCM encryption. Your data is encrypted before it leaves your device.
-- 🔗 **QR Code Linking** — Securely pair new devices in seconds by scanning a QR code.
-- 📜 **Clipboard History** — Access and search your recent clipboard items.
-- ⚡ **High Performance** — Rust backend and Rust-based native mobile bindings for maximum speed.
+The system is designed around several key technical constraints:
+- **Low-Latency Transport**: Bidirectional communication via WebSockets (WS) coupled with Rust-based broadcast channels.
+- **Client-Side Cryptography**: Mandatory encryption using **XChaCha20-Poly1305** for all data payloads.
+- **Cross-Platform Native Shims**: OS-specific implementations for clipboard monitoring and push-triggered synchronization.
+- **State Management**: Distributed state sharding to support high concurrency with minimal lock contention.
 
-## 🏗️ Architecture
+## 🔄 System Data Flow
 
-```mermaid
-graph TD
-    subgraph Devices
-        A[Desktop macOS/Win/Lin]
-        B[Mobile Android/iOS]
-    end
+The following diagram illustrates the lifecycle of a clipboard event across the sharded synchronization pipeline:
 
-    subgraph Backend
-        S[Echo Server Rust/Axum]
-        DB[(PostgreSQL)]
-        FCM[Firebase Cloud Messaging]
-    end
-
-    A <-->|WebSocket| S
-    B <-->|WebSocket| S
-    S -->|Push Notification| FCM
-    FCM -->|Wake Up/Sync| B
-    S <--> DB
+```text
+ User A (Device 1)        Echo Server (Rust)        User B (Device 2)
+  |                         |                         |
+  |-- Local Copy Event      |                         |
+  |                         |                         |
+  |-- Encrypt Payloads ---->|                         |
+  |   (XChaCha20-Poly1305)  |                         |
+  |                         |-- Hub Routing --------->|
+  |                         |   (DashMap Look-up)     |
+  |                         |                         |
+  |                         |-- Broadcast Arc<Msg> -->|
+  |                         |                         |
+  |                         |<-- Decrypt Payloads ----|
+  |                         |    (XChaCha20-Poly1305) |
+  |                         |                         |
+  |                         |-- OS Clipboard Write ---|
 ```
 
-- **Hub-and-Spoke**: A central Rust server coordinates sync.
-- **WebSockets**: Primary real-time transport for active devices.
-- **FCM (Firebase Cloud Messaging)**: Used to wake up or notify mobile devices when the app is in the background, enabling "Tap to Sync".
+## 🏗️ Technical Architecture
 
-## 🚀 Quick Start
+### Backend Implementation (Rust/Axum)
+The synchronization server is built for high-throughput concurrency:
+- **Concurrent Hash Maps**: Utilizes `DashMap` for sharded state management, bypassing the bottleneck of standard `RwLock<HashMap>` and optimizing p99 broadcast latency.
+- **Resource Profiling**: Implements Arc-based message sharing to minimize heap allocations and avoid cloning overhead during N-device fan-out.
+- **Data Persistence**: **SQLx** for asynchronous, type-safe interaction with PostgreSQL, utilizing indexed queries for efficient history retrieval.
+
+### Frontend Strategy (React + Tauri)
+The client adapts its synchronization strategy based on host environment capabilities:
+- **Desktop (Tauri)**: Native Rust-side clipboard listeners integrated with the system event loop.
+- **Android**: Hybrid Kotlin event listeners combined with background polling for reliability across diverse OEM power-management policies.
+- **iOS**: Adaptive polling mechanism that adjusts intervals (500ms to 15s) based on application visibility and user interaction frequency.
+
+## 🔐 Security Protocol
+
+Encryption is strictly decoupled from the transport layer:
+1. **Entropy**: 32-byte secret keys are generated locally using cryptographically secure random number generators (CSPRNG).
+2. **Distribution**: Key exchange between devices occurs via high-entropy QR codes; keys are never transmitted to the synchronization server.
+3. **Payload Isolation**: Every clipboard entry is encrypted with a unique 24-byte nonce. The server acts as a blind relay, storing and broadcasting only ciphertext and nonces.
+
+## 🛠️ Workspace Organization
+
+```text
+.
+├── backend/           # Axum server + SQLx/PostgreSQL migrations
+├── desktop/           # Tauri workspace
+│   ├── src/           # React frontend + Crypto primitives
+│   └── src-tauri/     # Rust-side Core & Native plugins
+└── CHANGELOG.md       # Version history
+```
+
+## 🚦 Deployment & Environment
 
 ### Prerequisites
+- Rust (Stable)
+- Node.js (v18+)
+- PostgreSQL (v14+)
 
-- [Rust](https://rustup.rs/) (1.70+)
-- [Node.js](https://nodejs.org/) (18+)
-- [PostgreSQL](https://www.postgresql.org/) (14+)
-- **Mobile Dev**: Android Studio (for Android) or Xcode (for iOS).
-
-### 1. Backend Setup
-
-```bash
-git clone https://github.com/jephter-olamiposi/echo.git
-cd echo/backend
-
-# 1. Setup Database
-createdb echo_db
-# Copy environment file
-cp .env.example .env
-# Update .env with your DATABASE_URL
-
-# 2. Run Migrations
-cargo install sqlx-cli
-sqlx migrate run
-
-# 3. Setup Firebase (Optional for Mobile Push)
-# Place your 'service-account.json' in the backend/ directory
-# and update .env with GOOGLE_APPLICATION_CREDENTIALS=./service-account.json
-
-# 4. Run Server
-cargo run
-# Server starts at http://0.0.0.0:3000
-```
-
-### 2. Frontend & Mobile Setup
-
-The desktop and mobile apps share the same codebase in `desktop/`.
-
-```bash
-cd desktop
-
-# 1. Install Dependencies
-npm install
-
-# 2. Configure Env
-cp .env.example .env
-# Set VITE_API_URL=http://<YOUR_IP>:3000
-# Set VITE_WS_URL=ws://<YOUR_IP>:3000
-# IMPORTANT: For mobile, use your local IP, not localhost!
-
-# 3. Run Desktop Dev
-npm run tauri dev
-
-# 4. Run Mobile Dev
-# Ensure an emulator is running or device is connected
-npm run tauri android dev
-# OR
-npm run tauri ios dev
-```
-
-## 🔐 End-to-End Encryption
-
-Echo supports optional E2EE. When enabled:
-1.  A random 256-bit key is generated from your passphrase (PBKDF2).
-2.  Content is encrypted with AES-256-GCM before sending to the server.
-3.  The server stores only encrypted blobs.
-4.  Other devices need the same passphrase to decrypt and view content.
-
-## 📱 "Tap to Sync" (Mobile)
-
-On Android and iOS, background clipboard access is restricted. Echo solves this with **Tap to Sync**:
-1.  When you copy on Desktop, the Server receives the data.
-2.  Server sends a high-priority FCM notification to your Mobile device.
-3.  Notification appears: *"Tap to sync from Desktop"*.
-4.  Tapping the notification opens Echo and instantly syncs the clipboard.
-
-## 🔧 Configuration
-
-### Backend (`backend/.env`)
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | Postgres connection string | Yes |
-| `JWT_SECRET` | Secret for signing auth tokens | Yes |
-| `GOOGLE_PROJECT_ID` | Firebase Project ID (for FCM) | No |
-| `FIREBASE_SERVICE_ACCOUNT` | Path to service account (or use `FCM_SERVICE_ACCOUNT_PATH`) | No |
-| `FCM_SERVICE_ACCOUNT_JSON` | Raw JSON content of service account | No |
-| `ALLOWED_ORIGINS` | CORS origins (comma-separated) | No (defaults to localhost+tauri) |
-
-### Frontend (`desktop/.env`)
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `VITE_API_URL` | HTTP URL of backend | `http://localhost:3000` |
-| `VITE_WS_URL` | WebSocket URL of backend | `ws://localhost:3000` |
-
-## 🤝 Contributing
-
-PRs are welcome! Please match the existing code style (Rustfmt for backend, Prettier for frontend).
-
-## ⚡ Performance
-
-Echo is designed for high throughput and low latency:
-
-### Design Decisions
-
-| Component | Choice | Why |
-|-----------|--------|-----|
-| **Concurrent State** | DashMap | 3-5x faster than RwLock<HashMap> for our read-heavy workload |
-| **Real-time Transport** | tokio broadcast channels | Zero-copy fan-out to all connected devices |
-| **Rate Limiting** | Token bucket (300/min, 50ms debounce) | Prevents abuse without impacting normal use |
-| **Connection Keepalive** | 15s ping interval | Balances responsiveness vs. battery/bandwidth |
-
-### Running Benchmarks
-
+### Backend Bootstrap
 ```bash
 cd backend
-
-# Run all benchmarks
-cargo bench
-
-# Run specific benchmark
-cargo bench --bench rate_limiting
-cargo bench --bench broadcast
-
-# Generate HTML report (requires gnuplot)
-cargo bench -- --save-baseline main
+cp .env.example .env
+# Setup PostgreSQL and configure DATABASE_URL in .env
+cargo run
 ```
 
-### Benchmark Results (M1 MacBook Pro)
+### Frontend Bootstrap
+```bash
+cd desktop
+npm install
+npm run tauri dev
+```
 
-| Benchmark | Throughput | Notes |
-|-----------|------------|-------|
-| Rate limit check | ~50M ops/sec | DashMap single-shard access |
-| Broadcast fan-out (10 subscribers) | ~2M msgs/sec | Per-user channel isolation |
-| WebSocket message parse | ~1.5M msgs/sec | serde_json deserialization |
+## 📈 Engineering Standards
 
-See [backend/ARCHITECTURE.md](backend/ARCHITECTURE.md) for detailed design documentation.
+We maintain system integrity through automated workflows:
+- **Static Analysis**: `cargo clippy`, `cargo fmt`, and `eslint`.
+- **Benchmarking**: Performance regression testing via `criterion` in `backend/benches`.
+- **Security Auditing**: Mandatory `cargo audit` for dependency vulnerability tracking.
 
-## 📄 License
+---
 
-MIT © [Jephter Olamiposi](https://github.com/jephter-olamiposi)
+## 📄 Documentation 
+
+- [Backend Architecture](backend/ARCHITECTURE.md) - Detailed backend design decisions

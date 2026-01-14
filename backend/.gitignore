@@ -22,3 +22,12 @@ firebase-service-account.json
 
 # Logs
 *.log
+
+# Database (local dev/testing)
+*.db
+*.sqlite
+*.sqlite3
+
+# Benchmark outputs
+/benches/target
+criterion/

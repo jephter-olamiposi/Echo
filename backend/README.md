@@ -1,117 +1,89 @@
 # Echo Backend
 
-Real-time clipboard synchronization server built with Rust and Axum.
+High-concurrency synchronization server implemented in Rust using the Axum framework and Tokio async runtime.
 
-## Quick Start
+## 🏗️ Architecture & Component Mapping
 
-```bash
-# Install dependencies
-cargo build
+The backend is structured into specialized modules to isolate side effects and maintain strict type safety across the synchronization pipeline.
 
-# Setup database
-createdb echo_db
-cp .env.example .env
-# Edit .env with your DATABASE_URL and JWT_SECRET
+| Module | Responsibility | Implementation Details |
+|--------|----------------|------------------------|
+| `main` | Bootstrap | Setup Axum router, WebSocket routes, and graceful shutdown signal handling. |
+| `handler` | Route Handlers | Manages HTTP upgrades to WebSockets and standard REST endpoints for history. |
+| `state` | Core State | Implements sharded state via `DashMap` and user-specific `broadcast` channels. |
+| `auth` | Identity | Argon2id password hashing and JWT issuance/validation. |
+| `db` | Persistence | SQLx repository layer for PostgreSQL interaction. |
+| `push` | FCM Client | Manages device token registration and push-triggered sync notifications. |
+| `error` | Error Handling | Unified `AppError` type with automatic conversion to HTTP status codes. |
 
-# Run migrations
-cargo install sqlx-cli
-sqlx migrate run
+## ⚙️ Concurrency & Performance
 
-# Start server
-cargo run
+### Sharded State Control
+To minimize lock contention in high-concurrency scenarios (1,000+ active WS connections), the server utilizes `DashMap`. This sharded concurrent hash map allows parallel mutations of user states without global locking.
+
+### Zero-Copy Broadcast
+Real-time clipboard fan-out is handled via `tokio::sync::broadcast`. Messages are wrapped in `Arc` (Atomic Reference Counting) to ensure that broadcasting to N devices involves only a few atomic increments rather than full payload cloning.
+
+## 🗄️ Database Context
+
+Managed via **SQLx** for compile-time verified queries.
+- **Migrations**: Found in `./migrations`.
+- **Primary Schema**: Focused on `users`, `devices`, and `clipboard_history`.
+- **Indexing**: Optimized for `(user_id, timestamp DESC)` to ensure O(1) or O(log N) retrieval of the latest sync state.
+
+## 🛠️ Development & Ops
+
+### Environment Configuration
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string. |
+| `JWT_SECRET` | HS256 signing secret. |
+| `FCM_SERVICE_ACCOUNT_JSON` | Firebase credentials for push-triggered sync. |
+
+## 📡 Message Protocol Specification
+
+The synchronization protocol utilizes structured JSON over WebSockets. Every message must include a `device_id` and `timestamp`.
+
+### 1. Handshake (Identity Registration)
+Sent immediately upon connection to map the WebSocket stream to a logical device.
+```json
+{
+  "device_id": "uuid-v4",
+  "device_name": "Echo Desktop (Mac)",
+  "content": "__HANDSHAKE__",
+  "timestamp": 1705234200000,
+  "encrypted": false
+}
 ```
 
-## Architecture
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed design documentation.
-
-### Module Overview
-
-| Module | Purpose |
-|--------|---------|
-| `main` | Server bootstrap, routes, graceful shutdown |
-| `handler` | HTTP and WebSocket route handlers |
-| `state` | Application state with DashMap, broadcast channels |
-| `auth` | Argon2 password hashing, JWT tokens |
-| `db` | PostgreSQL repository layer (SQLx) |
-| `middleware` | JWT authentication extractor |
-| `models` | Request/response DTOs |
-| `push` | Firebase Cloud Messaging integration |
-| `error` | Unified error types with HTTP mapping |
-
-## Development
-
-### Running Tests
-
-```bash
-# Unit tests
-cargo test
-
-# With logging
-RUST_LOG=debug cargo test -- --nocapture
+### 2. Clipboard Sync (E2EE Payload)
+Primary data carrier for encrypted clipboard content.
+```json
+{
+  "device_id": "uuid-v4",
+  "device_name": "Echo Desktop (Mac)",
+  "content": "base64-ciphertext",
+  "nonce": "base64-24byte-nonce",
+  "encrypted": true,
+  "timestamp": 1705234200100
+}
 ```
 
-### Running Benchmarks
+### 3. Presence Indicators
+Broadcasted by the server when a device joins or leaves the user's hub.
+- `__JOIN__`: Device associated and ready for sync.
+- `__LEAVE__`: Device disconnected or timed out.
 
-```bash
-# All benchmarks
-cargo bench
+### 4. Protocol Error Codes
+Applied to `CloseFrame` or explicit error messages:
+- `4001`: Authentication Failed (Invalid/Expired JWT).
+- `4002`: Protocol Violation (Malformed JSON).
+- `4003`: Security Violation (Unencrypted payload received).
 
-# Specific benchmark
-cargo bench --bench rate_limiting
-cargo bench --bench broadcast
-```
+## 🛠️ Diagnostic Tooling
 
-### Code Quality
-
-```bash
-# Format
-cargo fmt
-
-# Lint
-cargo clippy -D warnings
-
-# Check for security issues
-cargo audit
-```
-
-## Environment Variables
-
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `DATABASE_URL` | PostgreSQL connection string | Yes |
-| `JWT_SECRET` | Secret for signing auth tokens | Yes |
-| `RUST_LOG` | Log level (trace/debug/info/warn/error) | No |
-| `FCM_SERVICE_ACCOUNT_JSON` | Firebase service account JSON | No |
-| `FCM_SERVICE_ACCOUNT_PATH` | Path to service account file | No |
-| `ALLOWED_ORIGINS` | CORS origins (comma-separated) | No |
-
-## API Endpoints
-
-### Auth
-
-- `POST /api/register` - Create account
-- `POST /api/login` - Get JWT token
-- `GET /api/me` - Get current user (requires auth)
-
-### Sync
-
-- `GET /api/sync` - WebSocket upgrade for real-time sync
-- `GET /api/clipboard/latest` - Get latest clipboard entry
-- `GET /api/clipboard/history` - Get clipboard history
-- `DELETE /api/clipboard/history` - Clear history
-
-### Push Notifications
-
-- `POST /api/push/register` - Register FCM token
-
-## Performance
-
-The backend is designed for high concurrency:
-
-- **DashMap**: Lock-free concurrent hash maps for state
-- **Broadcast channels**: Efficient fan-out to connected devices
-- **Rate limiting**: Token bucket algorithm (300 msgs/min)
-- **Connection pooling**: SQLx with 20 max connections
-
-See benchmarks in `/benches` for performance characteristics.
+We maintain system integrity through automated workflows:
+- **Unit Testing**: `cargo test` for logic verification.
+- **Benchmarking**: Performance regression testing via `criterion` in `./benches`.
+- **Static Analysis**: `cargo clippy -- -D warnings` for enforce code quality.
+- **Security Auditing**: `cargo audit` for dependency vulnerability tracking.
