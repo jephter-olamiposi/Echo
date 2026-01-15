@@ -14,7 +14,6 @@ export function useKeys() {
   const [isReady, setIsReady] = useState(false);
   const [needsKeySetup, setNeedsKeySetup] = useState(false);
 
-  // Generate Fingerprint
   const generateFingerprint = async (key: Uint8Array) => {
     const buf = await crypto.subtle.digest(
       "SHA-256",
@@ -28,11 +27,8 @@ export function useKeys() {
     setFingerprint(hex);
   };
 
-  // Generate Link URI
   const generateLink = (key: Uint8Array) => {
     const keyB64 = exportKey(key);
-    // Simple fallback if we don't have device info here
-    // In App.tsx we override this with full info
     setLinkUri(`echo://${keyB64}`);
   };
 
@@ -44,7 +40,6 @@ export function useKeys() {
     generateLink(key);
   }, []);
 
-  // Generate a new key (for "Start Fresh" option)
   const createNewKey = useCallback(async () => {
     const key = generateSecretKey();
     await saveKey(key);
@@ -56,7 +51,6 @@ export function useKeys() {
       const key = await loadEncryptionKey();
 
       if (!key) {
-        // No key found - user needs to set up (scan, import, or create new)
         setNeedsKeySetup(true);
         setIsReady(true);
         return null;
@@ -76,7 +70,6 @@ export function useKeys() {
     }
   }, []);
 
-  // Clear all key material (for Logout)
   const clearKeys = useCallback(async () => {
     await clearEncryptionKey();
     setEncryptionKey(null);

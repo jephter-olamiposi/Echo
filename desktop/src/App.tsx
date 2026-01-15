@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
-import { hostname, type as platformType } from "@tauri-apps/plugin-os";
+import { getDeviceName } from "./utils/deviceName";
+import { type as platformType } from "@tauri-apps/plugin-os";
 import { listen } from "@tauri-apps/api/event";
 import { scan, Format, checkPermissions, requestPermissions, cancel as cancelScan } from "@tauri-apps/plugin-barcode-scanner";
 import "./App.css";
@@ -263,27 +264,8 @@ function AppContent() {
         const isMobile = platform === 'android' || platform === 'ios';
         setIsMobilePlatform(isMobile);
 
-        let name = "Echo Device";
-        if (platform === 'android') {
-          name = 'Echo Mobile (Android)';
-        } else if (platform === 'ios') {
-          name = 'Echo Mobile (iOS)';
-        } else {
-          try {
-            const sysName = await hostname();
-            if (sysName && !sysName.includes("localhost") && sysName !== "This Device") {
-              name = sysName;
-            } else {
-              name = platform === 'macos' ? 'Echo Desktop (Mac)' :
-                platform === 'windows' ? 'Echo Desktop (Windows)' :
-                  platform === 'linux' ? 'Echo Desktop (Linux)' : 'Echo Desktop';
-            }
-          } catch (e) {
-            name = platform === 'macos' ? 'Echo Desktop (Mac)' :
-              platform === 'windows' ? 'Echo Desktop (Windows)' : 'Echo Desktop';
-          }
-        }
-
+        // Get actual device model name
+        const name = await getDeviceName();
         setDeviceName(name);
         setDevices([{ id, name, lastSeen: Date.now(), isCurrentDevice: true }]);
       } catch (e) {
@@ -302,6 +284,7 @@ function AppContent() {
     const unlistenFocusRef = { current: undefined as (() => void) | undefined };
     const unlistenResumeRef = { current: undefined as (() => void) | undefined };
     const unlistenClipboardRef = { current: undefined as (() => void) | undefined };
+    const unlistenClipboardInitRef = { current: undefined as (() => void) | undefined };
 
     const setupListeners = async () => {
       try {
@@ -342,6 +325,19 @@ function AppContent() {
             }
           }
         });
+
+        // Listen for initial clipboard content (emitted once on app start)
+        unlistenClipboardInitRef.current = await listen<string>('clipboard-init', (event) => {
+          console.log("[App] Received initial clipboard content");
+          const content = event.payload;
+          if (content && typeof content === 'string') {
+            const wasAdded = clipboard.addEntry(content, 'local', deviceName);
+            if (wasAdded && keys.encryptionKey) {
+              console.log("[App] Syncing initial clipboard content");
+              ws.send(content);
+            }
+          }
+        });
       } catch (e) {
         console.error("Failed to setup lifecycle listeners", e);
       }
@@ -353,6 +349,7 @@ function AppContent() {
       unlistenFocusRef.current?.();
       unlistenResumeRef.current?.();
       unlistenClipboardRef.current?.();
+      unlistenClipboardInitRef.current?.();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keys.encryptionKey, deviceName]);
@@ -604,8 +601,13 @@ function AppContent() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      // Reconnect WebSocket to ensure live connection
-      ws.connect();
+      // Force reconnect WebSocket to ensure fresh connection
+      console.log('[Refresh] Forcing websocket reconnection...');
+      ws.reconnect();
+
+      // Wait a moment for connection to establish
+      // This gives the WebSocket time to reconnect before fetching history
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Fetch history from server
       const serverHistory = await fetchClipboardHistory();
@@ -632,8 +634,11 @@ function AppContent() {
           }
         }
       }
+
+      console.log('[Refresh] Refresh complete');
     } catch (e) {
       console.error('[Refresh] Error:', e);
+      showError('Failed to refresh. Please check your connection.');
     } finally {
       setIsRefreshing(false);
     }

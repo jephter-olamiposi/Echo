@@ -5,8 +5,6 @@ import {
   requestPermission,
 } from "@tauri-apps/plugin-notification";
 
-// EchoBridge type is declared in api.ts
-
 interface UsePushNotificationsOptions {
   token: string | null;
   deviceId: string;
@@ -49,12 +47,10 @@ export function usePushNotifications({
     [token, deviceId]
   );
 
-  // Reset registration when auth/device changes
   useEffect(() => {
     hasRegistered.current = false;
   }, [token, deviceId]);
 
-  // Main registration effect - runs when connected
   useEffect(() => {
     if (!token || !isConnected || hasRegistered.current) {
       console.log("[Push] Skip init:", {
@@ -75,7 +71,6 @@ export function usePushNotifications({
           return;
         }
 
-        // Request notification permission
         let permission = await isPermissionGranted();
         if (!permission) {
           permission = (await requestPermission()) === "granted";
@@ -86,7 +81,6 @@ export function usePushNotifications({
           return;
         }
 
-        // Wait for bridge with simple polling
         let bridge = window.EchoBridge;
         let attempts = 0;
         while (!bridge && attempts < 20) {
@@ -100,7 +94,6 @@ export function usePushNotifications({
           return;
         }
 
-        // Get FCM token with retries
         let fcmToken = bridge.getFcmToken?.();
         let tokenAttempts = 0;
         while (!fcmToken && tokenAttempts < 5) {
@@ -125,11 +118,9 @@ export function usePushNotifications({
     initPush();
   }, [token, isConnected, registerPushToken]);
 
-  // Handle sync requests from push notifications
   useEffect(() => {
     if (!onSyncRequest) return;
 
-    // Check for cold start from push
     const checkPushOpen = () => {
       const bridge = window.EchoBridge;
       if (bridge?.wasOpenedFromPush?.()) {
@@ -141,7 +132,6 @@ export function usePushNotifications({
 
     checkPushOpen();
 
-    // Listen for warm start event
     const handleSyncTrigger = () => {
       console.log("[Push] Warm start sync triggered");
       onSyncRequest();

@@ -1,12 +1,7 @@
 import React from 'react';
 import { haptic } from '../../utils/haptics';
 
-/* ─────────────────────────────────────────────────────────────────────────────
- * FilterChip Component
- * 
- * A pill-style filter button with active/inactive states.
- * Active state shows gradient background with glow shadow.
- * ───────────────────────────────────────────────────────────────────────────── */
+
 
 export interface FilterChipProps {
   label: string;
@@ -15,9 +10,9 @@ export interface FilterChipProps {
   className?: string;
 }
 
-export const FilterChip: React.FC<FilterChipProps> = ({ 
-  label, 
-  isActive, 
+export const FilterChip: React.FC<FilterChipProps> = ({
+  label,
+  isActive,
   onClick,
   className = ''
 }) => (
@@ -30,8 +25,8 @@ export const FilterChip: React.FC<FilterChipProps> = ({
     className={`
       flex-1 py-3 rounded-xl text-[14px] font-semibold text-center 
       select-none transition-all duration-300 ease-out active:scale-95
-      ${isActive 
-        ? 'bg-linear-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/25' 
+      ${isActive
+        ? 'bg-linear-to-r from-purple-500 to-purple-600 text-white shadow-lg shadow-purple-500/25'
         : 'bg-(--color-surface) text-(--color-text-secondary) hover:bg-(--color-surface-raised) hover:text-(--color-text-primary) border border-(--color-border)'
       }
       ${className}

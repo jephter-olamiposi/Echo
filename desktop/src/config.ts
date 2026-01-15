@@ -1,7 +1,5 @@
-// Basic platform check
 const isAndroid = () => navigator.userAgent.includes("Android");
 
-// Helper to sanitize WS URL
 const getWsUrl = (apiUrl: string, explicitWsUrl?: string) => {
   if (explicitWsUrl) {
     if (explicitWsUrl.endsWith("/ws")) return explicitWsUrl;
@@ -23,7 +21,6 @@ const getWsUrl = (apiUrl: string, explicitWsUrl?: string) => {
 const getApiUrl = () => {
   let url = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
-  // Use 10.0.2.2 for Android emulator loopback
   if (isAndroid() && url.includes("localhost")) {
     url = url.replace("localhost", "10.0.2.2");
   }

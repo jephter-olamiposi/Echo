@@ -25,12 +25,24 @@
     {
       "identifier": "http:allow-fetch",
       "allow": [
-        { "url": "http://localhost:3000/*" },
-        { "url": "http://10.0.2.2:3000/*" },
-        { "url": "http://10.0.3.2:3000/*" },
-        { "url": "https://api.qrserver.com/*" },
-        { "url": "https://echo-backend-bkbw.onrender.com/*" },
-        { "url": "wss://echo-backend-bkbw.onrender.com/*" }
+        {
+          "url": "http://localhost:3000/*"
+        },
+        {
+          "url": "http://10.0.2.2:3000/*"
+        },
+        {
+          "url": "http://10.0.3.2:3000/*"
+        },
+        {
+          "url": "https://api.qrserver.com/*"
+        },
+        {
+          "url": "https://echo-backend-bkbw.onrender.com/*"
+        },
+        {
+          "url": "wss://echo-backend-bkbw.onrender.com/*"
+        }
       ]
     },
     "barcode-scanner:default",
@@ -47,6 +59,14 @@
     "os:allow-platform",
     "os:allow-version",
     "os:allow-arch",
-    "os:allow-hostname"
+    "os:allow-hostname",
+    "dialog:default",
+    "dialog:allow-save",
+    "fs:default",
+    "fs:allow-write-text-file",
+    "notification:default",
+    "notification:allow-is-permission-granted",
+    "notification:allow-request-permission",
+    "notification:allow-notify"
   ]
 }

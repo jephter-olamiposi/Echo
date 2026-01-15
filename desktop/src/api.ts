@@ -3,18 +3,7 @@ import { Store } from "@tauri-apps/plugin-store";
 import { fetch } from "@tauri-apps/plugin-http";
 import { AppError, ErrorType } from "./utils/AppError";
 
-// Declare EchoBridge for Android integration
-declare global {
-  interface Window {
-    EchoBridge?: {
-      saveAuthToken(token: string): void;
-      clearAuthToken(): void;
-      getFcmToken?(): string | null;
-      wasOpenedFromPush?(): boolean;
-      clearOpenedFromPush?(): void;
-    };
-  }
-}
+
 
 const AUTH_STORE_PATH = "echo-auth.json";
 const TOKEN_KEY = "auth_token";
@@ -23,13 +12,11 @@ let authStore: Store | null = null;
 const getAuthStore = async () =>
   (authStore ??= await Store.load(AUTH_STORE_PATH));
 
-// Secure token management functions
 export async function saveAuthToken(token: string): Promise<void> {
   const store = await getAuthStore();
   await store.set(TOKEN_KEY, token);
   await store.save();
 
-  // Also save to Android SharedPreferences for background sync
   if (window.EchoBridge?.saveAuthToken) {
     try {
       window.EchoBridge.saveAuthToken(token);
@@ -54,7 +41,6 @@ export async function removeAuthToken(): Promise<void> {
     await store.delete(TOKEN_KEY);
     await store.save();
 
-    // Also clear from Android SharedPreferences
     if (window.EchoBridge?.clearAuthToken) {
       try {
         window.EchoBridge.clearAuthToken();
@@ -66,7 +52,6 @@ export async function removeAuthToken(): Promise<void> {
       }
     }
   } catch {
-    // Ignore errors during token removal
   }
 }
 
@@ -111,9 +96,6 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   } catch (err: any) {
     if (err instanceof AppError) throw err;
 
-    // Check if it's a network error
-    // Standard fetch throws TypeError: Failed to fetch
-    // Tauri HTTP plugin might throw errors with specific strings
     const errorMessage = typeof err === "string" ? err : err?.message;
 
     const isNetworkError =
@@ -136,7 +118,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
   }
 }
 
-// Fetch clipboard history from server
+
 export async function fetchClipboardHistory(): Promise<any[]> {
   return apiFetch("/history", { method: "GET" });
 }

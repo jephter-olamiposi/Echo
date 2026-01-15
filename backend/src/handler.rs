@@ -23,8 +23,8 @@ use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::sync::Mutex;
 use uuid::Uuid;
 
-const PING_INTERVAL_SECS: u64 = 15; // Reduced from 30 for faster dead connection detection
-const MAX_CLIPBOARD_SIZE: usize = 10 * 1024 * 1024; // 10MB
+const PING_INTERVAL_SECS: u64 = 15;
+const MAX_CLIPBOARD_SIZE: usize = 10 * 1024 * 1024;
 const MAX_DEVICE_NAME_SIZE: usize = 256;
 const MAX_PUSH_TOKEN_SIZE: usize = 512;
 
@@ -134,7 +134,6 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
         match receiver.next().await {
             Some(Ok(Message::Text(text))) if text != "ping" => {
                 if let Ok(msg) = serde_json::from_str::<ClipboardMessage>(&text) {
-                    // Only allow handshake messages during initial connection
                     if msg.content == MSG_HANDSHAKE {
                         tracing::info!(user = %user_id, device = %msg.device_id, "device handshake completed");
                         break (
@@ -143,7 +142,6 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
                         );
                     } else {
                         tracing::warn!(user = %user_id, device = %msg.device_id, "rejected non-handshake message during connection");
-                        // Drop non-handshake messages during connection phase
                         continue;
                     }
                 } else {
@@ -175,7 +173,6 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
         }
     }
 
-    // Load history and push tokens from database (ensures persistence across restarts)
     state.load_history_from_db(user_id).await;
     state.load_push_tokens_from_db(user_id).await;
     let history = state.get_history(&user_id);
@@ -186,7 +183,6 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
         if msg.content == MSG_PRESENCE || msg.content == MSG_HANDSHAKE || msg.content == "ping" {
             continue;
         }
-        // Always mark replayed messages as history so clients don't treat them as live.
         msg.is_history = true;
         if let Ok(json) = serde_json::to_string(&msg) {
             if sender
@@ -267,7 +263,6 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: Uuid) {
         _ = ping_task => {},
     }
 
-    // Remove session and notify others before potentially cleaning up the channel.
     state.remove_session(user_id, &device_id);
     let presence_leave =
         ClipboardMessage::new(device_id.clone(), crate::models::MSG_PRESENCE_LEAVE);
@@ -297,13 +292,11 @@ async fn handle_incoming(
                     }
                 };
 
-                // Validate clipboard content size
                 if clipboard_msg.content.len() > MAX_CLIPBOARD_SIZE {
                     tracing::warn!(user = %user_id, device = %device_id, size = clipboard_msg.content.len(), "clipboard content too large");
                     continue;
                 }
 
-                // Validate device name size if present
                 if let Some(ref name) = clipboard_msg.device_name {
                     if name.len() > MAX_DEVICE_NAME_SIZE {
                         tracing::warn!(user = %user_id, device = %device_id, size = name.len(), "device name too long");
@@ -356,19 +349,16 @@ pub async fn register_push_token(
     State(state): State<AppState>,
     Json(payload): Json<PushTokenRequest>,
 ) -> Result<impl IntoResponse, AppError> {
-    // Validate push token size
     if payload.token.len() > MAX_PUSH_TOKEN_SIZE {
         tracing::warn!(user = %user_id, token_size = payload.token.len(), "push token too long");
         return Err(AppError::BadRequest("Push token too long".into()));
     }
 
-    // Validate device_id is not empty and reasonable size
     if payload.device_id.is_empty() || payload.device_id.len() > MAX_DEVICE_NAME_SIZE {
         tracing::warn!(user = %user_id, device_id_size = payload.device_id.len(), "invalid device_id");
         return Err(AppError::BadRequest("Invalid device_id".into()));
     }
 
-    // Basic token format validation (should contain only alphanumeric and some special chars)
     if !payload
         .token
         .chars()

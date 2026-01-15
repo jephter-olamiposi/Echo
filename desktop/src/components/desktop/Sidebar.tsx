@@ -105,16 +105,14 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
   const entrySections = React.useMemo(() => {
     const sections: { title: string; items: ClipboardEntry[] }[] = [];
 
-    // 1. Separate Pinned items
     const pinnedItems = filteredHistory.filter(item => item.pinned);
     const unpinnedItems = filteredHistory.filter(item => !item.pinned);
 
-    // 2. Add Pinned Section if exists
     if (pinnedItems.length > 0) {
       sections.push({ title: "Pinned", items: pinnedItems });
     }
 
-    // 3. Group remaining items by date
+
     const dateGroups = unpinnedItems.reduce((groups, entry) => {
       const date = new Date(entry.timestamp);
       const today = new Date();
@@ -136,8 +134,6 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
       return groups;
     }, {} as Record<string, ClipboardEntry[]>);
 
-    // 4. Convert date groups to sections (preserving insertion order from reduce is usually fine for simple date sort, 
-    //    but purely relying on object key order can be risky. However, given input is sorted by time, keys are created in order.)
     Object.entries(dateGroups).forEach(([title, items]) => {
       sections.push({ title, items });
     });
@@ -147,13 +143,9 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
 
   return (
     <aside className="w-80 h-screen bg-(--color-bg) border-r border-(--color-border) flex flex-col overflow-hidden relative transition-colors duration-300">
-      {/* App Branding - Draggable */}
-      {/* App Branding - Draggable */}
-      {/* App Branding - Draggable */}
       <div className="px-5 py-4 border-b border-(--color-glass-border) bg-(--color-glass-surface) backdrop-blur-3xl z-20" data-tauri-drag-region>
         <div className="flex items-center justify-between" data-tauri-drag-region>
           <div className="flex items-center gap-4" data-tauri-drag-region>
-            {/* Traffic Lights */}
             <div className="flex items-center gap-2" data-tauri-drag-region>
               <button onClick={async () => (await import('@tauri-apps/api/window')).getCurrentWindow().close()} className="w-3 h-3 rounded-full bg-[#ff5f57] hover:brightness-110 active:brightness-90 transition-all shadow-inner" aria-label="Close" />
               <button onClick={async () => (await import('@tauri-apps/api/window')).getCurrentWindow().minimize()} className="w-3 h-3 rounded-full bg-[#febc2e] hover:brightness-110 active:brightness-90 transition-all shadow-inner" aria-label="Minimize" />
@@ -163,7 +155,6 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
               }} className="w-3 h-3 rounded-full bg-[#28c840] hover:brightness-110 active:brightness-90 transition-all shadow-inner" aria-label="Maximize" />
             </div>
 
-            {/* Logo & Brand */}
             <div className="flex items-center gap-2.5 pl-2 border-l border-(--color-glass-border)" data-tauri-drag-region>
               <div className="w-6 h-6 rounded-lg bg-linear-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-lg shadow-purple-500/30 rotate-3">
                 <div className="w-3.5 h-3.5 text-white">{Icons.logo || Icons.sync}</div>
@@ -223,7 +214,6 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
         </div>
       </div>
 
-      {/* History List */}
       <div className="flex-1 overflow-y-auto custom-scrollbar px-3 pb-4">
         {entrySections.length > 0 ? (
           entrySections.map(({ title, items }) => (
@@ -254,7 +244,6 @@ export const Sidebar: React.FC<DesktopSidebarProps> = ({
         )}
       </div>
 
-      {/* Sidebar Footer */}
       <div className="p-4 border-t border-(--color-border) bg-(--color-surface)/80 backdrop-blur-md">
         <button
           onClick={onClearHistory}

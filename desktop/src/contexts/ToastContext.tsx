@@ -41,9 +41,9 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     }
     // Handle AppError specifically if imported, but simpler string extraction works for now
     if ((error as any)?.userMessage) {
-        message = (error as any).userMessage;
+      message = (error as any).userMessage;
     }
-    
+
     showToast(message, 'error');
   }, [showToast]);
 
@@ -53,7 +53,7 @@ export const ToastProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       <div className="fixed top-6 left-0 right-0 z-50 pointer-events-none flex flex-col items-center gap-2">
         {toasts.map((toast) => (
           <div key={toast.id} className="animate-in fade-in slide-in-from-top-5 duration-300">
-             <Toast message={toast.message} type={toast.type} />
+            <Toast message={toast.message} type={toast.type} />
           </div>
         ))}
       </div>

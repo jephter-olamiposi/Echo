@@ -1,11 +1,6 @@
 import React from 'react';
 
-/* ─────────────────────────────────────────────────────────────────────────────
- * Input Component
- * 
- * Standardized text input with consistent styling and states.
- * Follows design system tokens for sizing and colors.
- * ───────────────────────────────────────────────────────────────────────────── */
+
 
 export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   label?: string;

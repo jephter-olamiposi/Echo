@@ -131,7 +131,6 @@ export const History: React.FC<MobileHistoryProps> = ({
 
   return (
     <div className="flex flex-col h-full bg-transparent w-full transition-colors duration-300">
-      {/* Sticky Header */}
       <div className="shrink-0 z-30 bg-transparent backdrop-blur-2xl border-b border-(--color-border) sticky top-0 transition-colors duration-300">
         <MobileHeader
           title={t('history')}
@@ -151,7 +150,6 @@ export const History: React.FC<MobileHistoryProps> = ({
           }
         />
 
-        {/* Search Input */}
         <div className="px-4 pb-4">
           <div className="relative group">
             <div className="absolute -inset-0.5 rounded-2xl opacity-0 group-focus-within:opacity-100 bg-linear-to-r from-purple-500/40 via-pink-500/40 to-purple-500/40 blur-lg transition-opacity duration-500" />
@@ -180,7 +178,6 @@ export const History: React.FC<MobileHistoryProps> = ({
           </div>
         </div>
 
-        {/* Filter Pills - Full Width Grid */}
         <div className="px-4 pb-4">
           <div className="grid grid-cols-4 gap-2 w-full">
             {filterOptions.map(({ type, label }) => (
@@ -195,9 +192,7 @@ export const History: React.FC<MobileHistoryProps> = ({
         </div>
       </div>
 
-      {/* Scrollable Content */}
       <div ref={containerRef} className="flex-1 overflow-y-auto custom-scrollbar relative bg-transparent pb-32!">
-        {/* Pull to Refresh */}
         <div
           className="absolute top-0 left-0 right-0 flex justify-center overflow-hidden pointer-events-none z-10"
           style={{ height: `${pullHeight}px` }}

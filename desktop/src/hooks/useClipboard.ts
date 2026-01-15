@@ -20,7 +20,6 @@ export function useClipboard() {
   const lastSentRef = useRef<string>("");
   const { showError } = useToast();
 
-  // Load history on mount
   useEffect(() => {
     const init = async () => {
       try {
@@ -32,9 +31,6 @@ export function useClipboard() {
         }
       } catch (e) {
         console.error("Failed to load history", e);
-        // Silent failure for init is usually better than a toast loop on startup,
-        // but we could log it or show a subtle notification if critical.
-        // For now, let's keep it silent or log to a remote service in a real app.
       }
     };
     init();
@@ -57,16 +53,13 @@ export function useClipboard() {
       source: "local" | "remote" = "local",
       deviceName?: string
     ) => {
-      // Reject system messages
       const systemMessages = ["ping", "handshake", "__JOIN__", "__LEAVE__"];
       if (systemMessages.includes(text) || systemMessages.includes(text.trim()))
         return;
 
-      // Hardened check for duplicates (ignore whitespace diffs and line endings)
       const normalize = (s: string) => s.replace(/\r\n/g, "\n").trim();
       const normalizedText = normalize(text);
 
-      // Immediate check against last sent to avoid redundant processing
       if (
         text === lastSentRef.current ||
         normalizedText === normalize(lastSentRef.current)
@@ -76,7 +69,6 @@ export function useClipboard() {
 
       let wasAdded = true;
       setHistory((prev) => {
-        // More robust check: is it already in history?
         if (prev.some((entry) => normalize(entry.content) === normalizedText)) {
           wasAdded = false;
           return prev;
@@ -151,11 +143,9 @@ export function useClipboard() {
     haptic.medium();
   }, []);
 
-  // Get the most recent entry from a remote device (for tap-to-sync)
   const getLatestRemoteEntry = useCallback((): ClipboardEntry | null => {
     const remoteEntries = history.filter((entry) => entry.source === "remote");
     if (remoteEntries.length === 0) return null;
-    // History is already sorted newest-first
     return remoteEntries[0];
   }, [history]);
 

@@ -37,31 +37,31 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
   };
 
   return (
-    <div className="flex flex-col gap-10 w-full animate-in fade-in slide-in-from-bottom-6 duration-1000">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold text-(--color-text-primary)">Welcome back</h1>
-        <p className="text-(--color-text-tertiary) text-[14px]">Sign in to continue</p>
+    <div className="flex flex-col gap-6 landscape:gap-4 lg:gap-10 w-full animate-in fade-in slide-in-from-bottom-6 duration-1000 px-safe">
+      <div className="space-y-1.5 landscape:space-y-1">
+        <h1 className="text-2xl landscape:text-xl lg:text-3xl font-semibold text-(--color-text-primary)">Welcome back</h1>
+        <p className="text-(--color-text-tertiary) text-[13px] landscape:text-[12px]">Sign in to continue</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="space-y-2">
-          <label htmlFor="login-email" className="text-[13px] font-medium text-(--color-text-secondary) pl-1">Email</label>
+      <form onSubmit={handleSubmit} className="space-y-5 landscape:space-y-3">
+        <div className="space-y-1.5 landscape:space-y-1">
+          <label htmlFor="login-email" className="text-[13px] landscape:text-[12px] font-medium text-(--color-text-secondary) pl-1">Email</label>
           <input
             id="login-email"
             type="email"
             required
             autoComplete="email"
-            className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/40 focus:bg-white/10 transition-all shadow-inner"
+            className="w-full h-11 landscape:h-10 px-4 bg-white/5 border border-white/10 rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/40 focus:bg-white/10 transition-all shadow-inner"
             placeholder="name@example.com"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
           />
         </div>
 
-        <div className="space-y-2">
+        <div className="space-y-1.5 landscape:space-y-1">
           <div className="flex justify-between items-center px-1">
-            <label htmlFor="login-password" className="text-[13px] font-medium text-(--color-text-secondary)">Password</label>
-            <button type="button" className="text-[13px] text-purple-400 hover:text-purple-300 transition-colors font-medium">
+            <label htmlFor="login-password" className="text-[13px] landscape:text-[12px] font-medium text-(--color-text-secondary)">Password</label>
+            <button type="button" className="text-[12px] landscape:text-[11px] text-purple-400 hover:text-purple-300 transition-colors font-medium">
               Forgot?
             </button>
           </div>
@@ -71,7 +71,7 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
               type={showPassword ? "text" : "password"}
               required
               autoComplete="current-password"
-              className="w-full h-12 px-4 pr-12 bg-white/5 border border-white/10 rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/40 focus:bg-white/10 transition-all shadow-inner"
+              className="w-full h-11 landscape:h-10 px-4 pr-12 bg-white/5 border border-white/10 rounded-xl text-(--color-text-primary) placeholder:text-(--color-text-muted) focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-500/40 focus:bg-white/10 transition-all shadow-inner"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
@@ -89,7 +89,7 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
         </div>
 
         {error && (
-          <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-[13px] font-medium text-center animate-shake">
+          <div className="p-3 landscape:p-2 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-[13px] landscape:text-[12px] font-medium text-center animate-shake">
             {error}
           </div>
         )}
@@ -97,16 +97,16 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
         <button
           type="submit"
           disabled={loading}
-          className="w-full h-12 bg-(--color-text-primary) text-(--color-bg) rounded-xl font-bold text-[15px] hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-50 shadow-lg shadow-purple-500/10"
+          className="w-full h-11 landscape:h-10 bg-(--color-text-primary) text-(--color-bg) rounded-xl font-bold text-[15px] landscape:text-[14px] hover:opacity-90 active:scale-[0.97] transition-all disabled:opacity-50 shadow-lg shadow-purple-500/10"
         >
           {loading ? 'Signing in...' : 'Sign in'}
         </button>
       </form>
 
-      <div className="text-center pt-2">
+      <div className="text-center pt-2 landscape:pt-1 pb-safe">
         <button
           onClick={onSwitchToRegister}
-          className="text-[14px] text-(--color-text-secondary) hover:text-(--color-text-primary) transition-colors"
+          className="text-[13px] landscape:text-[12px] text-(--color-text-secondary) hover:text-(--color-text-primary) transition-colors"
         >
           Don't have an account? <span className="font-medium text-purple-400 ml-1">Sign up</span>
         </button>

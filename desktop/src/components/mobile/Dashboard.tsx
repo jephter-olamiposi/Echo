@@ -14,12 +14,7 @@ import { QuickAction } from '../ui/QuickAction';
 import { StatCard } from '../ui/StatCard';
 import { useLanguage } from '../../contexts/LanguageContext';
 
-/* ─────────────────────────────────────────────────────────────────────────────
- * Dashboard Component
- * 
- * Main mobile dashboard showing connection status, latest clip, 
- * recent history, and quick actions.
- * ───────────────────────────────────────────────────────────────────────────── */
+
 
 interface MobileDashboardProps {
   isLoading?: boolean;
@@ -72,7 +67,6 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
         ref={containerRef}
         className="flex-1 overflow-y-auto custom-scrollbar pb-32! relative"
       >
-        {/* Pull to Refresh Indicator */}
         <div
           className="absolute top-0 left-0 w-full flex items-center justify-center pointer-events-none z-40"
           style={{ height: `${pullHeight}px` }}
@@ -93,7 +87,6 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
         </div>
 
         <div className="flex flex-col gap-8 w-full px-4 pt-2">
-          {/* Hero Status */}
           <div className="flex justify-center py-6">
             {isLoading ? (
               <div className="flex flex-col items-center gap-3">
@@ -105,8 +98,8 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
               <div className="flex flex-col items-center gap-3">
                 <div
                   className={`w-20 h-20 rounded-3xl flex items-center justify-center border-2 transition-all duration-500 ${connected
-                      ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.15)]'
-                      : 'bg-(--color-surface) text-(--color-text-tertiary) border-(--color-border)'
+                    ? 'bg-purple-500/10 text-purple-400 border-purple-500/30 shadow-[0_0_30px_rgba(168,85,247,0.15)]'
+                    : 'bg-(--color-surface) text-(--color-text-tertiary) border-(--color-border)'
                     }`}
                   onClick={() => haptic.medium()}
                 >
@@ -118,7 +111,6 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
                   {connected ? t('ready_to_sync') : t('waiting_for_device')}
                 </h2>
                 <StatusBadge status={connected ? 'online' : 'offline'} />
-                {/* Syncing indicator */}
                 {syncing && (
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/10 border border-purple-500/20 animate-pulse">
                     <div className="w-3 h-3 text-purple-400 animate-spin">
@@ -129,7 +121,6 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
                     </span>
                   </div>
                 )}
-                {/* Queued items indicator */}
                 {!connected && queuedCount && queuedCount > 0 && (
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20">
                     <span className="text-[12px] text-amber-400 font-medium">
@@ -141,7 +132,6 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
             )}
           </div>
 
-          {/* Stats Bar */}
           {isLoading ? (
             <Card variant="ghost" padding="lg" className="flex items-center justify-center gap-5">
               <Skeleton variant="rectangular" className="w-14 h-12 rounded-xl!" />
@@ -158,7 +148,6 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
             </Card>
           )}
 
-          {/* Latest Item Preview */}
           {!isLoading && latestItem && (
             <Card variant="default" padding="lg" className="rounded-2xl">
               <div className="flex justify-between items-center mb-3">
@@ -193,7 +182,6 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
             </Card>
           )}
 
-          {/* Recent History Preview */}
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between px-1">
               <h3 className="text-[13px] font-medium text-(--color-text-tertiary)">{t('recent')}</h3>
@@ -232,7 +220,6 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
             )}
           </div>
 
-          {/* Quick Actions */}
           <div className="flex flex-col gap-4">
             <h3 className="text-[13px] font-medium text-(--color-text-tertiary) pl-1">{t('quick_actions')}</h3>
             <div className="grid grid-cols-2 gap-3">
@@ -267,3 +254,4 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
     </div>
   );
 };
+

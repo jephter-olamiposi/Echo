@@ -67,7 +67,6 @@ export const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }
 
       <div className="flex-1 lg:max-w-xl flex flex-col lg:flex-row lg:items-center lg:justify-center relative bg-(--color-bg) lg:bg-transparent">
         <div className="lg:hidden w-full h-full flex flex-col relative z-10">
-          {/* Mobile Header/Logo - Safe Area Aware */}
           <div className="w-full pt-[calc(env(safe-area-inset-top,0px)+1rem)] lg:pt-[calc(env(safe-area-inset-top,0px)+1.5rem)] pb-4 lg:pb-6 flex items-center justify-center shrink-0 landscape:pt-2 landscape:pb-2">
             <div className="flex items-center gap-3 p-1 lg:p-1.5 pl-1.5 pr-3 lg:pr-4 rounded-xl bg-(--color-surface-raised) border border-(--color-border) shadow-xl landscape:scale-90">
               <div className="w-8 h-8 lg:w-9 lg:h-9 bg-(--color-text-primary) rounded-lg flex items-center justify-center shadow-md rotate-6">
@@ -87,7 +86,6 @@ export const AuthLayout: React.FC<{ children: React.ReactNode }> = ({ children }
           </div>
         </div>
 
-        {/* Desktop Content (Centered) */}
         <div className="hidden lg:block w-full max-w-md relative z-10 p-12 bg-(--color-glass-surface) backdrop-blur-3xl border border-(--color-glass-border) rounded-2xl shadow-2xl shadow-(--color-glass-shadow)">
           {children}
         </div>

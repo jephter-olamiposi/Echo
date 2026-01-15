@@ -22,7 +22,6 @@ interface MobileSettingsProps {
   onShowThemePicker?: () => void;
   onShowLanguagePicker?: () => void;
   onShowNotifications?: () => void;
-  onExportData?: () => void;
 }
 
 interface SettingsRowProps {
@@ -90,8 +89,7 @@ export const Settings: React.FC<MobileSettingsProps> = ({
   onViewHistory,
   onShowThemePicker,
   onShowLanguagePicker,
-  onShowNotifications,
-  onExportData
+  onShowNotifications
 }) => {
   const { theme } = useTheme();
   const { language } = useLanguage();
@@ -121,23 +119,18 @@ export const Settings: React.FC<MobileSettingsProps> = ({
       <div className="flex-1 overflow-y-auto pb-32">
         <div className="px-4 py-6 flex flex-col gap-8">
 
-          {/* Account Header */}
           <div className="flex flex-col items-center py-4">
-            {/* Avatar with first letter */}
             <div className="w-20 h-20 rounded-full bg-linear-to-br from-purple-500 to-blue-500 flex items-center justify-center mb-3 shadow-lg">
               <span className="text-3xl font-semibold text-white uppercase">
                 {email.charAt(0)}
               </span>
             </div>
-            {/* Email */}
             <span className="text-[15px] text-(--color-text-secondary) mb-1">{email}</span>
-            {/* Subscription badge */}
             <div className="px-3 py-1 rounded-full bg-(--color-bg-tertiary) border border-(--color-border)">
               <span className="text-[12px] font-medium text-(--color-text-secondary)">Free Plan</span>
             </div>
           </div>
 
-          {/* Data & Storage */}
           <SettingsGroup label="Data & storage">
             <SettingsRow
               icon={Icons.history}
@@ -153,15 +146,8 @@ export const Settings: React.FC<MobileSettingsProps> = ({
               onClick={() => { haptic.medium(); onClearHistory(); }}
               destructive
             />
-            <SettingsRow
-              icon={Icons.download}
-              iconBg="bg-(--color-bg-tertiary) text-(--color-text-tertiary)"
-              label="Export data"
-              onClick={() => { haptic.light(); onExportData?.(); }}
-            />
           </SettingsGroup>
 
-          {/* Devices */}
           <SettingsGroup label="Devices">
             <SettingsRow
               icon={Icons.devices}
@@ -190,7 +176,6 @@ export const Settings: React.FC<MobileSettingsProps> = ({
             />
           </SettingsGroup>
 
-          {/* Preferences */}
           <SettingsGroup label="Preferences">
             <SettingsRow
               icon={Icons.bell}
@@ -214,7 +199,6 @@ export const Settings: React.FC<MobileSettingsProps> = ({
             />
           </SettingsGroup>
 
-          {/* Support */}
           <SettingsGroup label="Support">
             <SettingsRow
               icon={Icons.help}
@@ -236,7 +220,6 @@ export const Settings: React.FC<MobileSettingsProps> = ({
             />
           </SettingsGroup>
 
-          {/* Sign out */}
           <div className="px-6">
             <button
               className="w-full h-11 rounded-xl bg-(--color-bg-secondary) border border-(--color-border) text-red-500/80 text-[14px] font-medium active:scale-[0.98] transition-all"
@@ -246,7 +229,6 @@ export const Settings: React.FC<MobileSettingsProps> = ({
             </button>
           </div>
 
-          {/* Footer */}
           <div className="flex flex-col items-center gap-0.5 pt-4 pb-12">
             <span className="text-[11px] text-(--color-text-tertiary)">Echo v1.0.0</span>
             <span className="text-[11px] text-(--color-text-tertiary)">Encrypted & Open Source</span>

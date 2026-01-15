@@ -1,11 +1,7 @@
 import React from 'react';
 import { haptic } from '../../utils/haptics';
 
-/* ─────────────────────────────────────────────────────────────────────────────
- * StatCard Component
- * 
- * Displays a stat value with label, optionally interactive.
- * ───────────────────────────────────────────────────────────────────────────── */
+
 
 export interface StatCardProps {
   value: string | number;
@@ -13,12 +9,12 @@ export interface StatCardProps {
   onClick?: () => void;
 }
 
-export const StatCard: React.FC<StatCardProps> = ({ 
-  value, 
-  label, 
-  onClick 
+export const StatCard: React.FC<StatCardProps> = ({
+  value,
+  label,
+  onClick
 }) => (
-  <div 
+  <div
     className={`
       flex flex-col items-center gap-0.5 flex-1 py-2
       ${onClick ? 'cursor-pointer active:opacity-70 hover:bg-(--color-surface-raised) rounded-lg transition-colors' : ''}

@@ -80,7 +80,6 @@ impl ClipboardHistoryRepository {
         .execute(&self.pool)
         .await?;
 
-        // Keep only last 100 messages per user
         sqlx::query!(
             r#"
             DELETE FROM clipboard_history 

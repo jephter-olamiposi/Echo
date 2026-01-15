@@ -1,11 +1,6 @@
 import React from 'react';
 
-/* ─────────────────────────────────────────────────────────────────────────────
- * StatusBadge Component
- * 
- * Visual indicator for connection/sync status.
- * Includes animated pulse for active states.
- * ───────────────────────────────────────────────────────────────────────────── */
+
 
 export type StatusType = 'online' | 'offline' | 'connecting' | 'syncing' | 'error';
 
@@ -88,7 +83,7 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({
       `.trim().replace(/\s+/g, ' ')}
     >
       {showDot && (
-        <div 
+        <div
           className={`
             ${styles.dot} rounded-full ${config.dotColor}
             ${config.pulse ? 'animate-pulse' : ''}

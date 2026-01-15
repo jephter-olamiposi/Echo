@@ -1,15 +1,7 @@
 import React, { useEffect, useCallback } from 'react';
 import { Icons } from '../Icons';
 
-/* ─────────────────────────────────────────────────────────────────────────────
- * Modal Component
- * 
- * Responsive modal/bottom-sheet that adapts to screen size.
- * - Mobile: Bottom sheet with rounded top corners
- * - Desktop: Centered modal with zoom animation
- * 
- * Uses design system tokens for consistent styling.
- * ───────────────────────────────────────────────────────────────────────────── */
+
 
 export interface ModalProps {
   isOpen: boolean;
@@ -38,18 +30,18 @@ export const Modal: React.FC<ModalProps> = ({
   size = 'md',
   className = ''
 }) => {
-  // Memoized escape handler
+
   const handleEscape = useCallback((e: KeyboardEvent) => {
     if (e.key === 'Escape' && isOpen) onClose();
   }, [isOpen, onClose]);
 
-  // Escape key listener
+
   useEffect(() => {
     document.addEventListener('keydown', handleEscape);
     return () => document.removeEventListener('keydown', handleEscape);
   }, [handleEscape]);
 
-  // Prevent body scroll when modal is open
+
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -70,14 +62,12 @@ export const Modal: React.FC<ModalProps> = ({
       aria-modal="true"
       aria-labelledby="modal-title"
     >
-      {/* Backdrop */}
       <div
         className="absolute inset-0 bg-(--color-surface-overlay) backdrop-blur-sm animate-in fade-in duration-300"
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* Modal Container */}
       <div
         className={`
           relative w-full ${sizeClasses[size]}
@@ -92,7 +82,6 @@ export const Modal: React.FC<ModalProps> = ({
         `.trim().replace(/\s+/g, ' ')}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
         <div className="p-6 pb-2 md:pb-6">
           <div className="flex items-center justify-between mb-2">
             <h2
@@ -115,13 +104,11 @@ export const Modal: React.FC<ModalProps> = ({
             </p>
           )}
 
-          {/* Content */}
           <div className="mt-4">
             {children}
           </div>
         </div>
 
-        {/* Footer */}
         {footer && (
           <div className="bg-white/5 border-t border-white/5 p-6 md:p-4 flex md:justify-end gap-3 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] md:pb-4">
             {footer}

@@ -1,6 +1,4 @@
-/**
- * Mobile Components Barrel Export
- */
+
 
 export { Dashboard } from "./Dashboard";
 export { History } from "./History";

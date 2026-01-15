@@ -268,13 +268,11 @@ fn check_rate_custom(
 impl AppState {
     /// Add message to both in-memory cache and database
     pub fn add_to_history(&self, user_id: Uuid, msg: ClipboardMessage) {
-        // Add to in-memory cache for fast access
         let mut entry = self.history.entry(user_id).or_default();
         let history = entry.value_mut();
         history.insert(0, msg.clone());
         history.truncate(MAX_HISTORY_SIZE);
 
-        // Persist to database (fire-and-forget for performance)
         let pool = self.pool.clone();
         tokio::spawn(async move {
             use crate::db::ClipboardHistoryRepository;
@@ -287,7 +285,6 @@ impl AppState {
 
     /// Get history - first try cache, then fall back to database
     pub fn get_history(&self, user_id: &Uuid) -> Vec<ClipboardMessage> {
-        // Return cached history if available
         self.history
             .get(user_id)
             .map(|h| h.value().clone())
@@ -347,7 +344,6 @@ impl AppState {
     pub async fn clear_history(&self, user_id: Uuid) -> Result<(), AppError> {
         self.history.remove(&user_id);
 
-        // Also clear from database
         let repo = crate::db::ClipboardHistoryRepository::new(self.pool.clone());
         repo.clear(&user_id).await
     }

@@ -96,7 +96,6 @@ const toBase64 = (b: Uint8Array) => {
   const CHUNK_SIZE = 0x8000;
   const arr = [];
   for (let i = 0; i < b.length; i += CHUNK_SIZE) {
-    // Convert Uint8Array subarray to regular array for apply()
     const chunk = Array.from(b.subarray(i, i + CHUNK_SIZE));
     arr.push(String.fromCharCode.apply(null, chunk));
   }

@@ -38,13 +38,13 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
   };
 
   return (
-    <div className="flex flex-col gap-8 w-full animate-in fade-in slide-in-from-bottom-6 duration-1000">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold text-(--color-text-primary)">Create account</h1>
-        <p className="text-(--color-text-tertiary) text-[14px]">Join Echo to sync your clipboard</p>
+    <div className="flex flex-col gap-5 landscape:gap-3 lg:gap-8 w-full animate-in fade-in slide-in-from-bottom-6 duration-1000 px-safe">
+      <div className="space-y-1.5 landscape:space-y-1">
+        <h1 className="text-2xl landscape:text-xl lg:text-3xl font-semibold text-(--color-text-primary)">Create account</h1>
+        <p className="text-(--color-text-tertiary) text-[13px] landscape:text-[12px]">Join Echo to sync your clipboard</p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-4 landscape:space-y-2.5">
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <label htmlFor="register-firstname" className="text-[13px] font-medium text-(--color-text-secondary) pl-1">First name</label>
@@ -101,7 +101,6 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
-          {/* Strength Indicator */}
           {password && (
             <div className="flex items-center justify-between mt-2 px-1">
               <div className="flex gap-1.5 w-1/2">
@@ -113,19 +112,19 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
                     <div
                       key={level}
                       className={`h-1.5 flex-1 rounded-full transition-all duration-500 ${level <= strength
-                          ? strength === 4 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]'
-                            : strength === 3 ? 'bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.4)]'
-                              : strength === 2 ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]'
-                                : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]'
-                          : 'bg-white/5'
+                        ? strength === 4 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]'
+                          : strength === 3 ? 'bg-sky-500 shadow-[0_0_8px_rgba(14,165,233,0.4)]'
+                            : strength === 2 ? 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.4)]'
+                              : 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.4)]'
+                        : 'bg-white/5'
                         }`}
                     />
                   );
                 })}
               </div>
               <span className={`text-[11px] font-bold tracking-wider uppercase ${password.length >= 12 ? 'text-emerald-500' :
-                  password.length >= 10 ? 'text-sky-500' :
-                    password.length >= 8 ? 'text-amber-500' : 'text-rose-500'
+                password.length >= 10 ? 'text-sky-500' :
+                  password.length >= 8 ? 'text-amber-500' : 'text-rose-500'
                 }`}>
                 {password.length >= 12 ? 'Strong' :
                   password.length >= 10 ? 'Good' :
@@ -150,7 +149,7 @@ export const Register: React.FC<RegisterProps> = ({ initialEmail = '', onSuccess
         </button>
       </form>
 
-      <div className="text-center">
+      <div className="text-center pb-safe">
         <button
           onClick={onSwitchToLogin}
           className="text-[14px] text-(--color-text-secondary) hover:text-(--color-text-primary) transition-colors"

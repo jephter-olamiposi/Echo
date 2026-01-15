@@ -118,15 +118,12 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         '--orb-color-2': currentSlide.meshColors.orb2,
       }}
     >
-      {/* Premium Mesh Gradient Background */}
       <div className="mesh-gradient-bg transition-colors duration-700" />
 
-      {/* Floating Gradient Orbs */}
       <div className="gradient-orb gradient-orb-1 transition-all duration-700" />
       <div className="gradient-orb gradient-orb-2 transition-all duration-700" />
       <div className="gradient-orb gradient-orb-3 transition-all duration-700" />
 
-      {/* Decorative Glass Shapes */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-1">
         <div className="glass-shape shape-sphere float-slow w-32 h-32 top-[15%] left-[10%] opacity-40 blur-[2px] transition-all duration-500"
           style={{ transform: `translateX(${slide * 20}px) translateY(${slide * -10}px)` }} />
@@ -137,7 +134,6 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         <div className="glass-shape shape-ring float-medium w-64 h-64 bottom-[-10%] right-[10%] opacity-15 blur-[4px] transition-all duration-500" />
       </div>
 
-      {/* Skip Button - Hidden on last slide */}
       {slide < slides.length - 1 && (
         <div className="absolute top-0 right-4 z-20 pt-safe">
           <button
@@ -149,7 +145,6 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         </div>
       )}
 
-      {/* Slides Container */}
       <div className="flex-1 relative">
         <div
           className="absolute inset-0 flex transition-transform duration-500 ease-out pt-safe"
@@ -157,7 +152,6 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         >
           {slides.map((s, i) => (
             <div key={i} className="w-full h-full shrink-0 flex flex-col items-center justify-center text-center px-8">
-              {/* Icon Container with outer glow */}
               <div className="relative mb-14 transition-all duration-500"
                 style={{ transform: slide === i ? 'scale(1)' : 'scale(0.8)', opacity: slide === i ? 1 : 0.5 }}>
                 <div className={`absolute inset-0 blur-2xl opacity-40 rounded-3xl bg-linear-to-br ${s.gradient} transition-all duration-500`} />
@@ -168,13 +162,11 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
                 </div>
               </div>
 
-              {/* Title */}
               <h1 className="text-3xl font-semibold mb-5 leading-[1.2] whitespace-pre-line text-(--color-text-primary) transition-all duration-500"
                 style={{ transform: slide === i ? 'translateY(0)' : 'translateY(20px)', opacity: slide === i ? 1 : 0 }}>
                 {s.title}
               </h1>
 
-              {/* Description */}
               <p className="text-(--color-text-tertiary) text-base leading-relaxed max-w-65 mx-auto font-normal transition-all duration-500 delay-75"
                 style={{ transform: slide === i ? 'translateY(0)' : 'translateY(20px)', opacity: slide === i ? 1 : 0 }}>
                 {s.desc}
@@ -184,9 +176,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
         </div>
       </div>
 
-      {/* Bottom Controls */}
       <div className="px-6 pb-safe pt-4 flex flex-col gap-8 z-10 relative mb-8">
-        {/* Pagination Dots */}
         <div className="flex justify-center gap-2.5">
           {slides.map((_, i) => (
             <button
@@ -203,7 +193,6 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           ))}
         </div>
 
-        {/* Action Button */}
         {slide === slides.length - 1 ? (
           <button
             onClick={handleNext}

@@ -44,6 +44,17 @@ mod desktop {
                     let mut last_change = Instant::now();
                     eprintln!("[clipboard] monitor started (adaptive polling)");
 
+                    // Emit initial clipboard content if non-empty
+                    if !last_text.is_empty() {
+                        eprintln!(
+                            "[clipboard] emitting initial content: {} chars",
+                            last_text.len()
+                        );
+                        if let Err(e) = app.emit("clipboard-init", last_text.clone()) {
+                            eprintln!("[clipboard] init emit error: {e}");
+                        }
+                    }
+
                     loop {
                         // Adaptive polling: fast after recent activity, slow when idle
                         let idle_secs = last_change.elapsed().as_secs();

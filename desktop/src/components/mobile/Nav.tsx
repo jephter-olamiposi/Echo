@@ -4,11 +4,7 @@ import { NavItem } from '../ui/NavItem';
 import { MobileView } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 
-/* ─────────────────────────────────────────────────────────────────────────────
- * Bottom Navigation
- * 
- * Uses NavItem primitive for consistent styling and animations.
- * ───────────────────────────────────────────────────────────────────────────── */
+
 
 interface NavProps {
   currentView: MobileView;

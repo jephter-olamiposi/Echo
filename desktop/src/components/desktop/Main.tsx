@@ -44,15 +44,12 @@ export const Main: React.FC<DesktopMainProps> = ({
 }) => {
   return (
     <main className="flex-1 h-screen bg-(--color-bg) flex flex-col overflow-hidden relative">
-      {/* Premium Mesh Gradient Background */}
       <div className="mesh-gradient-bg" />
 
-      {/* Floating Gradient Orbs */}
       <div className="gradient-orb gradient-orb-1" />
       <div className="gradient-orb gradient-orb-2" />
       <div className="gradient-orb gradient-orb-3" />
 
-      {/* Decorative Glass Shapes - Subtle for workflow focus */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-1 opacity-40">
         <div className="glass-shape shape-sphere float-slow w-64 h-64 top-[-5%] right-[10%] opacity-15 blur-[4px]" />
         <div className="glass-shape shape-ring rotate-slow w-96 h-96 bottom-[-10%] left-[-5%] opacity-10" />
@@ -115,7 +112,6 @@ export const Main: React.FC<DesktopMainProps> = ({
               </div>
             </div>
 
-            {/* Meta info bar */}
             <div className="flex items-center gap-6 px-6 py-4 bg-(--color-surface)/50 border border-(--color-border) rounded-2xl mb-6 backdrop-blur-sm">
               {devices.length > 1 && (
                 <>
@@ -139,7 +135,6 @@ export const Main: React.FC<DesktopMainProps> = ({
               </div>
             </div>
 
-            {/* Content preview */}
             <div className="flex-1 relative overflow-hidden mb-6">
               <div className="absolute inset-0 bg-(--color-surface-raised)/30 border border-(--color-border) rounded-3xl backdrop-blur-sm" />
               <div className="relative h-full p-8 overflow-auto custom-scrollbar">
@@ -150,9 +145,7 @@ export const Main: React.FC<DesktopMainProps> = ({
             </div>
           </div>
         ) : (
-          /* ===== EMPTY STATE / DASHBOARD HOME ===== */
           <div className="flex-1 flex flex-col h-full bg-transparent min-w-0 transition-colors duration-300">
-            {/* Top Header Bar */}
             <div className="h-20 border-b border-(--color-border) flex items-center justify-between px-8 bg-(--color-surface)/50 backdrop-blur-xl shrink-0 z-10">
               <div className="flex items-center gap-6">
                 <div className="flex items-center gap-2 shrink-0 px-3 py-1.5 rounded-full bg-(--color-surface-raised)/50 border border-(--color-border)">
@@ -199,11 +192,9 @@ export const Main: React.FC<DesktopMainProps> = ({
               </div>
             </div>
 
-            {/* Main Center Content */}
             <div className="flex-1 flex flex-col items-center p-8 relative overflow-y-auto custom-scrollbar">
 
               <div className="relative z-10 max-w-3xl w-full flex flex-col items-center animate-in fade-in zoom-in-95 duration-700">
-                {/* Hero Icon */}
                 <div className="relative mb-10 group">
                   <div className="absolute inset-0 bg-linear-to-br from-purple-500 to-blue-600 blur-3xl opacity-30 group-hover:opacity-40 transition-opacity duration-700 animate-pulse" />
                   <div className="relative w-28 h-28 rounded-[2rem] bg-(--color-glass-surface) backdrop-blur-3xl border border-(--color-glass-border) flex items-center justify-center shadow-2xl rotate-3 group-hover:rotate-0 transition-all duration-700 transform-gpu">
@@ -216,9 +207,7 @@ export const Main: React.FC<DesktopMainProps> = ({
                   Your clipboard syncs across all devices in real-time with end-to-end encryption.
                 </p>
 
-                {/* 2x2 Feature Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 w-full mb-10">
-                  {/* Connection Card */}
                   <div className="bg-(--color-glass-surface) backdrop-blur-3xl p-6 rounded-2xl border border-(--color-glass-border) flex items-center gap-5 hover:bg-(--color-highlight) hover:border-(--color-border-focus) transition-all duration-300 group shadow-lg shadow-(--color-glass-shadow)">
                     <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 transition-all duration-500 shadow-lg ${connected ? 'bg-emerald-500/10 text-emerald-400 group-hover:bg-emerald-500/20 group-hover:scale-110' : 'bg-red-500/10 text-red-400 group-hover:bg-red-500/20 group-hover:scale-110'}`}>
                       <div className="w-6 h-6">{Icons.sync}</div>
@@ -231,7 +220,6 @@ export const Main: React.FC<DesktopMainProps> = ({
                     </div>
                   </div>
 
-                  {/* Encryption Card */}
                   <div className="bg-(--color-glass-surface) backdrop-blur-3xl p-6 rounded-2xl border border-(--color-glass-border) flex items-center gap-5 hover:bg-(--color-highlight) hover:border-(--color-border-focus) transition-all duration-300 group shadow-lg shadow-(--color-glass-shadow)">
                     <div className="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center shrink-0 transition-all duration-500 shadow-lg group-hover:bg-blue-500/20 group-hover:scale-110">
                       <div className="w-6 h-6">{Icons.shield}</div>
@@ -242,7 +230,6 @@ export const Main: React.FC<DesktopMainProps> = ({
                     </div>
                   </div>
 
-                  {/* History Card */}
                   <div className="bg-(--color-glass-surface) backdrop-blur-3xl p-6 rounded-2xl border border-(--color-glass-border) flex items-center gap-5 hover:bg-(--color-highlight) hover:border-(--color-border-focus) transition-all duration-300 group shadow-lg shadow-(--color-glass-shadow)">
                     <div className="w-12 h-12 rounded-2xl bg-purple-500/10 text-purple-400 flex items-center justify-center shrink-0 transition-all duration-500 shadow-lg group-hover:bg-purple-500/20 group-hover:scale-110">
                       <div className="w-6 h-6">{Icons.history}</div>
@@ -253,7 +240,6 @@ export const Main: React.FC<DesktopMainProps> = ({
                     </div>
                   </div>
 
-                  {/* Devices Card */}
                   <div
                     className="bg-(--color-glass-surface) backdrop-blur-3xl p-6 rounded-2xl border border-(--color-glass-border) flex items-center gap-5 hover:bg-(--color-highlight) hover:border-(--color-border-focus) transition-all duration-300 group shadow-lg shadow-(--color-glass-shadow) cursor-pointer"
                     onClick={onManageDevices}
@@ -268,7 +254,6 @@ export const Main: React.FC<DesktopMainProps> = ({
                   </div>
                 </div>
 
-                {/* Background Mode Toggle */}
                 <div
                   className="w-full bg-(--color-surface-raised)/30 rounded-xl border border-(--color-border) p-5 mb-8 flex items-center justify-between cursor-pointer hover:bg-(--color-surface-raised)/50 transition-all group backdrop-blur-sm"
                   onClick={onToggleBackgroundMode}
@@ -282,13 +267,11 @@ export const Main: React.FC<DesktopMainProps> = ({
                       <p className="text-(--color-text-tertiary) text-xs">Keep Echo running when window is closed</p>
                     </div>
                   </div>
-                  {/* Toggle Switch */}
                   <div className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${backgroundModeEnabled ? 'bg-green-500' : 'bg-(--color-surface-raised) border border-(--color-border)'}`}>
                     <div className={`w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-300 ${backgroundModeEnabled ? 'translate-x-6' : 'translate-x-0'}`} />
                   </div>
                 </div>
 
-                {/* Bottom Actions */}
                 <div className="flex flex-col sm:flex-row items-center gap-4 w-full justify-center">
                   <button
                     onClick={onLinkDevice}

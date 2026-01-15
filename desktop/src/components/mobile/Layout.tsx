@@ -8,12 +8,9 @@ import { DetailModal } from './DetailModal';
 import { MobileView, ClipboardEntry, ContentType, LinkedDevice } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
 import { useTheme } from '../../contexts/ThemeContext';
-import { save } from '@tauri-apps/plugin-dialog';
-import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 
 interface MobileLayoutProps {
-  // State props - passed directly
   history: ClipboardEntry[];
   devices: LinkedDevice[];
   mobileView: MobileView;
@@ -27,7 +24,6 @@ interface MobileLayoutProps {
   syncing?: boolean;
   queuedCount?: number;
 
-  // Action handlers - passed directly
   onCopy: (text: string) => void;
   onDelete: (id: string) => void;
   onClearHistory: () => void;
@@ -45,7 +41,6 @@ interface MobileLayoutProps {
 }
 
 export const MobileLayout: React.FC<MobileLayoutProps> = ({
-  // State
   history,
   devices,
   mobileView,
@@ -58,7 +53,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   email,
   syncing,
   queuedCount,
-  // Actions
   onCopy,
   onDelete,
   onClearHistory,
@@ -113,35 +107,9 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
     setShowNotifications(false);
   };
 
-  const handleExportData = async () => {
-    const exportData = {
-      exportedAt: new Date().toISOString(),
-      email,
-      historyCount: history.length,
-      history: history.map(entry => ({
-        id: entry.id,
-        content: entry.content,
-        type: entry.contentType,
-        source: entry.source,
-        createdAt: entry.timestamp,
-        pinned: entry.pinned
-      }))
-    };
-
-    const filePath = await save({
-      title: 'Export Echo Data',
-      defaultPath: `echo-export-${new Date().toISOString().split('T')[0]}.json`,
-      filters: [{ name: 'JSON', extensions: ['json'] }]
-    });
-
-    if (filePath) {
-      await writeTextFile(filePath, JSON.stringify(exportData, null, 2));
-    }
-  };
 
   return (
     <div className="relative h-dvh w-full bg-(--color-bg) overflow-hidden font-sans transition-colors duration-300">
-      {/* Stylish Background - Matching Onboarding */}
       <div className="absolute inset-0 pointer-events-none">
         <div
           className="absolute inset-0 transition-colors duration-300"
@@ -158,7 +126,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
           style={{ backgroundColor: 'var(--mobile-glow-secondary)' }}
         />
 
-        {/* Grid Pattern */}
         <div className="absolute inset-0 opacity-5"
           style={{
             backgroundImage: 'linear-gradient(var(--color-border) 1px, transparent 1px), linear-gradient(90deg, var(--color-border) 1px, transparent 1px)',
@@ -167,12 +134,10 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         />
       </div>
 
-      {/* View Slider Container */}
       <div
         className="absolute inset-0 flex transition-transform duration-500 ease-[cubic-bezier(0.32,0.72,0,1)]"
         style={{ transform: `translateX(${slideOffset})`, width: '300vw' }}
       >
-        {/* Dashboard */}
         <div className="w-screen h-full shrink-0 overflow-y-auto">
           <Dashboard
             isLoading={isLoading}
@@ -193,7 +158,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
           />
         </div>
 
-        {/* History */}
         <div className="w-screen h-full shrink-0 overflow-y-auto">
           <History
             isLoading={isLoading}
@@ -211,7 +175,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
           />
         </div>
 
-        {/* Settings */}
         <div className="w-screen h-full shrink-0 overflow-y-auto">
           <Settings
             email={email}
@@ -228,12 +191,10 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             onShowLanguagePicker={() => setShowLanguage(true)}
             onShowThemePicker={() => setShowTheme(true)}
             onShowNotifications={() => setShowNotifications(true)}
-            onExportData={handleExportData}
           />
         </div>
       </div>
 
-      {/* Bottom Nav */}
       <div className="fixed bottom-0 left-0 right-0 z-80 flex justify-center pointer-events-none pb-safe">
         <div className="w-full pointer-events-auto">
           <Nav
@@ -244,7 +205,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         </div>
       </div>
 
-      {/* Mobile Detail Modal */}
       {selectedEntry && (
         <DetailModal
           entry={selectedEntry}
@@ -255,7 +215,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         />
       )}
 
-      {/* Language Modal */}
       {showLanguage && (
         <div className="fixed inset-0 z-(--z-modal) flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-xs bg-(--color-glass-surface) backdrop-blur-3xl rounded-3xl border border-(--color-glass-border) p-4 shadow-2xl animate-in zoom-in-95 duration-200">
@@ -282,7 +241,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         </div>
       )}
 
-      {/* Theme Modal */}
       {showTheme && (
         <div className="fixed inset-0 z-(--z-modal) flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-xs bg-(--color-glass-surface) backdrop-blur-3xl rounded-3xl border border-(--color-glass-border) p-4 shadow-2xl animate-in zoom-in-95 duration-200">
@@ -314,7 +272,6 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
         </div>
       )}
 
-      {/* Notifications Modal */}
       {showNotifications && (
         <div className="fixed inset-0 z-(--z-modal) flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="w-full max-w-xs bg-(--color-glass-surface) backdrop-blur-3xl rounded-3xl border border-(--color-glass-border) p-6 shadow-2xl animate-in zoom-in-95 duration-200 text-center">

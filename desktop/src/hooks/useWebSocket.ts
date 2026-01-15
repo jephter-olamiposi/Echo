@@ -4,7 +4,6 @@ import { ClipboardEntry, LinkedDevice } from "../types";
 import { encrypt, decrypt } from "../crypto";
 import { detectContentType } from "../utils";
 
-// Message types from backend
 const MSG_HANDSHAKE = "handshake";
 const MSG_PRESENCE_JOIN = "__JOIN__";
 const MSG_PRESENCE_LEAVE = "__LEAVE__";
@@ -100,7 +99,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     }
   }, []);
 
-  // Add network status listeners
   const connectRef = useRef<() => void>(() => { });
   const messageQueueRef = useRef<string[]>([]);
   const sendRef = useRef<((content: string) => void) | null>(null);
@@ -127,7 +125,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       BASE_DELAY_MS * Math.pow(2, retriesRef.current),
       MAX_DELAY_MS
     );
-    // Add jitter +/-15% to avoid synchronized reconnect storms
     const jittered = baseDelay * (0.85 + Math.random() * 0.3);
     const delay = Math.floor(jittered);
 
@@ -154,10 +151,8 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     try {
       const msg: ServerMessage = JSON.parse(text);
 
-      // Skip messages from self
       if (msg.device_id === deviceIdRef.current) return;
 
-      // Handle presence
       if (msg.content === MSG_PRESENCE_JOIN) {
         onDeviceJoinRef.current({
           id: msg.device_id,
@@ -173,10 +168,8 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
         return;
       }
 
-      // Skip handshake echoes
       if (msg.content === MSG_HANDSHAKE) return;
 
-      // Handle encryption for clipboard messages (non-presence/handshake)
       if (!msg.encrypted || !msg.nonce) {
         console.warn("[ws] Rejected unencrypted message");
         onErrorRef.current?.(
@@ -199,7 +192,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
         return;
       }
 
-      // Build entry and notify
       const entry: ClipboardEntry = {
         id: crypto.randomUUID(),
         content,
@@ -226,7 +218,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       return;
     }
 
-    // Close existing connection
     if (wsRef.current) {
       intentionalCloseRef.current = true;
       wsRef.current.close();
@@ -246,7 +237,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       retriesRef.current = 0;
       updateConnectionState(true);
 
-      // Send handshake
       const handshake = {
         device_id: deviceIdRef.current,
         device_name: deviceNameRef.current,
@@ -256,14 +246,12 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       };
       ws.send(JSON.stringify(handshake));
 
-      // Start ping interval (keep-alive only)
       pingIntervalRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
           ws.send("ping");
         }
       }, PING_INTERVAL_MS);
 
-      // Flush queue
       while (messageQueueRef.current.length > 0) {
         const msg = messageQueueRef.current.shift();
         if (msg) {
@@ -280,7 +268,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       updateConnectionState(false);
 
       if (event.code === 4001 || event.code === 4002 || event.code === 4003) {
-        // Auth errors - do not retry
         onErrorRef.current?.(`Auth Error: ${event.reason || "Check login"}`);
         return;
       }
@@ -292,17 +279,13 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
     ws.onerror = (error) => {
       console.error("[ws] Error:", error);
-      // Generic network error often doesn't give details in JS, but 'close' might.
-      // We rely on onclose for most error handling logic.
     };
   }, [token, cleanup, updateConnectionState, handleMessage, scheduleReconnect]);
 
-  // Update connectRef
   useEffect(() => {
     connectRef.current = connect;
   }, [connect]);
 
-  // Add network and visibility listeners
   useEffect(() => {
     const handleOnline = () => {
       console.log("[ws] Network online detected, reconnecting immediately");
@@ -318,8 +301,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
     const handleVisibility = () => {
       if (document.visibilityState === "visible" && navigator.onLine) {
-        // Always reconnect immediately on resume for instant sync
-        // This is important for mobile where WebSocket may have been killed
         const ws = wsRef.current;
         const isConnected = ws && ws.readyState === WebSocket.OPEN;
 
@@ -358,7 +339,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
       console.log("[ws] Connection not open, queuing message");
       if (messageQueueRef.current.length >= MAX_QUEUE) {
-        // Drop oldest to keep memory bounded
         messageQueueRef.current.shift();
       }
       messageQueueRef.current.push(content);
@@ -386,12 +366,10 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     wsRef.current.send(JSON.stringify(payload));
   }, []);
 
-  // Update sendRef
   useEffect(() => {
     sendRef.current = send;
   }, [send]);
 
-  // Cleanup WebSocket on unmount ONLY
   useEffect(() => {
     return () => {
       intentionalCloseRef.current = true;

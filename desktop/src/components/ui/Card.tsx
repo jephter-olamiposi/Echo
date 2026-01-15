@@ -1,11 +1,6 @@
 import React from 'react';
 
-/* ─────────────────────────────────────────────────────────────────────────────
- * Card Component
- * 
- * Surface container with consistent styling.
- * Used for grouping related content.
- * ───────────────────────────────────────────────────────────────────────────── */
+
 
 export type CardVariant = 'default' | 'elevated' | 'outlined' | 'ghost';
 

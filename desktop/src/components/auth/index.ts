@@ -1,6 +1,4 @@
-/**
- * Auth Components Barrel Export
- */
+
 
 export { AuthLayout } from "./AuthLayout";
 export { Login } from "./Login";

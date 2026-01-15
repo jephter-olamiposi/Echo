@@ -37,7 +37,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let database_url = std::env::var("DATABASE_URL").expect("DATABASE_URL required");
     let jwt_secret = std::env::var("JWT_SECRET").expect("JWT_SECRET required");
 
-    // Prefer explicit JSON first, then file path fallbacks compatible with common setups.
     let fcm_json = std::env::var("FCM_SERVICE_ACCOUNT_JSON")
         .or_else(|_| std::env::var("FIREBASE_SERVICE_ACCOUNT_JSON"))
         .ok();
@@ -114,7 +113,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
 
-    // Setup graceful shutdown
     let server = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),

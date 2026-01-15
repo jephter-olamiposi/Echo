@@ -306,5 +306,17 @@ class MainActivity : TauriActivity() {
                 .apply()
             android.util.Log.d("Echo", "Auth token cleared from SharedPreferences")
         }
+
+        @JavascriptInterface
+        fun getDeviceModel(): String {
+            val manufacturer = Build.MANUFACTURER.replaceFirstChar { it.uppercase() }
+            val model = Build.MODEL
+            // If model already starts with manufacturer, just return model
+            return if (model.startsWith(manufacturer, ignoreCase = true)) {
+                model
+            } else {
+                "$manufacturer $model"
+            }
+        }
     }
 }
