@@ -32,6 +32,7 @@ interface MobileDashboardProps {
   onDelete: (id: string) => void;
   onRefresh: () => Promise<void>;
   onViewAllHistory: () => void;
+  onSelectEntry: (entry: ClipboardEntry) => void;
 }
 
 export const Dashboard: React.FC<MobileDashboardProps> = ({
@@ -49,6 +50,7 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
   onCopy,
   onDelete,
   onViewAllHistory,
+  onSelectEntry,
   onRefresh
 }) => {
   const { containerRef, pullHeight, isLoading: isHookLoading } = usePullToRefresh(onRefresh);
@@ -149,15 +151,21 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
           )}
 
           {!isLoading && latestItem && (
-            <Card variant="default" padding="lg" className="rounded-2xl">
-              <div className="flex justify-between items-center mb-3">
+            <Card variant="default" padding="lg" className="rounded-2xl group active:scale-[0.98] transition-transform">
+              <div
+                className="flex justify-between items-center mb-3 cursor-pointer"
+                onClick={() => { haptic.light(); onSelectEntry(latestItem); }}
+              >
                 <span className="text-[13px] font-medium text-purple-400 flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-purple-500" />
                   {t('latest_clip')}
                 </span>
                 <span className="text-[12px] text-(--color-text-tertiary)">{formatTime(latestItem.timestamp)}</span>
               </div>
-              <p className="text-[15px] leading-relaxed text-(--color-text-secondary) line-clamp-2 overflow-hidden mb-5">
+              <p
+                className="text-[15px] leading-relaxed text-(--color-text-secondary) line-clamp-2 overflow-hidden mb-5 cursor-pointer"
+                onClick={() => { haptic.light(); onSelectEntry(latestItem); }}
+              >
                 {latestItem.content.substring(0, 100)}
                 {latestItem.content.length > 100 ? '...' : ''}
               </p>
@@ -201,7 +209,7 @@ export const Dashboard: React.FC<MobileDashboardProps> = ({
                   <button
                     key={item.id}
                     className="flex justify-between items-center min-h-14 px-4 w-full text-left active:bg-(--color-surface-raised) transition-colors"
-                    onClick={() => { haptic.light(); onViewAllHistory(); }}
+                    onClick={() => { haptic.light(); onSelectEntry(item); }}
                   >
                     <span className="text-[15px] text-(--color-text-secondary) truncate pr-4">
                       {item.content}

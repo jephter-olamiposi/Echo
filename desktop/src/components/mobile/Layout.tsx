@@ -155,6 +155,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
             onDelete={onDelete}
             onRefresh={onRefresh}
             isRefreshing={isRefreshing}
+            onSelectEntry={(entry) => entry && onSelectEntry(entry)}
           />
         </div>
 
