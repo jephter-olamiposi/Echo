@@ -11,14 +11,18 @@ COPY Cargo.toml Cargo.lock ./
 
 # Create a dummy main.rs to build dependencies (caching trick)
 RUN mkdir src && \
+    mkdir benches && \
     echo "fn main() {}" > src/main.rs && \
+    echo "fn main() {}" > benches/rate_limiting.rs && \
+    echo "fn main() {}" > benches/broadcast.rs && \
     cargo build --release && \
-    rm -rf src
+    rm -rf src benches
 
 # Copy the actual source code and .sqlx folder for offline mode
 COPY src ./src
 COPY .sqlx ./.sqlx
 COPY migrations ./migrations
+COPY benches ./benches
 
 # Touch main.rs to force rebuild of application code
 RUN touch src/main.rs
