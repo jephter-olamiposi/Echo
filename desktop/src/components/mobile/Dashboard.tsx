@@ -14,8 +14,6 @@ import { QuickAction } from '../ui/QuickAction';
 import { StatCard } from '../ui/StatCard';
 import { useLanguage } from '../../contexts/LanguageContext';
 
-
-
 interface MobileDashboardProps {
   isLoading?: boolean;
   isRefreshing?: boolean;

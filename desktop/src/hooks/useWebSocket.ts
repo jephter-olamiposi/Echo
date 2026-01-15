@@ -8,7 +8,7 @@ const MSG_HANDSHAKE = "handshake";
 const MSG_PRESENCE_JOIN = "__JOIN__";
 const MSG_PRESENCE_LEAVE = "__LEAVE__";
 
-const MAX_RETRIES = 8;
+
 const BASE_DELAY_MS = 500;
 const MAX_DELAY_MS = 10000;
 const PING_INTERVAL_MS = 20000;
@@ -110,14 +110,12 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
   const scheduleReconnect = useCallback(() => {
     if (intentionalCloseRef.current) {
-      console.log("[ws] Intentional close, stopping reconnection");
       return;
     }
 
     // Checking navigator.onLine prevents rapid retry loops when completely offline
     // We rely on window 'online' event to trigger immediate retry
     if (!navigator.onLine) {
-      console.log("[ws] Offline, pausing reconnection until online event");
       return;
     }
 
@@ -128,10 +126,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     const jittered = baseDelay * (0.85 + Math.random() * 0.3);
     const delay = Math.floor(jittered);
 
-    console.log(
-      `[ws] Reconnecting in ${delay}ms (attempt ${retriesRef.current + 1
-      }/${MAX_RETRIES})`
-    );
+
 
     reconnectTimeoutRef.current = setTimeout(() => {
       retriesRef.current++;
@@ -288,14 +283,12 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
   useEffect(() => {
     const handleOnline = () => {
-      console.log("[ws] Network online detected, reconnecting immediately");
       cleanup();
       retriesRef.current = 0;
       connect();
     };
 
     const handleOffline = () => {
-      console.log("[ws] Network offline detected");
       updateConnectionState(false);
     };
 
@@ -305,7 +298,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
         const isConnected = ws && ws.readyState === WebSocket.OPEN;
 
         if (!isConnected) {
-          console.log("[ws] App visible; instant reconnect for mobile sync");
           cleanup();
           retriesRef.current = 0;
           connect();
@@ -337,7 +329,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
   const send = useCallback((content: string) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.log("[ws] Connection not open, queuing message");
       if (messageQueueRef.current.length >= MAX_QUEUE) {
         messageQueueRef.current.shift();
       }

@@ -133,7 +133,6 @@ function AppContent() {
     } else if (isSyncingFromPushRef.current) {
       // History replay during a push-triggered sync (cold start)
       // Copy the first history item (which is the most recent from server)
-      console.log("[App] Cold start sync: copying first history item to clipboard");
       isSyncingFromPushRef.current = false; // Only sync once
       await copyToOsClipboard(entry.content);
     }
@@ -165,14 +164,13 @@ function AppContent() {
     isConnected: connected,
     onSyncRequest: async () => {
       const isConnected = connectedRef.current;
-      console.log("[App] Sync request received from push, connected:", isConnected);
+
 
       if (isConnected) {
         // WARM START: Already connected, sync from local history
         // The latest remote entry in our history is the newest clipboard from other devices
         const latestRemote = clipboardRef.current.getLatestRemoteEntry();
         if (latestRemote) {
-          console.log("[App] Warm start sync: copying latest remote entry to clipboard");
           showToast("Syncing clipboard...", "info");
           isRemoteUpdateRef.current = true;
           try {
@@ -186,12 +184,11 @@ function AppContent() {
             isRemoteUpdateRef.current = false;
           }
         } else {
-          console.log("[App] No remote entries in history to sync");
           showToast("No clipboard to sync", "info");
         }
       } else {
+
         // COLD START: Need to reconnect, the first history item will be synced
-        console.log("[App] Cold start sync: setting flag and reconnecting");
         isSyncingFromPushRef.current = true;
 
         // Timeout to reset flag if sync doesn't happen
@@ -203,7 +200,6 @@ function AppContent() {
           showToast("Syncing from notification...", "info");
           wsRef.current.connect();
         } else {
-          console.log("[App] Token or ws not ready, sync will happen on auto-connect");
         }
       }
     }
@@ -313,7 +309,6 @@ function AppContent() {
         unlistenClipboardRef.current = await listen<string>('clipboard-change', (event) => {
           // Check lock
           if (isRemoteUpdateRef.current) {
-            console.log("Ignoring remote update clipboard event");
             return;
           }
 
@@ -326,14 +321,11 @@ function AppContent() {
           }
         });
 
-        // Listen for initial clipboard content (emitted once on app start)
         unlistenClipboardInitRef.current = await listen<string>('clipboard-init', (event) => {
-          console.log("[App] Received initial clipboard content");
           const content = event.payload;
           if (content && typeof content === 'string') {
             const wasAdded = clipboard.addEntry(content, 'local', deviceName);
             if (wasAdded && keys.encryptionKey) {
-              console.log("[App] Syncing initial clipboard content");
               ws.send(content);
             }
           }
@@ -376,7 +368,6 @@ function AppContent() {
         if (platform === 'android') {
           // Android: Listen for native clipboard change events from MainActivity.kt
           // PLUS fallback polling since the native listener is unreliable on many devices
-          console.log("[Android] Setting up native clipboard listener + fallback polling");
 
           let lastPolledText = '';
 
@@ -385,12 +376,10 @@ function AppContent() {
             const content = customEvent.detail;
 
             if (isRemoteUpdateRef.current) {
-              console.log("[Android] Ignoring remote update");
               return;
             }
 
             if (content && typeof content === 'string') {
-              console.log("[Android] Native clipboard change detected");
               lastPolledText = content; // Update to avoid duplicate from polling
               const wasAdded = clipboardRef.current.addEntry(content, 'local', deviceNameRef.current);
               // Always call ws.send() - it will queue if not connected and send when reconnected
@@ -412,7 +401,6 @@ function AppContent() {
               const text = await clipboardRef.current.readFromClipboard();
               if (text && text !== lastPolledText && !isRemoteUpdateRef.current) {
                 lastPolledText = text;
-                console.log("[Android] Polling detected clipboard change");
                 const wasAdded = clipboardRef.current.addEntry(text, 'local', deviceNameRef.current);
                 if (wasAdded && keysRef.current.encryptionKey) {
                   wsRef.current.send(text);
@@ -449,8 +437,6 @@ function AppContent() {
 
         } else if (platform === 'ios') {
           // iOS: Adaptive polling (no native clipboard events available)
-          console.log("[iOS] Starting adaptive clipboard polling");
-
           let lastChangeTime = Date.now();
           let currentInterval = 500; // Start very fast (500ms)
 
@@ -521,11 +507,9 @@ function AppContent() {
 
     return () => {
       if (interval) {
-        console.log("[Mobile] Stopping clipboard polling");
         clearInterval(interval);
       }
       if (adjustmentInterval) {
-        console.log("[Mobile] Stopping adjustment interval");
         clearInterval(adjustmentInterval);
       }
       // Clean up iOS timeout-based polling
@@ -601,8 +585,8 @@ function AppContent() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
+
       // Force reconnect WebSocket to ensure fresh connection
-      console.log('[Refresh] Forcing websocket reconnection...');
       ws.reconnect();
 
       // Wait a moment for connection to establish
@@ -634,8 +618,6 @@ function AppContent() {
           }
         }
       }
-
-      console.log('[Refresh] Refresh complete');
     } catch (e) {
       console.error('[Refresh] Error:', e);
       showError('Failed to refresh. Please check your connection.');

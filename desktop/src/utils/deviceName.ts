@@ -19,8 +19,9 @@ export async function getDeviceName(): Promise<string> {
                     if (window.EchoBridge?.getDeviceModel) {
                         const model = window.EchoBridge.getDeviceModel();
                         if (model && model.trim()) {
-                            console.log('[getDeviceName] Android model:', model);
-                            return model;
+                            if (model && model.trim()) {
+                                return model;
+                            }
                         }
                     }
                 } catch (e) {

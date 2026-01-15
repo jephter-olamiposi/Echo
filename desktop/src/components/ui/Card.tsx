@@ -1,7 +1,5 @@
 import React from 'react';
 
-
-
 export type CardVariant = 'default' | 'elevated' | 'outlined' | 'ghost';
 
 export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {

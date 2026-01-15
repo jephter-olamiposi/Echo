@@ -23,12 +23,10 @@ export function usePushNotifications({
   const registerPushToken = useCallback(
     async (fcmToken: string) => {
       if (!token) {
-        console.log("[Push] No auth token, skipping registration");
         return false;
       }
 
       try {
-        console.log("[Push] Registering FCM token with backend...");
         await apiFetch("/push/register", {
           method: "POST",
           body: JSON.stringify({
@@ -37,7 +35,6 @@ export function usePushNotifications({
           }),
         });
         hasRegistered.current = true;
-        console.log("[Push] Token registered successfully");
         return true;
       } catch (error) {
         console.error("[Push] Error registering token:", error);
@@ -53,11 +50,6 @@ export function usePushNotifications({
 
   useEffect(() => {
     if (!token || !isConnected || hasRegistered.current) {
-      console.log("[Push] Skip init:", {
-        token: !!token,
-        isConnected,
-        hasRegistered: hasRegistered.current,
-      });
       return;
     }
 
@@ -67,7 +59,6 @@ export function usePushNotifications({
         const platform = type();
 
         if (platform !== "android" && platform !== "ios") {
-          console.log("[Push] Not a mobile platform, skipping");
           return;
         }
 
@@ -97,9 +88,6 @@ export function usePushNotifications({
         let fcmToken = bridge.getFcmToken?.();
         let tokenAttempts = 0;
         while (!fcmToken && tokenAttempts < 5) {
-          console.log(
-            `[Push] Waiting for FCM token (attempt ${tokenAttempts + 1}/5)`
-          );
           await new Promise((r) => setTimeout(r, 1000));
           fcmToken = bridge.getFcmToken?.();
           tokenAttempts++;
@@ -124,7 +112,6 @@ export function usePushNotifications({
     const checkPushOpen = () => {
       const bridge = window.EchoBridge;
       if (bridge?.wasOpenedFromPush?.()) {
-        console.log("[Push] Cold start from notification");
         onSyncRequest();
         bridge.clearOpenedFromPush?.();
       }
@@ -133,7 +120,6 @@ export function usePushNotifications({
     checkPushOpen();
 
     const handleSyncTrigger = () => {
-      console.log("[Push] Warm start sync triggered");
       onSyncRequest();
     };
 
