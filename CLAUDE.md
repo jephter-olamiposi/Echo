@@ -14,7 +14,7 @@ cd backend
 # Run (requires DATABASE_URL and JWT_SECRET in .env)
 cargo run
 
-# Test (no database required — tests use the in-memory SyncEngine test double)
+# Test (no database required — tests use AppState directly with an in-memory fixture)
 cargo test
 cargo test <test_name>   # e.g. cargo test rate_limit_tests::allows_first_message
 
@@ -81,17 +81,15 @@ Cargo workspace with two members:
 6. All real clipboard payloads must carry `encrypted: true` and a `nonce` field — the server stores and relays ciphertext only (blind relay)
 7. On disconnect: presence leave is broadcast, channel cleaned up if no remaining subscribers
 
-### `AppState` (`backend/src/state.rs`)
+### `AppState` (`backend/src/state/mod.rs`)
 
-All shared state is held in `AppState`, cheaply cloned via `Arc` internals:
+All shared state is held in `AppState`, cheaply cloned via `Arc` internals. State is split across three sub-structs:
 
-| Field | Type | Purpose |
+| Sub-struct | File | Responsibility |
 |---|---|---|
-| `hub` | `DashMap<Uuid, broadcast::Sender<ClipboardMessage>>` | One broadcast channel per user |
-| `history` | `DashMap<Uuid, Vec<ClipboardMessage>>` | In-memory cache (max 50); async-written to PostgreSQL |
-| `rate_limits` | `DashMap<String, RateLimitState>` | Dual-layer: 50ms min interval + 300 msg/60s window |
-| `sessions` | `DashMap<Uuid, HashMap<String, String>>` | device_id → device_name for online devices |
-| `push_tokens` | `DashMap<Uuid, HashMap<String, String>>` | device_id → FCM token; persisted to DB |
+| `SyncState` | `state/sync.rs` | Broadcast channels, in-memory history, online sessions |
+| `RateLimiter` | `state/rate_limit.rs` | Dual-layer rate limiting (50ms min interval + 300 msg/60s window) |
+| `PushManager` | `state/push_manager.rs` | FCM token storage; persisted to DB |
 
 `DashMap` is used throughout instead of `RwLock<HashMap>` to eliminate shard-level lock contention.
 
@@ -101,22 +99,32 @@ Broadcast channel capacity scales dynamically: `clamp(device_count × 25, 50, 50
 
 | Module | Responsibility |
 |---|---|
-| `main.rs` | Router, DB pool, migrations, graceful shutdown |
-| `state.rs` | All concurrent state + rate limiting; `SyncEngine` test double (no DB) |
-| `handler.rs` | HTTP handlers + WebSocket lifecycle (handshake → history replay → sync loop) |
+| `main.rs` | Router, DB pool, migrations, CORS, graceful shutdown |
+| `state/mod.rs` | `AppState` entry point; push token persistence via `UserRepository` |
+| `state/sync.rs` | Broadcast channels, in-memory clipboard history, online session map |
+| `state/rate_limit.rs` | Dual-layer rate limiter (`IntervalPolicy` + sliding window) |
+| `state/push_manager.rs` | In-memory FCM token map; load/persist via DB |
+| `handlers/auth.rs` | `POST /register`, `POST /login` |
+| `handlers/history.rs` | `GET /history`, `DELETE /history`, `POST /push/register` |
+| `handlers/ws.rs` | WebSocket lifecycle (handshake → history replay → sync loop) |
 | `auth.rs` | Argon2id password hashing, JWT encode/decode |
 | `middleware.rs` | `AuthUser` Axum extractor (reads `Authorization: Bearer`) |
 | `db.rs` | `UserRepository` + `ClipboardHistoryRepository` (SQLx typed queries) |
-| `models.rs` | `ClipboardMessage`, `Claims`, request/response DTOs, protocol constants |
+| `protocol.rs` | Wire type: `ClipboardMessage`; protocol constants (`MSG_HANDSHAKE`, `MSG_PRESENCE_*`) |
+| `dto.rs` | HTTP request/response types: `RegisterRequest`, `LoginRequest`, `AuthResponse`, `Claims`, etc. |
+| `types.rs` | Domain newtypes with validation: `DeviceId`, `DeviceName`, `PushToken` |
+| `config.rs` | `Config::from_env()` — reads all env vars at startup |
 | `push.rs` | FCM client with cached OAuth2 token; auto-removes `InvalidToken` on 404/410 |
 | `error.rs` | `AppError` enum → HTTP status + JSON error body via `IntoResponse` |
 | `tests.rs` | Unit tests for rate limiting, history, channel lifecycle (no DB needed) |
 
 ### Frontend Architecture
 
-`App.tsx` is the monolithic state container — all global state (`token`, `encryptionKey`, `devices`, `history`, etc.) lives there and is passed down as props. No external state manager.
+`App.tsx` is the top-level orchestrator — global state is delegated to focused hooks and composed in `AppContent`. No external state manager.
 
 **Key hooks:**
+- `useAuth` — token persistence, view routing (`login | register | main | onboarding`), logout
+- `useDevices` — online device list, `handleDeviceJoin` / `handleDeviceLeave` / `removeDevice`
 - `useWebSocket` — connection lifecycle, exponential backoff with jitter, offline message queue (up to 200), encrypt-on-send / decrypt-on-receive
 - `useClipboard` — listens to Tauri `clipboard-change` event (desktop), calls `ws.send()`; writes remote content via `clipboard-remote-write` event. The Rust side (`clipboard.rs`) skips echoing back remote writes using a hash comparison.
 - `useKeys` — loads/saves 32-byte `Uint8Array` encryption key via `@tauri-apps/plugin-store` (`store.json`)
@@ -133,7 +141,7 @@ Uses `@noble/ciphers` (XChaCha20-Poly1305). Each message gets a unique 24-byte r
 
 ### WebSocket Protocol Constants
 
-Defined in `backend/src/models.rs` and mirrored in `useWebSocket.ts`:
+Defined in `backend/src/protocol.rs` and mirrored in `useWebSocket.ts`:
 - `"handshake"` — first message after connect (unencrypted)
 - `"__JOIN__"` / `"__LEAVE__"` — presence events
 - All sync payloads require `{ encrypted: true, nonce: "<base64>" }`. Unencrypted payloads are rejected client-side.
@@ -162,7 +170,7 @@ cargo test --all --quiet
 ### Rust Rules
 
 - **No panics in production code.** `unwrap()` and `expect()` are forbidden outside `#[cfg(test)]`. Use `unreachable!()` only for genuinely unreachable invariants.
-- **No blocking inside async functions.** Use `spawn_blocking` for CPU-bound work (e.g. Argon2 hashing — see `handler.rs`).
+- **No blocking inside async functions.** Use `spawn_blocking` for CPU-bound work (e.g. Argon2 hashing — see `handlers/auth.rs`).
 - **Boolean flags for state are prohibited.** Model state with enums; invalid states must be unrepresentable.
 - **Every `unsafe` block must have a `// SAFETY:` comment.**
 - Comments explaining *what* code does are not allowed — only `SAFETY:`, `INVARIANT:`, architectural trade-offs, or upstream bug workarounds (with issue link).

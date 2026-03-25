@@ -5,3 +5,18 @@ members = [
     "backend",
     "desktop/src-tauri",
 ]
+
+[workspace.dependencies]
+serde      = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
+
+# Base release profile — applied to all workspace members.
+# desktop additionally optimises for binary size via opt-level = "z".
+[profile.release]
+lto           = true
+codegen-units = 1
+strip         = "symbols"
+panic         = "abort"
+
+[profile.release.package.desktop]
+opt-level = "z"
