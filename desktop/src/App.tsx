@@ -25,18 +25,18 @@ import {
   generateLinkUri
 } from "./crypto";
 import { config } from "./config";
-import { getAuthToken, saveAuthToken, removeAuthToken, fetchClipboardHistory } from "./api";
+import { fetchClipboardHistory } from "./api";
 
-import { AppState, MobileView, LinkedDevice, ClipboardEntry, ContentType } from "./types";
+import { AppState, MobileView, ContentType } from "./types";
 import { ScanningOverlay } from "./components/mobile/ScanningOverlay";
 import { useClipboard } from "./hooks/useClipboard";
 import { useKeys } from "./hooks/useKeys";
 import { usePushNotifications } from "./hooks/usePushNotifications";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { useLatest } from "./hooks/useLatest";
+import { useAuth } from "./hooks/useAuth";
+import { useDevices } from "./hooks/useDevices";
 import { useToast, ToastProvider } from "./utils";
-
-
 
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -58,27 +58,39 @@ function AppContent() {
   const keys = useKeys();
   const { showToast, showError } = useToast();
 
-  const [token, setToken] = useState<string | null>(null);
-  const [email, setEmail] = useState<string | null>(null);
-
-  const [view, setViewState] = useState<"login" | "register" | "main" | "onboarding">("onboarding");
-  const [mobileView, setMobileView] = useState<MobileView>("dashboard");
-  const [isLoading, setIsLoading] = useState(true);
-  const [connected, setConnected] = useState(false);
+  // ── Device identity ─────────────────────────────────────────────────────────
   const [deviceId, setDeviceId] = useState<string>("unknown");
   const [deviceName, setDeviceName] = useState<string>("This Device");
+  const [isMobilePlatform, setIsMobilePlatform] = useState(false);
 
-  const [devices, setDevices] = useState<LinkedDevice[]>([]);
+  // ── Auth ────────────────────────────────────────────────────────────────────
+  const auth = useAuth(
+    () => showToast("Welcome to Echo!", "success"),
+    async () => {
+      clipboard.clearHistory();
+      await keys.clearKeys();
+      setDevices([]);
+    }
+  );
+  const { token, email, view, isLoading, setView, handleAuthSuccess, logout, handleOnboardingComplete } = auth;
+
+  // ── Devices ─────────────────────────────────────────────────────────────────
+  const { devices, setDevices, handleDeviceJoin, handleDeviceLeave, removeDevice } = useDevices(
+    deviceId,
+    (name) => showToast(`${name} joined`, "info")
+  );
+
+  // ── UI state ─────────────────────────────────────────────────────────────────
+  const [mobileView, setMobileView] = useState<MobileView>("dashboard");
+  const [connected, setConnected] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterType, setFilterType] = useState<ContentType | "all">("all");
-  const [selectedEntry, setSelectedEntry] = useState<ClipboardEntry | null>(null);
+  const [selectedEntry, setSelectedEntry] = useState<ReturnType<typeof useClipboard>["history"][number] | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
-  const [isMobilePlatform, setIsMobilePlatform] = useState(false);
   const [backgroundModeEnabled, setBackgroundModeEnabled] = useState(() => {
     return localStorage.getItem("echo_background_mode") === "true";
   });
-
   const [showQR, setShowQR] = useState(false);
   const [showDevices, setShowDevices] = useState(false);
   const [showKeyInput, setShowKeyInput] = useState(false);
@@ -91,29 +103,13 @@ function AppContent() {
   const clipboardRef = useLatest(clipboard);
   const connectedRef = useLatest(connected);
 
-  const handleDeviceJoin = useCallback((device: LinkedDevice) => {
-    setDevices(prev => {
-      const exists = prev.find(d => d.id === device.id);
-      if (exists) {
-        return prev.map(d => d.id === device.id ? { ...d, lastSeen: Date.now() } : d);
-      }
-      return [...prev, device];
-    });
-
-    const isMe = device.id === deviceId || device.isCurrentDevice;
-    const isGenericName = device.name === "This Device" || device.name === "Unknown Device";
-    if (!isMe && !isGenericName) {
-      showToast(`${device.name} joined`, "info");
-    }
-  }, [deviceId, showToast]);
-
+  // ── Clipboard sync helpers ───────────────────────────────────────────────────
   const copyToOsClipboard = useCallback(async (content: string) => {
     try {
       isRemoteUpdateRef.current = true;
       const { emit } = await import("@tauri-apps/api/event");
       await emit("clipboard-remote-write", content);
       await clipboard.copyToClipboard(content);
-      // Reset lock after a safety delay
       setTimeout(() => { isRemoteUpdateRef.current = false; }, 1000);
       return true;
     } catch (e) {
@@ -123,26 +119,26 @@ function AppContent() {
     }
   }, [clipboard]);
 
-  const handleIncomingCopy = useCallback(async (entry: ClipboardEntry, isHistory?: boolean) => {
-    // Always add to local history UI
+  const handleIncomingCopy = useCallback(async (entry: ReturnType<typeof useClipboard>["history"][number], isHistory?: boolean) => {
     clipboard.addEntry(entry.content, 'remote', entry.deviceName);
 
     if (!isHistory) {
-      // Live message - always copy to OS clipboard
       await copyToOsClipboard(entry.content);
     } else if (isSyncingFromPushRef.current) {
-      // History replay during a push-triggered sync (cold start)
-      // Copy the first history item (which is the most recent from server)
-      isSyncingFromPushRef.current = false; // Only sync once
+      isSyncingFromPushRef.current = false;
       await copyToOsClipboard(entry.content);
     }
-    // Normal history replay (not from push) - just add to UI, don't copy
   }, [clipboard, copyToOsClipboard]);
 
-  const handleDeviceLeave = useCallback((id: string) => {
-    setDevices(prev => prev.filter(d => d.id !== id || d.isCurrentDevice));
-  }, []);
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+    } catch {
+      // logout handles its own errors; ensure UI state is reset
+    }
+  }, [logout]);
 
+  // ── WebSocket ────────────────────────────────────────────────────────────────
   const ws = useWebSocket({
     token,
     deviceId,
@@ -155,7 +151,6 @@ function AppContent() {
     onError: (msg) => showError(msg),
   });
 
-  // Keep wsRef synced (useLatest pattern)
   const wsRef = useLatest(ws);
 
   usePushNotifications({
@@ -165,10 +160,7 @@ function AppContent() {
     onSyncRequest: async () => {
       const isConnected = connectedRef.current;
 
-
       if (isConnected) {
-        // WARM START: Already connected, sync from local history
-        // The latest remote entry in our history is the newest clipboard from other devices
         const latestRemote = clipboardRef.current.getLatestRemoteEntry();
         if (latestRemote) {
           showToast("Syncing clipboard...", "info");
@@ -187,63 +179,21 @@ function AppContent() {
           showToast("No clipboard to sync", "info");
         }
       } else {
-
-        // COLD START: Need to reconnect, the first history item will be synced
         isSyncingFromPushRef.current = true;
-
-        // Timeout to reset flag if sync doesn't happen
-        setTimeout(() => {
-          isSyncingFromPushRef.current = false;
-        }, 15000);
+        setTimeout(() => { isSyncingFromPushRef.current = false; }, 15000);
 
         if (token && wsRef.current) {
           showToast("Syncing from notification...", "info");
           wsRef.current.connect();
-        } else {
         }
       }
     }
   });
 
-  // Additional refs for polling intervals (avoids stale closures)
   const deviceNameRef = useLatest(deviceName);
   const keysRef = useLatest(keys);
 
-  // Initialize secure token and auth state
-  useEffect(() => {
-    const initAuth = async () => {
-      try {
-        const storedToken = await getAuthToken();
-        const storedEmail = localStorage.getItem("echo_email");
-        const onboardingComplete = localStorage.getItem("echo_onboarding_complete") === "true";
-
-        setToken(storedToken);
-        setEmail(storedEmail);
-
-        if (!onboardingComplete) {
-          setViewState("onboarding");
-        } else if (storedToken) {
-          setViewState("main");
-        } else {
-          setViewState("login");
-        }
-
-        // Sync background mode to Rust
-        try {
-          const { invoke } = await import('@tauri-apps/api/core');
-          await invoke('set_background_mode', { enabled: backgroundModeEnabled });
-        } catch (e) {
-          console.error("Failed to sync background mode:", e);
-        }
-      } catch (error) {
-        console.error("Failed to load auth state:", error);
-        setViewState("login");
-      }
-    };
-
-    initAuth();
-  }, []);
-
+  // ── Device + platform init ───────────────────────────────────────────────────
   useEffect(() => {
     const init = async () => {
       try {
@@ -256,11 +206,9 @@ function AppContent() {
           console.warn("Failed to detect platform:", e);
         }
 
-        // Detect if we're on a mobile platform (not just small screen)
         const isMobile = platform === 'android' || platform === 'ios';
         setIsMobilePlatform(isMobile);
 
-        // Get actual device model name
         const name = await getDeviceName();
         setDeviceName(name);
         setDevices([{ id, name, lastSeen: Date.now(), isCurrentDevice: true }]);
@@ -271,12 +219,19 @@ function AppContent() {
           setDeviceId(fallbackId);
           setDevices([{ id: fallbackId, name: "Echo Device", lastSeen: Date.now(), isCurrentDevice: true }]);
         }
-      } finally {
-        setIsLoading(false);
       }
     };
     init();
 
+    // Sync persisted background mode to Rust on mount.
+    import('@tauri-apps/api/core')
+      .then(({ invoke }) => invoke('set_background_mode', { enabled: backgroundModeEnabled }))
+      .catch((e) => console.error("Failed to sync background mode:", e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // ── Desktop lifecycle listeners (focus, resume, clipboard) ──────────────────
+  useEffect(() => {
     const unlistenFocusRef = { current: undefined as (() => void) | undefined };
     const unlistenResumeRef = { current: undefined as (() => void) | undefined };
     const unlistenClipboardRef = { current: undefined as (() => void) | undefined };
@@ -285,8 +240,7 @@ function AppContent() {
     const setupListeners = async () => {
       try {
         const checkClipboard = async () => {
-          if (isRemoteUpdateRef.current) return; // Skip check if we just wrote it
-
+          if (isRemoteUpdateRef.current) return;
           const text = await clipboard.readFromClipboard();
           if (text) {
             const wasAdded = clipboard.addEntry(text, 'local', deviceName);
@@ -307,11 +261,7 @@ function AppContent() {
         });
 
         unlistenClipboardRef.current = await listen<string>('clipboard-change', (event) => {
-          // Check lock
-          if (isRemoteUpdateRef.current) {
-            return;
-          }
-
+          if (isRemoteUpdateRef.current) return;
           const content = event.payload;
           if (content && typeof content === 'string') {
             const wasAdded = clipboard.addEntry(content, 'local', deviceName);
@@ -346,6 +296,7 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keys.encryptionKey, deviceName]);
 
+  // ── Connect/disconnect WebSocket when auth or key state changes ──────────────
   useEffect(() => {
     if (keys.encryptionKey && token) {
       ws.connect();
@@ -355,7 +306,7 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keys.encryptionKey, token]);
 
-  // Mobile clipboard handling - Native events on Android, adaptive polling on iOS
+  // ── Mobile clipboard polling ─────────────────────────────────────────────────
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | null = null;
     let adjustmentInterval: ReturnType<typeof setInterval> | null = null;
@@ -366,23 +317,15 @@ function AppContent() {
         const platform = platformType();
 
         if (platform === 'android') {
-          // Android: Listen for native clipboard change events from MainActivity.kt
-          // PLUS fallback polling since the native listener is unreliable on many devices
-
           let lastPolledText = '';
 
           nativeClipboardHandler = (e: Event) => {
             const customEvent = e as CustomEvent<string>;
             const content = customEvent.detail;
-
-            if (isRemoteUpdateRef.current) {
-              return;
-            }
-
+            if (isRemoteUpdateRef.current) return;
             if (content && typeof content === 'string') {
-              lastPolledText = content; // Update to avoid duplicate from polling
+              lastPolledText = content;
               const wasAdded = clipboardRef.current.addEntry(content, 'local', deviceNameRef.current);
-              // Always call ws.send() - it will queue if not connected and send when reconnected
               if (wasAdded && keysRef.current.encryptionKey) {
                 wsRef.current.send(content);
                 showToast(`Synced: ${content.substring(0, 30)}${content.length > 30 ? '...' : ''}`, 'success');
@@ -392,11 +335,9 @@ function AppContent() {
 
           window.addEventListener('native-clipboard-change', nativeClipboardHandler);
 
-          // Fallback polling for unreliable native listener (poll every 1s when visible)
           const pollClipboard = async () => {
             if (!keysRef.current.encryptionKey) return;
             if (document.visibilityState !== 'visible') return;
-
             try {
               const text = await clipboardRef.current.readFromClipboard();
               if (text && text !== lastPolledText && !isRemoteUpdateRef.current) {
@@ -407,94 +348,67 @@ function AppContent() {
                   showToast(`Synced: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`, 'success');
                 }
               }
-            } catch (e) {
-              // Ignore read errors
+            } catch {
+              // Ignore clipboard read errors
             }
           };
 
-          // Poll every 1 second as fallback
           interval = setInterval(pollClipboard, 1000);
 
-          // Also check immediately on resume for any missed changes
-          const checkOnResume = async () => {
-            const text = await clipboardRef.current.readFromClipboard();
-            if (text && text !== lastPolledText && !isRemoteUpdateRef.current) {
-              lastPolledText = text;
-              const wasAdded = clipboardRef.current.addEntry(text, 'local', deviceNameRef.current);
-              // Always call ws.send() - it will queue if not connected
-              if (wasAdded && keysRef.current.encryptionKey) {
-                wsRef.current.send(text);
-                showToast(`Synced: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`, 'success');
-              }
-            }
-          };
-
-          document.addEventListener('visibilitychange', () => {
+          document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible') {
-              checkOnResume();
+              const text = await clipboardRef.current.readFromClipboard();
+              if (text && text !== lastPolledText && !isRemoteUpdateRef.current) {
+                lastPolledText = text;
+                const wasAdded = clipboardRef.current.addEntry(text, 'local', deviceNameRef.current);
+                if (wasAdded && keysRef.current.encryptionKey) {
+                  wsRef.current.send(text);
+                  showToast(`Synced: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`, 'success');
+                }
+              }
             }
           });
 
         } else if (platform === 'ios') {
-          // iOS: Adaptive polling (no native clipboard events available)
           let lastChangeTime = Date.now();
-          let currentInterval = 500; // Start very fast (500ms)
+          let currentInterval = 500;
 
           const poll = async () => {
             if (!keysRef.current.encryptionKey) return;
-
             const text = await clipboardRef.current.readFromClipboard();
             if (text && !isRemoteUpdateRef.current) {
               const wasAdded = clipboardRef.current.addEntry(text, 'local', deviceNameRef.current);
-              // Always call ws.send() - it will queue if not connected and send when reconnected
               if (wasAdded && keysRef.current.encryptionKey) {
                 lastChangeTime = Date.now();
-                currentInterval = 500; // Speed up on activity
+                currentInterval = 500;
                 wsRef.current.send(text);
                 showToast(`Synced: ${text.substring(0, 30)}${text.length > 30 ? '...' : ''}`, 'success');
               }
             }
 
-            // Adaptive slowdown - more aggressive when active
             const idleTime = Date.now() - lastChangeTime;
             if (document.visibilityState === 'hidden') {
-              currentInterval = 15000; // Slower when backgrounded (was 30s)
+              currentInterval = 15000;
             } else if (idleTime > 120000) {
-              currentInterval = 5000; // Medium after 2 min idle (was 10s)
+              currentInterval = 5000;
             } else if (idleTime > 30000) {
-              currentInterval = 2000; // Faster after 30s idle (was 5s)
+              currentInterval = 2000;
             } else {
-              currentInterval = 500; // Very fast when active (was 2s)
+              currentInterval = 500;
             }
           };
 
-          // Use a single self-scheduling timeout instead of nested intervals
-          // This avoids the memory leak from creating new intervals
           let timeoutId: ReturnType<typeof setTimeout> | null = null;
-
           const scheduleNext = () => {
             timeoutId = setTimeout(async () => {
               await poll();
-              scheduleNext(); // Schedule next poll with updated interval
+              scheduleNext();
             }, currentInterval);
           };
 
-          // Store the cleanup function
-          interval = setInterval(() => { }, 1); // Dummy to satisfy type
-          clearInterval(interval);
-
           scheduleNext();
-
-          // Override cleanup to use the timeout
-          adjustmentInterval = setInterval(() => {
-            // No-op, kept for cleanup compatibility
-          }, 86400000);
-
-          // Store timeout cleanup in adjustmentInterval's slot
-          const originalCleanup = () => {
-            if (timeoutId) clearTimeout(timeoutId);
-          };
-          (window as any).__iosClipboardCleanup = originalCleanup;
+          adjustmentInterval = setInterval(() => {}, 86400000);
+          (window as any).__iosClipboardCleanup = () => { if (timeoutId) clearTimeout(timeoutId); };
         }
       } catch (e) {
         console.error("[Mobile] Clipboard setup failed:", e);
@@ -506,13 +420,8 @@ function AppContent() {
     }
 
     return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-      if (adjustmentInterval) {
-        clearInterval(adjustmentInterval);
-      }
-      // Clean up iOS timeout-based polling
+      if (interval) clearInterval(interval);
+      if (adjustmentInterval) clearInterval(adjustmentInterval);
       if ((window as any).__iosClipboardCleanup) {
         (window as any).__iosClipboardCleanup();
         delete (window as any).__iosClipboardCleanup;
@@ -537,95 +446,15 @@ function AppContent() {
     if (!import.meta.env.DEV) {
       document.addEventListener('contextmenu', event => event.preventDefault());
     }
-
     const handleAuthError = () => {
       handleLogout();
       showToast("Session expired. Please sign in again.", "error");
     };
-
     window.addEventListener('auth-error', handleAuthError);
     return () => window.removeEventListener('auth-error', handleAuthError);
   }, []);
 
-  const handleAuthSuccess = async (newToken: string, newEmail: string) => {
-    try {
-      await saveAuthToken(newToken);
-      localStorage.setItem("echo_email", newEmail);
-      setToken(newToken);
-      setEmail(newEmail);
-      setViewState("main");
-      showToast("Welcome to Echo!", "success");
-    } catch (error) {
-      console.error("Failed to save auth token:", error);
-      showToast("Failed to save login credentials", "error");
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      // CRITICAL: Wipe sensitive data on logout
-      clipboard.clearHistory();
-      await keys.clearKeys();
-      setDevices([]);
-
-      await removeAuthToken();
-      localStorage.removeItem("echo_email");
-      setToken(null);
-      setEmail(null);
-      setViewState("login");
-    } catch (error) {
-      console.error("Failed to clear auth token during logout:", error);
-      // Still update UI state even if storage fails
-      setToken(null);
-      setEmail(null);
-      setViewState("login");
-    }
-  };
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    try {
-
-      // Force reconnect WebSocket to ensure fresh connection
-      ws.reconnect();
-
-      // Wait a moment for connection to establish
-      // This gives the WebSocket time to reconnect before fetching history
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Fetch history from server
-      const serverHistory = await fetchClipboardHistory();
-
-      if (Array.isArray(serverHistory) && serverHistory.length > 0) {
-        // Decrypt and add any new entries from server
-        for (const msg of serverHistory) {
-          // Skip messages from this device
-          if (msg.device_id === deviceId) continue;
-
-          // Skip non-encrypted or system messages
-          if (!msg.encrypted || !msg.nonce) continue;
-          if (!keys.encryptionKey) continue;
-
-          try {
-            // Import decrypt function
-            const { decrypt } = await import('./crypto');
-            const content = decrypt(msg.content, msg.nonce, keys.encryptionKey);
-
-            // Add to local history (addEntry will dedupe)
-            clipboard.addEntry(content, 'remote', msg.device_name);
-          } catch (e) {
-            console.warn('[Refresh] Failed to decrypt message:', e);
-          }
-        }
-      }
-    } catch (e) {
-      console.error('[Refresh] Error:', e);
-      showError('Failed to refresh. Please check your connection.');
-    } finally {
-      setIsRefreshing(false);
-    }
-  };
-
+  // ── Action handlers ─────────────────────────────────────────────────────────
   const handleManualKeySync = async () => {
     if (!manualKey) return;
     try {
@@ -634,7 +463,7 @@ function AppContent() {
       showToast("Sync key saved!", "success");
       setManualKey("");
       setShowKeyInput(false);
-    } catch (e) {
+    } catch {
       showToast("Invalid key format", "error");
     }
   };
@@ -643,12 +472,9 @@ function AppContent() {
     setMobileView("settings");
     try {
       let permissions = await checkPermissions();
-
-      // Request permission if not already granted
       if (permissions !== 'granted') {
         permissions = await requestPermissions();
       }
-
       if (permissions !== 'granted') {
         showToast("Camera permission denied", "error");
         return;
@@ -658,7 +484,7 @@ function AppContent() {
       const result = await scan({ windowed: true, formats: [Format.QRCode] });
       setIsScanning(false);
 
-      if (!result || !result.content) {
+      if (!result?.content) {
         showToast("No QR code detected", "info");
         return;
       }
@@ -666,7 +492,6 @@ function AppContent() {
       if (result.content.startsWith("echo://")) {
         const uri = result.content;
         let keyBase64 = "";
-
         if (uri.startsWith("echo://connect?")) {
           try {
             const params = new URLSearchParams(uri.split("?")[1]);
@@ -686,7 +511,7 @@ function AppContent() {
           showToast("Invalid QR Code content", "error");
         }
       } else {
-        showToast(`Not an Echo QR code`, "error");
+        showToast("Not an Echo QR code", "error");
       }
     } catch (e: any) {
       console.error("QR Scanner error:", e);
@@ -702,15 +527,54 @@ function AppContent() {
   const handleCancelScan = async () => {
     try {
       await cancelScan();
-      setIsScanning(false);
-    } catch (e) {
+    } finally {
       setIsScanning(false);
     }
   };
 
-  const removeDevice = (id: string) => {
-    setDevices(prev => prev.filter(d => d.id !== id));
-    showToast("Device unlinked locally", "info");
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      ws.reconnect();
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      const serverHistory = await fetchClipboardHistory();
+
+      if (Array.isArray(serverHistory) && serverHistory.length > 0) {
+        for (const msg of serverHistory) {
+          if (msg.device_id === deviceId) continue;
+          if (!msg.encrypted || !msg.nonce || !keys.encryptionKey) continue;
+          try {
+            const { decrypt } = await import('./crypto');
+            const content = decrypt(msg.content, msg.nonce, keys.encryptionKey);
+            clipboard.addEntry(content, 'remote', msg.device_name);
+          } catch (e) {
+            console.warn('[Refresh] Failed to decrypt message:', e);
+          }
+        }
+      }
+    } catch {
+      showError('Failed to refresh. Please check your connection.');
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleDeviceSetupImportKey = async (keyString: string) => {
+    try {
+      const key = importKey(keyString);
+      await keys.saveKey(key);
+      showToast("Device linked successfully!", "success");
+    } catch {
+      showToast("Invalid encryption key", "error");
+    }
+  };
+
+  const handleDeviceSetupCreateNew = async () => {
+    await keys.createNewKey();
+    clipboard.clearHistory();
+    setDevices([]);
+    ws.reconnect();
+    showToast("Started fresh with new encryption key", "success");
   };
 
   const getDeviceIcon = (name: string) => {
@@ -720,6 +584,7 @@ function AppContent() {
     return Icons.devices;
   };
 
+  // ── Derived state ───────────────────────────────────────────────────────────
   const derivedState: AppState = useMemo(() => ({
     history: clipboard.history,
     connected,
@@ -742,37 +607,11 @@ function AppContent() {
     showClearConfirm
   }), [clipboard.history, connected, searchQuery, selectedEntry, keys.encryptionKey, keys.fingerprint, view, isRefreshing, filterType, devices, showQR, keys.linkUri, showDevices, showKeyInput, manualKey, mobileView, isLoading, showClearConfirm, deviceId, email]);
 
-  const handleOnboardingComplete = () => {
-    localStorage.setItem("echo_onboarding_complete", "true");
-    setViewState("login");
-  };
-
-  // Handle device setup actions
-  const handleDeviceSetupImportKey = async (keyString: string) => {
-    try {
-      const key = importKey(keyString);
-      await keys.saveKey(key);
-      showToast("Device linked successfully!", "success");
-    } catch (e) {
-      console.error("Failed to import key:", e);
-      showToast("Invalid encryption key", "error");
-    }
-  };
-
-  const handleDeviceSetupCreateNew = async () => {
-    await keys.createNewKey();
-    // CRITICAL: Clear local history and devices when starting fresh
-    clipboard.clearHistory();
-    setDevices([]); // Reset link status locally
-    ws.reconnect(); // Force handshake/reconnect with NEW key
-    showToast("Started fresh with new encryption key", "success");
-  };
-
+  // ── Routing ─────────────────────────────────────────────────────────────────
   if (view === "onboarding") return <ErrorBoundary><Onboarding onComplete={handleOnboardingComplete} /></ErrorBoundary>;
-  if (view === "login") return <ErrorBoundary><AuthLayout><Login initialEmail={email || ""} onSuccess={handleAuthSuccess} onSwitchToRegister={() => setViewState("register")} /></AuthLayout></ErrorBoundary>;
-  if (view === "register") return <ErrorBoundary><AuthLayout><Register initialEmail={email || ""} onSuccess={handleAuthSuccess} onSwitchToLogin={() => setViewState("login")} /></AuthLayout></ErrorBoundary>;
+  if (view === "login") return <ErrorBoundary><AuthLayout><Login initialEmail={email || ""} onSuccess={handleAuthSuccess} onSwitchToRegister={() => setView("register")} /></AuthLayout></ErrorBoundary>;
+  if (view === "register") return <ErrorBoundary><AuthLayout><Register initialEmail={email || ""} onSuccess={handleAuthSuccess} onSwitchToLogin={() => setView("login")} /></AuthLayout></ErrorBoundary>;
 
-  // Show device setup if logged in but no encryption key
   if (view === "main" && keys.needsKeySetup) {
     return (
       <ErrorBoundary>
@@ -797,7 +636,6 @@ function AppContent() {
       {isScanning && <ScanningOverlay onCancel={handleCancelScan} />}
 
       <div className={`transition-opacity duration-300 ${isScanning ? 'opacity-0' : 'opacity-100'}`}>
-        {/* Mobile Layout - show for mobile platforms regardless of screen size */}
         {isMobilePlatform && (
           <div className="h-dvh w-full">
             <MobileLayout
@@ -831,7 +669,6 @@ function AppContent() {
           </div>
         )}
 
-        {/* Desktop Layout - show for desktop platforms */}
         {!isMobilePlatform && (
           <div className="flex flex-row h-screen w-full overflow-hidden bg-(--color-bg) text-(--color-text-primary)">
             <Sidebar
@@ -957,7 +794,11 @@ function AppContent() {
                   </div>
                 </div>
               </div>
-              {!device.isCurrentDevice && <button onClick={() => removeDevice(device.id)} className="text-(--color-text-secondary) hover:text-red-500 transition-colors">{Icons.trash}</button>}
+              {!device.isCurrentDevice && (
+                <button onClick={() => removeDevice(device.id)} className="text-(--color-text-secondary) hover:text-red-500 transition-colors">
+                  {Icons.trash}
+                </button>
+              )}
             </div>
           ))}
         </div>

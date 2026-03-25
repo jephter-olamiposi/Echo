@@ -1,23 +1,19 @@
 //! Firebase Cloud Messaging (FCM) push notifications.
-//!
 //! Uses data-only messages for background sync support.
 
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
+use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     fmt, fs,
-    sync::RwLock,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
 use tracing::{error, info, warn};
 
-/// Errors that can occur when sending push notifications.
 #[derive(Debug)]
-pub enum PushError {
-    /// The FCM token is invalid/expired/unregistered. Should be removed.
+pub(crate) enum PushError {
     InvalidToken,
-    /// Any other error (network, auth, etc).
     Other(String),
 }
 
@@ -32,7 +28,7 @@ impl fmt::Display for PushError {
 
 impl std::error::Error for PushError {}
 
-pub struct PushClient {
+pub(crate) struct PushClient {
     client: reqwest::Client,
     project_id: String,
     service_account: ServiceAccount,
@@ -63,12 +59,12 @@ struct TokenResponse {
 }
 
 impl PushClient {
-    pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub(crate) fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let json = fs::read_to_string(path)?;
         Self::from_json(&json)
     }
 
-    pub fn from_json(json: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
+    pub(crate) fn from_json(json: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
         let sa: ServiceAccount = serde_json::from_str(json)?;
         Ok(Self {
             project_id: sa.project_id.clone(),
@@ -79,7 +75,7 @@ impl PushClient {
     }
 
     async fn access_token(&self) -> Result<String, PushError> {
-        if let Some((token, exp)) = self.cached_token.read().unwrap().clone() {
+        if let Some((token, exp)) = self.cached_token.read().clone() {
             if exp > Instant::now() + Duration::from_secs(60) {
                 return Ok(token);
             }
@@ -117,14 +113,14 @@ impl PushClient {
             .await
             .map_err(|e| PushError::Other(format!("Token parse failed: {}", e)))?;
 
-        *self.cached_token.write().unwrap() = Some((
+        *self.cached_token.write() = Some((
             resp.access_token.clone(),
             Instant::now() + Duration::from_secs(resp.expires_in),
         ));
         Ok(resp.access_token)
     }
 
-    pub async fn send(&self, token: &str, title: &str, body: &str) -> Result<(), PushError> {
+    pub(crate) async fn send(&self, token: &str, title: &str, body: &str) -> Result<(), PushError> {
         let payload = json!({
             "message": {
                 "token": token,
@@ -171,7 +167,7 @@ impl PushClient {
         }
     }
 
-    pub async fn notify_sync(&self, token: &str, from: &str) -> Result<(), PushError> {
+    pub(crate) async fn notify_sync(&self, token: &str, from: &str) -> Result<(), PushError> {
         self.send(token, "Echo", &format!("Tap to sync from {}", from))
             .await
     }

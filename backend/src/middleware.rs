@@ -12,10 +12,10 @@ use axum_extra::{
 use jsonwebtoken::{decode, DecodingKey, Validation};
 use uuid::Uuid;
 
-use crate::{error::AppError, models::Claims, state::AppState};
+use crate::{dto::Claims, error::AppError, state::AppState};
 
-pub struct AuthUser {
-    pub user_id: Uuid,
+pub(crate) struct AuthUser {
+    pub(crate) user_id: Uuid,
 }
 
 impl<S> FromRequestParts<S> for AuthUser
@@ -35,7 +35,7 @@ where
 
         let token_data = decode::<Claims>(
             bearer.token(),
-            &DecodingKey::from_secret(state.jwt_secret.as_bytes()),
+            &DecodingKey::from_secret(state.jwt_secret().as_bytes()),
             &Validation::default(),
         )
         .map_err(|_| AppError::Auth("Invalid or expired token".into()))?;

@@ -8,10 +8,8 @@ use axum::{
 use serde::Serialize;
 use thiserror::Error;
 
-///
-/// All handlers return `Result<T, AppError>` for consistent error handling.
 #[derive(Debug, Error)]
-pub enum AppError {
+pub(crate) enum AppError {
     /// Authentication/authorization failure (401 Unauthorized)
     #[error("Authentication error: {0}")]
     Auth(String),
@@ -41,7 +39,6 @@ pub enum AppError {
     Task(#[from] tokio::task::JoinError),
 }
 
-/// JSON response body for errors
 #[derive(Serialize)]
 struct ErrorBody {
     error: String,
@@ -100,11 +97,5 @@ impl IntoResponse for AppError {
     }
 }
 
-/// Result type alias for handlers.
-///
-/// Convenience type to reduce boilerplate. Usage:
-/// ```ignore
-/// async fn my_handler() -> AppResult<impl IntoResponse> { ... }
-/// ```
 #[allow(dead_code)]
-pub type AppResult<T> = Result<T, AppError>;
+pub(crate) type AppResult<T> = Result<T, AppError>;

@@ -1,9 +1,10 @@
 mod clipboard;
 
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(target_os = "macos")]
+use tauri::ActivationPolicy;
 use tauri::Manager;
 
-// Global flag for background mode (read from frontend store on startup)
 static BACKGROUND_MODE: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
@@ -37,16 +38,12 @@ pub fn run() {
         builder = builder.plugin(tauri_plugin_barcode_scanner::init());
     }
 
-    // Desktop-only: single instance to show hidden window on relaunch
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            // When user relaunches, show the existing hidden window
             if let Some(window) = app.get_webview_window("main") {
-                // Restore to regular app (show in dock) on macOS
                 #[cfg(target_os = "macos")]
                 {
-                    use tauri::ActivationPolicy;
                     let _ = app.set_activation_policy(ActivationPolicy::Regular);
                 }
                 let _ = window.show();
@@ -68,7 +65,6 @@ pub fn run() {
             }
             Ok(())
         })
-        // Desktop-only: intercept close to hide window if background mode is enabled
         .on_window_event(|window, event| {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             {
@@ -79,31 +75,27 @@ pub fn run() {
                         bg_mode
                     );
                     if bg_mode {
-                        // Prevent actual close
                         api.prevent_close();
-                        println!("[close_handler] Hiding window...");
-                        // Hide the window
                         let _ = window.hide();
-                        // Completely remove from dock on macOS by becoming a background app
                         #[cfg(target_os = "macos")]
                         {
-                            use tauri::ActivationPolicy;
                             let _ = window
                                 .app_handle()
                                 .set_activation_policy(ActivationPolicy::Accessory);
-                            println!("[close_handler] Set to Accessory mode (no dock icon)");
                         }
                     } else {
                         println!("[close_handler] Allowing close (app will quit)");
                     }
                 }
             }
-            // Suppress unused variable warning on mobile
             #[cfg(any(target_os = "android", target_os = "ios"))]
             {
                 let _ = (window, event);
             }
         })
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .unwrap_or_else(|e| {
+            eprintln!("Failed to run tauri application: {e}");
+            std::process::exit(1);
+        });
 }

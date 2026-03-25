@@ -1,103 +1,101 @@
 #[cfg(test)]
 mod rate_limit_tests {
-    use crate::state::SyncEngine;
+    use crate::state::TestFixture;
     use std::thread;
     use std::time::Duration;
 
     #[test]
     fn allows_first_message() {
-        let engine = SyncEngine::default();
-        assert!(engine.check_rate_limit("device_1"));
+        let f = TestFixture::default();
+        assert!(f.rate_limiter.check_device("device_1"));
     }
 
     #[test]
     fn blocks_rapid_fire_messages() {
-        let engine = SyncEngine::default();
+        let f = TestFixture::default();
         let device = "rapid_device";
 
-        assert!(engine.check_rate_limit(device));
-        assert!(!engine.check_rate_limit(device));
+        assert!(f.rate_limiter.check_device(device));
+        assert!(!f.rate_limiter.check_device(device));
     }
 
     #[test]
     fn allows_message_after_interval() {
-        let engine = SyncEngine::default();
+        let f = TestFixture::default();
         let device = "slow_device";
 
-        assert!(engine.check_rate_limit(device));
+        assert!(f.rate_limiter.check_device(device));
         thread::sleep(Duration::from_millis(150));
-        assert!(engine.check_rate_limit(device));
+        assert!(f.rate_limiter.check_device(device));
     }
 
     #[test]
     fn blocks_after_window_limit() {
-        let engine = SyncEngine::default();
+        let f = TestFixture::default();
         let device = "spam_device";
 
         // MAX_MESSAGES_PER_WINDOW = 300
         for i in 0..300 {
-            {
-                let mut entry = engine.rate_limits.entry(device.to_string()).or_default();
-                entry.value_mut().last_message = None;
-            }
+            f.rate_limiter.reset_interval_for(device);
             assert!(
-                engine.check_rate_limit(device),
-                "Message {} should be allowed",
+                f.rate_limiter.check_device(device),
+                "message {} should be allowed",
                 i + 1
             );
         }
 
-        {
-            let mut entry = engine.rate_limits.entry(device.to_string()).or_default();
-            entry.value_mut().last_message = None;
-        }
+        f.rate_limiter.reset_interval_for(device);
         assert!(
-            !engine.check_rate_limit(device),
-            "Message 301 should be blocked"
+            !f.rate_limiter.check_device(device),
+            "message 301 should be blocked"
         );
     }
 
     #[test]
-    fn different_devices_independent() {
-        let engine = SyncEngine::default();
+    fn different_devices_are_independent() {
+        let f = TestFixture::default();
 
-        assert!(engine.check_rate_limit("device_a"));
-        assert!(engine.check_rate_limit("device_b"));
-        assert!(!engine.check_rate_limit("device_a"));
+        assert!(f.rate_limiter.check_device("device_a"));
+        assert!(f.rate_limiter.check_device("device_b"));
+        assert!(!f.rate_limiter.check_device("device_a"));
 
         thread::sleep(Duration::from_millis(150));
-        assert!(engine.check_rate_limit("device_b"));
+        assert!(f.rate_limiter.check_device("device_b"));
     }
 }
 
 #[cfg(test)]
 mod history_tests {
-    use crate::models::ClipboardMessage;
-    use crate::state::SyncEngine;
+    use crate::protocol::ClipboardMessage;
+    use crate::state::TestFixture;
     use uuid::Uuid;
 
     #[test]
     fn adds_to_history() {
-        let engine = SyncEngine::default();
+        let f = TestFixture::default();
         let user_id = Uuid::new_v4();
 
-        engine.add_to_history(user_id, ClipboardMessage::new("device_1", "Hello"));
+        f.sync
+            .add_to_history(user_id, ClipboardMessage::new("device_1", "Hello"));
 
-        let history = engine.get_history(&user_id);
+        let history = f.sync.get_history(&user_id);
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].content, "Hello");
     }
 
     #[test]
     fn history_newest_first() {
-        let engine = SyncEngine::default();
+        let f = TestFixture::default();
         let user_id = Uuid::new_v4();
 
-        engine.add_to_history(user_id, ClipboardMessage::new("d1", "First"));
-        engine.add_to_history(user_id, ClipboardMessage::new("d1", "Second"));
-        engine.add_to_history(user_id, ClipboardMessage::new("d1", "Third"));
+        f.sync
+            .add_to_history(user_id, ClipboardMessage::new("d1", "First"));
+        f.sync
+            .add_to_history(user_id, ClipboardMessage::new("d1", "Second"));
+        f.sync
+            .add_to_history(user_id, ClipboardMessage::new("d1", "Third"));
 
-        let history = engine.get_history(&user_id);
+        let history = f.sync.get_history(&user_id);
         assert_eq!(history.len(), 3);
         assert_eq!(history[0].content, "Third");
         assert_eq!(history[1].content, "Second");
@@ -106,14 +104,15 @@ mod history_tests {
 
     #[test]
     fn history_truncates_at_50() {
-        let engine = SyncEngine::default();
+        let f = TestFixture::default();
         let user_id = Uuid::new_v4();
 
         for i in 0..60 {
-            engine.add_to_history(user_id, ClipboardMessage::new("d1", format!("msg_{}", i)));
+            f.sync
+                .add_to_history(user_id, ClipboardMessage::new("d1", format!("msg_{}", i)));
         }
 
-        let history = engine.get_history(&user_id);
+        let history = f.sync.get_history(&user_id);
         assert_eq!(history.len(), 50);
         assert_eq!(history[0].content, "msg_59");
         assert_eq!(history[49].content, "msg_10");
@@ -121,23 +120,23 @@ mod history_tests {
 
     #[test]
     fn empty_history_for_unknown_user() {
-        let engine = SyncEngine::default();
-        let unknown_user = Uuid::new_v4();
-
-        assert!(engine.get_history(&unknown_user).is_empty());
+        let f = TestFixture::default();
+        assert!(f.sync.get_history(&Uuid::new_v4()).is_empty());
     }
 
     #[test]
     fn users_have_separate_histories() {
-        let engine = SyncEngine::default();
+        let f = TestFixture::default();
         let user_a = Uuid::new_v4();
         let user_b = Uuid::new_v4();
 
-        engine.add_to_history(user_a, ClipboardMessage::new("d1", "User A message"));
-        engine.add_to_history(user_b, ClipboardMessage::new("d2", "User B message"));
+        f.sync
+            .add_to_history(user_a, ClipboardMessage::new("d1", "User A message"));
+        f.sync
+            .add_to_history(user_b, ClipboardMessage::new("d2", "User B message"));
 
-        let history_a = engine.get_history(&user_a);
-        let history_b = engine.get_history(&user_b);
+        let history_a = f.sync.get_history(&user_a);
+        let history_b = f.sync.get_history(&user_b);
 
         assert_eq!(history_a.len(), 1);
         assert_eq!(history_b.len(), 1);
@@ -148,7 +147,7 @@ mod history_tests {
 
 #[cfg(test)]
 mod models_tests {
-    use crate::models::ClipboardMessage;
+    use crate::protocol::ClipboardMessage;
 
     #[test]
     fn clipboard_message_new_sets_defaults() {
@@ -173,51 +172,51 @@ mod models_tests {
 
 #[cfg(test)]
 mod channel_tests {
-    use crate::state::SyncEngine;
+    use crate::state::TestFixture;
     use uuid::Uuid;
 
     #[test]
     fn creates_new_channel() {
-        let engine = SyncEngine::default();
+        let f = TestFixture::default();
         let user_id = Uuid::new_v4();
 
-        assert!(!engine.hub.contains_key(&user_id));
-        let _tx = engine.get_or_create_channel(user_id);
-        assert!(engine.hub.contains_key(&user_id));
+        assert!(!f.sync.channel_exists(&user_id));
+        let _tx = f.sync.get_or_create_channel(user_id);
+        assert!(f.sync.channel_exists(&user_id));
     }
 
     #[test]
     fn reuses_existing_channel() {
-        let engine = SyncEngine::default();
+        let f = TestFixture::default();
         let user_id = Uuid::new_v4();
 
-        let tx1 = engine.get_or_create_channel(user_id);
-        let tx2 = engine.get_or_create_channel(user_id);
+        let tx1 = f.sync.get_or_create_channel(user_id);
+        let tx2 = f.sync.get_or_create_channel(user_id);
 
         assert_eq!(tx1.receiver_count(), tx2.receiver_count());
     }
 
     #[test]
     fn cleanup_removes_empty_channel() {
-        let engine = SyncEngine::default();
+        let f = TestFixture::default();
         let user_id = Uuid::new_v4();
 
-        let tx = engine.get_or_create_channel(user_id);
-        assert!(engine.hub.contains_key(&user_id));
+        let tx = f.sync.get_or_create_channel(user_id);
+        assert!(f.sync.channel_exists(&user_id));
 
-        engine.cleanup_channel_if_empty(&user_id, &tx);
-        assert!(!engine.hub.contains_key(&user_id));
+        f.sync.cleanup_channel_if_empty(&user_id, &tx);
+        assert!(!f.sync.channel_exists(&user_id));
     }
 
     #[test]
     fn cleanup_keeps_channel_with_subscribers() {
-        let engine = SyncEngine::default();
+        let f = TestFixture::default();
         let user_id = Uuid::new_v4();
 
-        let tx = engine.get_or_create_channel(user_id);
+        let tx = f.sync.get_or_create_channel(user_id);
         let _rx = tx.subscribe();
 
-        engine.cleanup_channel_if_empty(&user_id, &tx);
-        assert!(engine.hub.contains_key(&user_id));
+        f.sync.cleanup_channel_if_empty(&user_id, &tx);
+        assert!(f.sync.channel_exists(&user_id));
     }
 }

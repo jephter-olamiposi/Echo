@@ -1,17 +1,18 @@
 //! Password hashing (Argon2) and JWT token management.
 
+use crate::dto::Claims;
 use crate::error::AppError;
-use crate::models::Claims;
 use argon2::{
     password_hash::{rand_core::OsRng, SaltString},
     Argon2, PasswordHash, PasswordHasher, PasswordVerifier,
 };
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
+use std::time::{SystemTime, UNIX_EPOCH};
 use uuid::Uuid;
 
 const JWT_EXPIRY_HOURS: u64 = 48;
 
-pub fn hash_password(password: String) -> Result<String, AppError> {
+pub(crate) fn hash_password(password: String) -> Result<String, AppError> {
     let salt = SaltString::generate(&mut OsRng);
     Argon2::default()
         .hash_password(password.as_bytes(), &salt)
@@ -19,7 +20,7 @@ pub fn hash_password(password: String) -> Result<String, AppError> {
         .map_err(|e| AppError::Internal(format!("Hash failed: {e}")))
 }
 
-pub fn verify_password(password: String, hash: String) -> Result<bool, AppError> {
+pub(crate) fn verify_password(password: String, hash: String) -> Result<bool, AppError> {
     Ok(PasswordHash::new(&hash)
         .ok()
         .map(|h| {
@@ -30,9 +31,9 @@ pub fn verify_password(password: String, hash: String) -> Result<bool, AppError>
         .unwrap_or(false))
 }
 
-pub fn generate_jwt(user_id: Uuid, secret: &str) -> Result<String, AppError> {
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
+pub(crate) fn generate_jwt(user_id: Uuid, secret: &str) -> Result<String, AppError> {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
         .map_err(|e| AppError::Internal(e.to_string()))?
         .as_secs() as usize;
 
@@ -50,7 +51,7 @@ pub fn generate_jwt(user_id: Uuid, secret: &str) -> Result<String, AppError> {
     .map_err(|e| AppError::Internal(e.to_string()))
 }
 
-pub fn decode_jwt(token: &str, secret: &str) -> Result<Claims, AppError> {
+pub(crate) fn decode_jwt(token: &str, secret: &str) -> Result<Claims, AppError> {
     let validation = Validation::default();
     let key = DecodingKey::from_secret(secret.as_bytes());
 

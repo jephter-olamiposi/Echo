@@ -8,7 +8,6 @@ mod desktop {
     use std::time::{Duration, Instant};
     use tauri::{AppHandle, Emitter, Listener};
 
-    // Adaptive polling: fast when active, slow when idle
     const FAST_POLL_MS: u64 = 300;
     const SLOW_POLL_MS: u64 = 1000;
     const IDLE_THRESHOLD_SECS: u64 = 60;
@@ -26,7 +25,6 @@ mod desktop {
         let ignored_hash: IgnoredHash = Arc::new(Mutex::new(None));
         let ignored_hash_clone = ignored_hash.clone();
 
-        // Listen for remote clipboard events to trigger ignore
         app.listen("clipboard-remote-write", move |event| {
             if let Ok(text) = serde_json::from_str::<String>(event.payload()) {
                 let hash = calculate_hash(&text);
@@ -44,7 +42,6 @@ mod desktop {
                     let mut last_change = Instant::now();
                     eprintln!("[clipboard] monitor started (adaptive polling)");
 
-                    // Emit initial clipboard content if non-empty
                     if !last_text.is_empty() {
                         eprintln!(
                             "[clipboard] emitting initial content: {} chars",
@@ -56,7 +53,6 @@ mod desktop {
                     }
 
                     loop {
-                        // Adaptive polling: fast after recent activity, slow when idle
                         let idle_secs = last_change.elapsed().as_secs();
                         let poll_ms = if idle_secs < IDLE_THRESHOLD_SECS {
                             FAST_POLL_MS
@@ -69,18 +65,18 @@ mod desktop {
                             Ok(current) if current != last_text && !current.is_empty() => {
                                 let current_hash = calculate_hash(&current);
 
-                                // Check if this should be ignored
                                 {
-                                    let mut guard = ignored_hash.lock().unwrap();
-                                    if let Some(ignored) = *guard {
-                                        if ignored == current_hash {
-                                            eprintln!("[clipboard] skipped echoed content");
-                                            *guard = None;
-                                            last_text = current;
-                                            continue;
+                                    if let Ok(mut guard) = ignored_hash.lock() {
+                                        if let Some(ignored) = *guard {
+                                            if ignored == current_hash {
+                                                eprintln!("[clipboard] skipped echoed content");
+                                                *guard = None;
+                                                last_text = current;
+                                                continue;
+                                            }
                                         }
+                                        *guard = None;
                                     }
-                                    *guard = None;
                                 }
 
                                 last_text = current.clone();
