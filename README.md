@@ -29,7 +29,7 @@ The following diagram illustrates the lifecycle of a clipboard event across the 
   |                         |-- Hub Routing --------->|
   |                         |   (DashMap Look-up)     |
   |                         |                         |
-  |                         |-- Broadcast Arc<Msg> -->|
+  |                         |-- Broadcast Message --->|
   |                         |                         |
   |                         |<-- Decrypt Payloads ----|
   |                         |    (XChaCha20-Poly1305) |
@@ -42,7 +42,7 @@ The following diagram illustrates the lifecycle of a clipboard event across the 
 ### Backend Implementation (Rust/Axum)
 The synchronization server is built for high-throughput concurrency:
 - **Concurrent Hash Maps**: Utilizes `DashMap` for sharded state management, bypassing the bottleneck of standard `RwLock<HashMap>` and optimizing p99 broadcast latency.
-- **Resource Profiling**: Implements Arc-based message sharing to minimize heap allocations and avoid cloning overhead during N-device fan-out.
+- **Efficient Fan-out**: `ClipboardMessage` implements `Clone`; the broadcast channel distributes to N receivers with per-subscriber clones, avoiding shared mutable state entirely.
 - **Data Persistence**: **SQLx** for asynchronous, type-safe interaction with PostgreSQL, utilizing indexed queries for efficient history retrieval.
 
 ### Frontend Strategy (React + Tauri)

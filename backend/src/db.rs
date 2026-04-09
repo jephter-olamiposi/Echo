@@ -111,6 +111,8 @@ impl ClipboardHistoryRepository {
     }
 
     pub(crate) async fn add(&self, user_id: Uuid, msg: &ClipboardMessage) -> Result<(), AppError> {
+        let mut tx = self.pool.begin().await?;
+
         sqlx::query!(
             r#"
             INSERT INTO clipboard_history (user_id, device_id, device_name, content, nonce, encrypted, timestamp)
@@ -124,7 +126,7 @@ impl ClipboardHistoryRepository {
             msg.encrypted,
             msg.timestamp as i64
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
 
         sqlx::query!(
@@ -140,9 +142,10 @@ impl ClipboardHistoryRepository {
             "#,
             user_id
         )
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await?;
 
+        tx.commit().await?;
         Ok(())
     }
 

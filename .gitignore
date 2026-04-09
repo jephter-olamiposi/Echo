@@ -10,10 +10,22 @@
 
 # IDE/Editor
 .idea/
+.vscode/
 *.swp
 *.swo
 *~
 .DS_Store
+
+# AI / personal
+CLAUDE.md
+rust.md
+linkedin.md
+.claude/
+
+# Sensitive credentials
+firebase-service-account.json
+*-service-account.json
+*.pem
 
 # Logs
 *.log

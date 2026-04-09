@@ -195,6 +195,7 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: uuid::Uuid) 
     let recv_task = tokio::spawn(handle_incoming(
         stream,
         tx.clone(),
+        write_tx.clone(),
         device_id.clone(),
         state.clone(),
         user_id,
@@ -230,6 +231,7 @@ async fn run_writer(
 async fn handle_incoming(
     mut stream: futures::stream::SplitStream<WebSocket>,
     tx: tokio::sync::broadcast::Sender<ClipboardMessage>,
+    write_tx: mpsc::Sender<Message>,
     device_id: DeviceId,
     state: AppState,
     user_id: uuid::Uuid,
@@ -241,7 +243,7 @@ async fn handle_incoming(
                     continue;
                 }
 
-                let clipboard_msg = match serde_json::from_str::<ClipboardMessage>(&text) {
+                let mut clipboard_msg = match serde_json::from_str::<ClipboardMessage>(&text) {
                     Ok(msg) => msg,
                     Err(e) => {
                         tracing::warn!(
@@ -253,6 +255,9 @@ async fn handle_incoming(
                         continue;
                     }
                 };
+                // INVARIANT: always use the server-validated device_id from the handshake.
+                // Clients must not be able to spoof a different device identity mid-session.
+                clipboard_msg.device_id = device_id.as_str().to_owned();
 
                 if clipboard_msg.content.len() > MAX_CLIPBOARD_SIZE {
                     tracing::warn!(
@@ -273,6 +278,11 @@ async fn handle_incoming(
 
                 if !state.check_rate_limit(device_id.as_str()) {
                     tracing::warn!(device = %device_id, "rate limited");
+                    let _ = write_tx
+                        .send(Message::Text(
+                            r#"{"error":"rate_limited","code":"RATE_LIMIT"}"#.into(),
+                        ))
+                        .await;
                     continue;
                 }
 

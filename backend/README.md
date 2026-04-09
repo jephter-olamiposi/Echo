@@ -21,8 +21,8 @@ The backend is structured into specialized modules to isolate side effects and m
 ### Sharded State Control
 To minimize lock contention in high-concurrency scenarios (1,000+ active WS connections), the server utilizes `DashMap`. This sharded concurrent hash map allows parallel mutations of user states without global locking.
 
-### Zero-Copy Broadcast
-Real-time clipboard fan-out is handled via `tokio::sync::broadcast`. Messages are wrapped in `Arc` (Atomic Reference Counting) to ensure that broadcasting to N devices involves only a few atomic increments rather than full payload cloning.
+### Broadcast Fan-out
+Real-time clipboard fan-out is handled via `tokio::sync::broadcast`. `ClipboardMessage` implements `Clone`; each subscriber receives its own copy. The dedicated writer task owns the WebSocket sink exclusively — no mutex is held across an await point.
 
 ## 🗄️ Database Context
 
@@ -50,7 +50,7 @@ Sent immediately upon connection to map the WebSocket stream to a logical device
 {
   "device_id": "uuid-v4",
   "device_name": "Echo Desktop (Mac)",
-  "content": "__HANDSHAKE__",
+  "content": "handshake",
   "timestamp": 1705234200000,
   "encrypted": false
 }
@@ -74,11 +74,11 @@ Broadcasted by the server when a device joins or leaves the user's hub.
 - `__JOIN__`: Device associated and ready for sync.
 - `__LEAVE__`: Device disconnected or timed out.
 
-### 4. Protocol Error Codes
-Applied to `CloseFrame` or explicit error messages:
-- `4001`: Authentication Failed (Invalid/Expired JWT).
-- `4002`: Protocol Violation (Malformed JSON).
-- `4003`: Security Violation (Unencrypted payload received).
+### 4. Rate Limit Response
+When a device exceeds the rate limit, the server sends an error frame before discarding the message:
+```json
+{ "error": "rate_limited", "code": "RATE_LIMIT" }
+```
 
 ## 🛠️ Diagnostic Tooling
 

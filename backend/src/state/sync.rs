@@ -5,7 +5,7 @@ use crate::error::AppError;
 use crate::protocol::ClipboardMessage;
 use crate::types::{DeviceId, DeviceName};
 use dashmap::DashMap;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use uuid::Uuid;
@@ -18,7 +18,7 @@ const CAPACITY_PER_DEVICE: usize = 25;
 #[derive(Clone, Default)]
 pub(crate) struct SyncState {
     hub: Arc<DashMap<Uuid, broadcast::Sender<ClipboardMessage>>>,
-    history: Arc<DashMap<Uuid, Vec<ClipboardMessage>>>,
+    history: Arc<DashMap<Uuid, VecDeque<ClipboardMessage>>>,
     sessions: Arc<DashMap<Uuid, HashMap<String, String>>>,
 }
 
@@ -94,21 +94,23 @@ impl SyncState {
         let mut entry = self
             .history
             .entry(user_id)
-            .or_insert_with(|| Vec::with_capacity(MAX_HISTORY_SIZE));
+            .or_insert_with(|| VecDeque::with_capacity(MAX_HISTORY_SIZE + 1));
         let history = entry.value_mut();
-        history.insert(0, msg);
-        history.truncate(MAX_HISTORY_SIZE);
+        history.push_front(msg);
+        if history.len() > MAX_HISTORY_SIZE {
+            history.pop_back();
+        }
     }
 
     pub(crate) fn get_history(&self, user_id: &Uuid) -> Vec<ClipboardMessage> {
         self.history
             .get(user_id)
-            .map(|h| h.value().clone())
+            .map(|h| h.iter().cloned().collect())
             .unwrap_or_default()
     }
 
     pub(crate) fn set_history(&self, user_id: Uuid, msgs: Vec<ClipboardMessage>) {
-        *self.history.entry(user_id).or_default().value_mut() = msgs;
+        *self.history.entry(user_id).or_default().value_mut() = msgs.into_iter().collect();
     }
 
     pub(crate) fn clear_history_memory(&self, user_id: &Uuid) -> Result<(), AppError> {

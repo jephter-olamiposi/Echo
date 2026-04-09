@@ -2,13 +2,13 @@
 //! Uses data-only messages for background sync support.
 
 use jsonwebtoken::{encode, Algorithm, EncodingKey, Header};
-use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     fmt, fs,
     time::{Duration, Instant, SystemTime, UNIX_EPOCH},
 };
+use tokio::sync::Mutex;
 use tracing::{error, info, warn};
 
 #[derive(Debug)]
@@ -32,7 +32,9 @@ pub(crate) struct PushClient {
     client: reqwest::Client,
     project_id: String,
     service_account: ServiceAccount,
-    cached_token: RwLock<Option<(String, Instant)>>,
+    // INVARIANT: Mutex serializes concurrent token refreshes so at most one
+    // in-flight request fetches a new OAuth2 token at any given time.
+    cached_token: Mutex<Option<(String, Instant)>>,
 }
 
 #[derive(Deserialize)]
@@ -70,14 +72,16 @@ impl PushClient {
             project_id: sa.project_id.clone(),
             client: reqwest::Client::new(),
             service_account: sa,
-            cached_token: RwLock::new(None),
+            cached_token: Mutex::new(None),
         })
     }
 
     async fn access_token(&self) -> Result<String, PushError> {
-        if let Some((token, exp)) = self.cached_token.read().clone() {
-            if exp > Instant::now() + Duration::from_secs(60) {
-                return Ok(token);
+        let mut guard = self.cached_token.lock().await;
+
+        if let Some((token, exp)) = guard.as_ref() {
+            if *exp > Instant::now() + Duration::from_secs(60) {
+                return Ok(token.clone());
             }
         }
 
@@ -113,7 +117,7 @@ impl PushClient {
             .await
             .map_err(|e| PushError::Other(format!("Token parse failed: {}", e)))?;
 
-        *self.cached_token.write() = Some((
+        *guard = Some((
             resp.access_token.clone(),
             Instant::now() + Duration::from_secs(resp.expires_in),
         ));

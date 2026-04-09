@@ -96,6 +96,3 @@ impl IntoResponse for AppError {
             .into_response()
     }
 }
-
-#[allow(dead_code)]
-pub(crate) type AppResult<T> = Result<T, AppError>;

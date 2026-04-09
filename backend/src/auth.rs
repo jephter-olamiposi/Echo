@@ -12,6 +12,10 @@ use uuid::Uuid;
 
 const JWT_EXPIRY_HOURS: u64 = 48;
 
+// INVARIANT: HS256 (symmetric HMAC) is correct for this single-server deployment.
+// If token validation ever moves to a separate service or edge layer, migrate to
+// RS256 so the signing key stays on the issuer and verifiers only need the public key.
+
 pub(crate) fn hash_password(password: String) -> Result<String, AppError> {
     let salt = SaltString::generate(&mut OsRng);
     Argon2::default()

@@ -37,7 +37,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             backend/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('backend/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
 
       - name: Check formatting
         run: cargo fmt -- --check
