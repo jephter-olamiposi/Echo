@@ -119,6 +119,12 @@ impl AppState {
     }
 
     pub(crate) async fn load_history_from_db(&self, user_id: Uuid) {
+        // In-memory history is the authoritative cache once populated. Overwriting it with a DB
+        // snapshot would discard messages that were added to memory but whose async DB writes
+        // have not yet committed — causing history gaps on reconnect.
+        if self.sync.has_history(&user_id) {
+            return;
+        }
         let repo = ClipboardHistoryRepository::new(self.pool.clone());
         match repo.get(&user_id, MAX_HISTORY_SIZE as i64).await {
             Ok(msgs) => {

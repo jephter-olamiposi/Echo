@@ -113,6 +113,12 @@ impl SyncState {
         *self.history.entry(user_id).or_default().value_mut() = msgs.into_iter().collect();
     }
 
+    /// Returns true if history has already been loaded into memory for this user.
+    /// Used to guard against overwriting live in-memory state with a stale DB snapshot.
+    pub(crate) fn has_history(&self, user_id: &Uuid) -> bool {
+        self.history.contains_key(user_id)
+    }
+
     pub(crate) fn clear_history_memory(&self, user_id: &Uuid) -> Result<(), AppError> {
         self.history.remove(user_id);
         Ok(())

@@ -1,7 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import {
   generateSecretKey,
-  exportKey,
   saveEncryptionKey,
   loadEncryptionKey,
   clearEncryptionKey,
@@ -10,7 +9,6 @@ import {
 export function useKeys() {
   const [encryptionKey, setEncryptionKey] = useState<Uint8Array | null>(null);
   const [fingerprint, setFingerprint] = useState<string | null>(null);
-  const [linkUri, setLinkUri] = useState<string | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [needsKeySetup, setNeedsKeySetup] = useState(false);
 
@@ -27,17 +25,11 @@ export function useKeys() {
     setFingerprint(hex);
   };
 
-  const generateLink = (key: Uint8Array) => {
-    const keyB64 = exportKey(key);
-    setLinkUri(`echo://${keyB64}`);
-  };
-
   const saveKey = useCallback(async (key: Uint8Array) => {
     await saveEncryptionKey(key);
     setEncryptionKey(key);
     setNeedsKeySetup(false);
     await generateFingerprint(key);
-    generateLink(key);
   }, []);
 
   const createNewKey = useCallback(async () => {
@@ -59,7 +51,6 @@ export function useKeys() {
       setEncryptionKey(key);
       setNeedsKeySetup(false);
       await generateFingerprint(key);
-      generateLink(key);
       setIsReady(true);
       return key;
     } catch (e) {
@@ -74,7 +65,6 @@ export function useKeys() {
     await clearEncryptionKey();
     setEncryptionKey(null);
     setFingerprint(null);
-    setLinkUri(null);
     setNeedsKeySetup(true);
   }, []);
 
@@ -86,7 +76,6 @@ export function useKeys() {
     () => ({
       encryptionKey,
       fingerprint,
-      linkUri,
       saveKey,
       createNewKey,
       clearKeys,
@@ -96,7 +85,6 @@ export function useKeys() {
     [
       encryptionKey,
       fingerprint,
-      linkUri,
       saveKey,
       createNewKey,
       clearKeys,

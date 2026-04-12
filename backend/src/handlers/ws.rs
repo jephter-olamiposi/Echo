@@ -115,6 +115,10 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: uuid::Uuid) 
 
     let tx = state.get_or_create_channel(user_id);
 
+    // Subscribe before history replay so any messages broadcast by other devices during
+    // the (async) DB load are buffered in rx rather than silently dropped.
+    let mut rx = tx.subscribe();
+
     let mut join_msg = ClipboardMessage::new(device_id.as_str(), MSG_PRESENCE_JOIN);
     join_msg.device_name = Some(device_name.as_str().to_owned());
     let _ = tx.send(join_msg);
@@ -156,8 +160,6 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: uuid::Uuid) 
     tracing::info!(user = %user_id, device = %device_id.as_str(), "history replay complete");
 
     // --- Concurrent sync tasks ---
-    let mut rx = tx.subscribe();
-
     let ping_tx = write_tx.clone();
     let ping_task = tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(PING_INTERVAL_SECS));

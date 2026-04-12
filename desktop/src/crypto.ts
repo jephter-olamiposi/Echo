@@ -90,7 +90,13 @@ export async function getOrCreateDeviceId(): Promise<string> {
 }
 
 export const exportKey = (key: Uint8Array) => toBase64Url(key);
-export const importKey = (str: string) => fromBase64Url(str);
+export const importKey = (str: string): Uint8Array => {
+  const bytes = fromBase64Url(str.trim());
+  if (bytes.length !== KEY_BYTES) {
+    throw new Error(`Invalid key: expected ${KEY_BYTES} bytes, got ${bytes.length}`);
+  }
+  return bytes;
+};
 
 const toBase64 = (b: Uint8Array) => {
   const CHUNK_SIZE = 0x8000;

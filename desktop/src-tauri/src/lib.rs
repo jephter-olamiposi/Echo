@@ -9,15 +9,12 @@ static BACKGROUND_MODE: AtomicBool = AtomicBool::new(false);
 
 #[tauri::command]
 fn set_background_mode(enabled: bool) {
-    println!("[background_mode] Setting to: {}", enabled);
     BACKGROUND_MODE.store(enabled, Ordering::SeqCst);
 }
 
 #[tauri::command]
 fn get_background_mode() -> bool {
-    let val = BACKGROUND_MODE.load(Ordering::SeqCst);
-    println!("[background_mode] Getting: {}", val);
-    val
+    BACKGROUND_MODE.load(Ordering::SeqCst)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -69,12 +66,7 @@ pub fn run() {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             {
                 if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    let bg_mode = BACKGROUND_MODE.load(Ordering::SeqCst);
-                    println!(
-                        "[close_handler] CloseRequested, background_mode={}",
-                        bg_mode
-                    );
-                    if bg_mode {
+                    if BACKGROUND_MODE.load(Ordering::SeqCst) {
                         api.prevent_close();
                         let _ = window.hide();
                         #[cfg(target_os = "macos")]
@@ -83,8 +75,6 @@ pub fn run() {
                                 .app_handle()
                                 .set_activation_policy(ActivationPolicy::Accessory);
                         }
-                    } else {
-                        println!("[close_handler] Allowing close (app will quit)");
                     }
                 }
             }

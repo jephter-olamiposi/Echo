@@ -18,6 +18,7 @@ const getStore = async () => {
 export function useClipboard() {
   const [history, setHistory] = useState<ClipboardEntry[]>([]);
   const lastSentRef = useRef<string>("");
+  const lastSentTimestampRef = useRef<number>(0);
   const { showError } = useToast();
 
   useEffect(() => {
@@ -27,7 +28,8 @@ export function useClipboard() {
         const saved = await store.get<ClipboardEntry[]>(HISTORY_STORAGE_KEY);
         if (saved && Array.isArray(saved)) {
           setHistory(saved);
-          if (saved[0]) lastSentRef.current = saved[0].content;
+          // Do NOT seed lastSentRef from history — it tracks outgoing sends only.
+          // Seeding it would block re-syncing the most recent item after restart.
         }
       } catch (e) {
         console.error("Failed to load history", e);
@@ -60,17 +62,19 @@ export function useClipboard() {
       const normalize = (s: string) => s.replace(/\r\n/g, "\n").trim();
       const normalizedText = normalize(text);
 
+      // Deduplicate outgoing sends: only block if the same text was sent within the last 5s.
+      const now = Date.now();
       if (
-        text === lastSentRef.current ||
-        normalizedText === normalize(lastSentRef.current)
+        source === "local" &&
+        (text === lastSentRef.current || normalizedText === normalize(lastSentRef.current)) &&
+        now - lastSentTimestampRef.current < 5000
       ) {
         return false;
       }
 
-      let wasAdded = true;
+      let wasAdded = false;
       setHistory((prev) => {
         if (prev.some((entry) => normalize(entry.content) === normalizedText)) {
-          wasAdded = false;
           return prev;
         }
 
@@ -84,21 +88,36 @@ export function useClipboard() {
           contentType,
         };
 
-        lastSentRef.current = text;
         const updated = [newEntry, ...prev].slice(0, 500);
         saveToStore(updated);
         return updated;
       });
+
+      // Update the send dedup ref synchronously so the next clipboard event sees it immediately.
+      if (source === "local") {
+        lastSentRef.current = text;
+        lastSentTimestampRef.current = now;
+        wasAdded = true;
+      } else {
+        // Remote entries always count as "added" so callers can update the OS clipboard.
+        wasAdded = true;
+      }
 
       return wasAdded;
     },
     []
   );
 
+  // Called when remote content is written to the OS clipboard so the local
+  // poller treats it as already-sent and doesn't echo it back as a new local copy.
+  const suppressNextLocalSend = useCallback((text: string) => {
+    lastSentRef.current = text;
+    lastSentTimestampRef.current = Date.now();
+  }, []);
+
   const copyToClipboard = useCallback(async (text: string) => {
     try {
       await writeText(text);
-      lastSentRef.current = text;
       haptic.success();
       return true;
     } catch (err) {
@@ -153,6 +172,7 @@ export function useClipboard() {
     () => ({
       history,
       addEntry,
+      suppressNextLocalSend,
       copyToClipboard,
       deleteEntry,
       togglePin,
@@ -163,6 +183,7 @@ export function useClipboard() {
     [
       history,
       addEntry,
+      suppressNextLocalSend,
       copyToClipboard,
       deleteEntry,
       togglePin,

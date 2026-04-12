@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import QRCode from "qrcode";
 import { getDeviceName } from "./utils/deviceName";
 import { type as platformType } from "@tauri-apps/plugin-os";
 import { listen } from "@tauri-apps/api/event";
@@ -25,9 +26,9 @@ import {
   generateLinkUri
 } from "./crypto";
 import { config } from "./config";
-import { fetchClipboardHistory } from "./api";
+import { fetchClipboardHistory, clearServerHistory } from "./api";
 
-import { AppState, MobileView, ContentType } from "./types";
+import { MobileView, ContentType } from "./types";
 import { ScanningOverlay } from "./components/mobile/ScanningOverlay";
 import { useClipboard } from "./hooks/useClipboard";
 import { useKeys } from "./hooks/useKeys";
@@ -59,7 +60,7 @@ function AppContent() {
   const { showToast, showError } = useToast();
 
   // ── Device identity ─────────────────────────────────────────────────────────
-  const [deviceId, setDeviceId] = useState<string>("unknown");
+  const [deviceId, setDeviceId] = useState<string>("");
   const [deviceName, setDeviceName] = useState<string>("This Device");
   const [isMobilePlatform, setIsMobilePlatform] = useState(false);
 
@@ -68,7 +69,6 @@ function AppContent() {
     () => showToast("Welcome to Echo!", "success"),
     async () => {
       clipboard.clearHistory();
-      await keys.clearKeys();
       setDevices([]);
     }
   );
@@ -96,8 +96,10 @@ function AppContent() {
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [manualKey, setManualKey] = useState("");
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
 
   const isRemoteUpdateRef = useRef(false);
+  const remoteUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isSyncingFromPushRef = useRef(false);
 
   const clipboardRef = useLatest(clipboard);
@@ -106,14 +108,27 @@ function AppContent() {
   // ── Clipboard sync helpers ───────────────────────────────────────────────────
   const copyToOsClipboard = useCallback(async (content: string) => {
     try {
+      // Stamp lastSentRef so iOS/Android pollers treat this content as already-sent
+      // and don't echo it back as a new local clipboard event.
+      clipboard.suppressNextLocalSend(content);
       isRemoteUpdateRef.current = true;
       const { emit } = await import("@tauri-apps/api/event");
       await emit("clipboard-remote-write", content);
       await clipboard.copyToClipboard(content);
-      setTimeout(() => { isRemoteUpdateRef.current = false; }, 1000);
+      // Cancel any previous timer before setting a new one — rapid consecutive remote
+      // writes would otherwise cause the first timer to clear the flag prematurely.
+      if (remoteUpdateTimerRef.current) clearTimeout(remoteUpdateTimerRef.current);
+      remoteUpdateTimerRef.current = setTimeout(() => {
+        remoteUpdateTimerRef.current = null;
+        isRemoteUpdateRef.current = false;
+      }, 1000);
       return true;
     } catch (e) {
       console.error("Failed to copy to OS clipboard:", e);
+      if (remoteUpdateTimerRef.current) {
+        clearTimeout(remoteUpdateTimerRef.current);
+        remoteUpdateTimerRef.current = null;
+      }
       isRemoteUpdateRef.current = false;
       return false;
     }
@@ -164,17 +179,8 @@ function AppContent() {
         const latestRemote = clipboardRef.current.getLatestRemoteEntry();
         if (latestRemote) {
           showToast("Syncing clipboard...", "info");
-          isRemoteUpdateRef.current = true;
-          try {
-            const { emit } = await import("@tauri-apps/api/event");
-            await emit("clipboard-remote-write", latestRemote.content);
-            await clipboardRef.current.copyToClipboard(latestRemote.content);
-            setTimeout(() => { isRemoteUpdateRef.current = false; }, 1000);
-            showToast("Clipboard synced!", "success");
-          } catch (e) {
-            console.error("[App] Warm start sync failed:", e);
-            isRemoteUpdateRef.current = false;
-          }
+          const success = await copyToOsClipboard(latestRemote.content);
+          if (success) showToast("Clipboard synced!", "success");
         } else {
           showToast("No clipboard to sync", "info");
         }
@@ -211,13 +217,21 @@ function AppContent() {
 
         const name = await getDeviceName();
         setDeviceName(name);
-        setDevices([{ id, name, lastSeen: Date.now(), isCurrentDevice: true }]);
+        // Merge rather than overwrite — peers may already have been added via __JOIN__
+        // messages that arrived before this async init completed.
+        setDevices(prev => {
+          const others = prev.filter(d => d.id !== id && !d.isCurrentDevice);
+          return [{ id, name, lastSeen: Date.now(), isCurrentDevice: true }, ...others];
+        });
       } catch (e) {
         console.error("Initialization error:", e);
-        if (deviceId === "unknown") {
+        if (!deviceId) {
           const fallbackId = crypto.randomUUID();
           setDeviceId(fallbackId);
-          setDevices([{ id: fallbackId, name: "Echo Device", lastSeen: Date.now(), isCurrentDevice: true }]);
+          setDevices(prev => {
+            const others = prev.filter(d => d.id !== fallbackId && !d.isCurrentDevice);
+            return [{ id: fallbackId, name: "Echo Device", lastSeen: Date.now(), isCurrentDevice: true }, ...others];
+          });
         }
       }
     };
@@ -251,12 +265,12 @@ function AppContent() {
         };
 
         unlistenFocusRef.current = await listen('tauri://window-focus', () => {
-          if (keys.encryptionKey) ws.connect();
+          if (keys.encryptionKey && !connectedRef.current) ws.connect();
           checkClipboard();
         });
 
         unlistenResumeRef.current = await listen('tauri://resume', () => {
-          if (keys.encryptionKey) ws.connect();
+          if (keys.encryptionKey && !connectedRef.current) ws.connect();
           checkClipboard();
         });
 
@@ -296,15 +310,30 @@ function AppContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keys.encryptionKey, deviceName]);
 
+  // ── QR code — generated locally so the key never leaves the device ──────────
+  useEffect(() => {
+    const linkUri = keys.encryptionKey
+      ? generateLinkUri(deviceId, keys.encryptionKey, config.wsUrl)
+      : null;
+    if (!linkUri) { setQrDataUrl(null); return; }
+    QRCode.toDataURL(linkUri, { width: 200, margin: 1 })
+      .then(setQrDataUrl)
+      .catch(() => setQrDataUrl(null));
+  }, [keys.encryptionKey, deviceId]);
+
   // ── Connect/disconnect WebSocket when auth or key state changes ──────────────
   useEffect(() => {
-    if (keys.encryptionKey && token) {
+    if (keys.encryptionKey && token && deviceId) {
+      // Clear remote devices before connecting. The backend re-sends __JOIN__ 
+      // for every currently-online peer on handshake, so we start fresh.
+      setDevices(prev => prev.filter(d => d.isCurrentDevice));
       ws.connect();
     } else {
       ws.disconnect();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [keys.encryptionKey, token]);
+  }, [keys.encryptionKey, token, deviceId]);
+
 
   // ── Mobile clipboard polling ─────────────────────────────────────────────────
   useEffect(() => {
@@ -340,8 +369,12 @@ function AppContent() {
             if (document.visibilityState !== 'visible') return;
             try {
               const text = await clipboardRef.current.readFromClipboard();
-              if (text && text !== lastPolledText && !isRemoteUpdateRef.current) {
+              if (text && text !== lastPolledText) {
+                // Always update lastPolledText, even for remote writes.
+                // If we skip without updating, the next poll after isRemoteUpdateRef
+                // clears will see text !== lastPolledText and echo the remote content.
                 lastPolledText = text;
+                if (isRemoteUpdateRef.current) return;
                 const wasAdded = clipboardRef.current.addEntry(text, 'local', deviceNameRef.current);
                 if (wasAdded && keysRef.current.encryptionKey) {
                   wsRef.current.send(text);
@@ -358,8 +391,9 @@ function AppContent() {
           document.addEventListener('visibilitychange', async () => {
             if (document.visibilityState === 'visible') {
               const text = await clipboardRef.current.readFromClipboard();
-              if (text && text !== lastPolledText && !isRemoteUpdateRef.current) {
+              if (text && text !== lastPolledText) {
                 lastPolledText = text;
+                if (isRemoteUpdateRef.current) return;
                 const wasAdded = clipboardRef.current.addEntry(text, 'local', deviceNameRef.current);
                 if (wasAdded && keysRef.current.encryptionKey) {
                   wsRef.current.send(text);
@@ -460,6 +494,10 @@ function AppContent() {
     try {
       const key = importKey(manualKey);
       await keys.saveKey(key);
+      // Old server history was encrypted with the previous key — purge it so
+      // the history replay doesn't fail decryption on every reconnect.
+      clearServerHistory().catch(() => {});
+      clipboard.clearHistory();
       showToast("Sync key saved!", "success");
       setManualKey("");
       setShowKeyInput(false);
@@ -506,6 +544,8 @@ function AppContent() {
         if (keyBase64) {
           const key = importKey(keyBase64);
           await keys.saveKey(key);
+          clearServerHistory().catch(() => {});
+          clipboard.clearHistory();
           showToast("Device linked successfully!", "success");
         } else {
           showToast("Invalid QR Code content", "error");
@@ -563,6 +603,8 @@ function AppContent() {
     try {
       const key = importKey(keyString);
       await keys.saveKey(key);
+      clearServerHistory().catch(() => {});
+      clipboard.clearHistory();
       showToast("Device linked successfully!", "success");
     } catch {
       showToast("Invalid encryption key", "error");
@@ -571,6 +613,7 @@ function AppContent() {
 
   const handleDeviceSetupCreateNew = async () => {
     await keys.createNewKey();
+    clearServerHistory().catch(() => {});
     clipboard.clearHistory();
     setDevices([]);
     ws.reconnect();
@@ -584,28 +627,6 @@ function AppContent() {
     return Icons.devices;
   };
 
-  // ── Derived state ───────────────────────────────────────────────────────────
-  const derivedState: AppState = useMemo(() => ({
-    history: clipboard.history,
-    connected,
-    searchQuery,
-    selectedEntry,
-    encryptionKey: keys.encryptionKey,
-    keyFingerprint: keys.fingerprint,
-    view,
-    isRefreshing,
-    filterType,
-    devices,
-    showQR,
-    linkUri: keys.encryptionKey ? generateLinkUri(deviceId, keys.encryptionKey, config.wsUrl) : keys.linkUri,
-    showDevices,
-    showKeyInput,
-    manualKey,
-    mobileView,
-    isLoading,
-    email: email || "",
-    showClearConfirm
-  }), [clipboard.history, connected, searchQuery, selectedEntry, keys.encryptionKey, keys.fingerprint, view, isRefreshing, filterType, devices, showQR, keys.linkUri, showDevices, showKeyInput, manualKey, mobileView, isLoading, showClearConfirm, deviceId, email]);
 
   // ── Routing ─────────────────────────────────────────────────────────────────
   if (view === "onboarding") return <ErrorBoundary><Onboarding onComplete={handleOnboardingComplete} /></ErrorBoundary>;
@@ -738,7 +759,7 @@ function AppContent() {
       </Modal>
 
       <Modal
-        isOpen={showQR && !!derivedState.linkUri}
+        isOpen={showQR && !!keys.encryptionKey}
         onClose={() => setShowQR(false)}
         title="Link a device"
         description="Scan this QR code with the Echo mobile app"
@@ -746,12 +767,10 @@ function AppContent() {
       >
         <div className="flex flex-col items-center gap-5">
           <div className="p-4 bg-white rounded-2xl">
-            <img
-              src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(derivedState.linkUri || "")}`}
-              alt="QR code for device pairing - scan with Echo mobile app"
-              width={200}
-              height={200}
-            />
+            {qrDataUrl
+              ? <img src={qrDataUrl} alt="QR code for device pairing - scan with Echo mobile app" width={200} height={200} />
+              : <div className="w-[200px] h-[200px] flex items-center justify-center text-gray-400 text-sm">Generating…</div>
+            }
           </div>
           <div className="w-full bg-(--color-surface-raised) p-3 rounded-xl border border-(--color-border) flex items-center gap-2">
             <code className="text-[12px] text-(--color-text-tertiary) truncate flex-1 font-mono">{keys.encryptionKey ? exportKey(keys.encryptionKey) : ""}</code>

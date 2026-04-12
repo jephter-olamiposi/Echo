@@ -184,6 +184,13 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
         content = decrypt(msg.content, msg.nonce, encryptionKeyRef.current);
       } catch (e) {
         console.error("[ws] Decryption failed:", e);
+        // Only alert for live messages. History items encrypted with a previous
+        // key are expected to fail after re-keying — no need to alarm the user.
+        if (!msg.is_history) {
+          onErrorRef.current?.(
+            "Failed to decrypt a message. Make sure both devices are using the same encryption key."
+          );
+        }
         return;
       }
 
@@ -259,6 +266,10 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     ws.onmessage = handleMessage;
 
     ws.onclose = (event) => {
+      // Ignore stale close events from sockets that have already been replaced
+      // (e.g. old socket fires onclose after logout→login replaces it with a new one).
+      if (wsRef.current !== ws) return;
+      wsRef.current = null;
       cleanup();
       updateConnectionState(false);
 
@@ -283,6 +294,9 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
   useEffect(() => {
     const handleOnline = () => {
+      const ws = wsRef.current;
+      const isAlive = ws && ws.readyState === WebSocket.OPEN;
+      if (isAlive) return;
       cleanup();
       retriesRef.current = 0;
       connect();

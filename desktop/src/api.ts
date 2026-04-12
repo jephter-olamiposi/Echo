@@ -122,3 +122,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
 export async function fetchClipboardHistory(): Promise<any[]> {
   return apiFetch("/history", { method: "GET" });
 }
+
+export async function clearServerHistory(): Promise<void> {
+  await apiFetch("/history", { method: "DELETE" });
+}

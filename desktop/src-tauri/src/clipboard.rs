@@ -30,7 +30,6 @@ mod desktop {
                 let hash = calculate_hash(&text);
                 if let Ok(mut guard) = ignored_hash_clone.lock() {
                     *guard = Some(hash);
-                    eprintln!("[clipboard] ignoring next change with hash: {}", hash);
                 }
             }
         });
@@ -40,16 +39,9 @@ mod desktop {
                 Ok(mut clipboard) => {
                     let mut last_text = clipboard.get_text().unwrap_or_default();
                     let mut last_change = Instant::now();
-                    eprintln!("[clipboard] monitor started (adaptive polling)");
 
                     if !last_text.is_empty() {
-                        eprintln!(
-                            "[clipboard] emitting initial content: {} chars",
-                            last_text.len()
-                        );
-                        if let Err(e) = app.emit("clipboard-init", last_text.clone()) {
-                            eprintln!("[clipboard] init emit error: {e}");
-                        }
+                        let _ = app.emit("clipboard-init", last_text.clone());
                     }
 
                     loop {
@@ -69,29 +61,24 @@ mod desktop {
                                     if let Ok(mut guard) = ignored_hash.lock() {
                                         if let Some(ignored) = *guard {
                                             if ignored == current_hash {
-                                                eprintln!("[clipboard] skipped echoed content");
                                                 *guard = None;
                                                 last_text = current;
                                                 continue;
                                             }
                                         }
-                                        *guard = None;
                                     }
                                 }
 
                                 last_text = current.clone();
-                                last_change = Instant::now(); // Reset activity timer
-                                if let Err(e) = app.emit("clipboard-change", current) {
-                                    eprintln!("[clipboard] emit error: {e}");
-                                }
+                                last_change = Instant::now();
+                                let _ = app.emit("clipboard-change", current);
                             }
                             Ok(_) => {}
                             Err(_) => {}
                         }
                     }
                 }
-                Err(e) => {
-                    eprintln!("[clipboard] init error: {e}, retrying in {INIT_RETRY_SECS}s");
+                Err(_) => {
                     thread::sleep(Duration::from_secs(INIT_RETRY_SECS));
                 }
             }
