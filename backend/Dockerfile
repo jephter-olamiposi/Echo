@@ -6,30 +6,30 @@ WORKDIR /app
 # Install build dependencies
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 
-# Copy manifests first to cache dependencies
+# Copy workspace manifests first to cache dependencies
 COPY Cargo.toml Cargo.lock ./
+COPY backend/Cargo.toml ./backend/Cargo.toml
 
-# Create a dummy main.rs to build dependencies (caching trick)
-RUN mkdir src && \
-    mkdir benches && \
-    echo "fn main() {}" > src/main.rs && \
-    echo "fn main() {}" > benches/rate_limiting.rs && \
-    echo "fn main() {}" > benches/broadcast.rs && \
-    cargo build --release && \
-    rm -rf src benches
+# Create dummy source files to build dependencies (caching trick)
+RUN mkdir -p backend/src backend/benches && \
+    echo "fn main() {}" > backend/src/main.rs && \
+    echo "fn main() {}" > backend/benches/rate_limiting.rs && \
+    echo "fn main() {}" > backend/benches/broadcast.rs && \
+    cargo build --release -p backend && \
+    rm -rf backend/src backend/benches
 
 # Copy the actual source code and .sqlx folder for offline mode
-COPY src ./src
-COPY .sqlx ./.sqlx
-COPY migrations ./migrations
-COPY benches ./benches
+COPY backend/src ./backend/src
+COPY backend/.sqlx ./backend/.sqlx
+COPY backend/migrations ./backend/migrations
+COPY backend/benches ./backend/benches
 
 # Touch main.rs to force rebuild of application code
-RUN touch src/main.rs
+RUN touch backend/src/main.rs
 
 # Build the application with offline SQLx mode
 ENV SQLX_OFFLINE=true
-RUN cargo build --release
+RUN cargo build --release -p backend
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -44,7 +44,7 @@ RUN apt-get update && \
 
 # Copy the binary from the builder
 COPY --from=builder /app/target/release/backend ./backend
-COPY --from=builder /app/migrations ./migrations
+COPY --from=builder /app/backend/migrations ./migrations
 
 # Expose the port
 ENV PORT=3000
