@@ -21,7 +21,7 @@ The application bridges web technologies with native OS primitives via the Tauri
 Encryption is executed in the browser context (WebView) using the `@noble/ciphers` library:
 - **Primitive**: XChaCha20-Poly1305 (AEAD).
 - **Key Storage**: Secured via `tauri-plugin-store`, persisting the 32-byte secret key across app restarts.
-- **Fingerprinting**: SHA-256 hashing of physical device IDs and encryption keys for secure device recognition.
+- **Fingerprinting**: First 8 hex characters of the SHA-256 hash of the encryption key, displayed in the UI for manual verification across devices.
 
 ## 🛠️ Development Workflow
 

@@ -82,8 +82,8 @@ When a device exceeds the rate limit, the server sends an error frame before dis
 
 ## 🛠️ Diagnostic Tooling
 
-We maintain system integrity through automated workflows:
+Quality gates run on every change:
 - **Unit Testing**: `cargo test` for logic verification.
 - **Benchmarking**: Performance regression testing via `criterion` in `./benches`.
-- **Static Analysis**: `cargo clippy -- -D warnings` for enforce code quality.
+- **Static Analysis**: `cargo clippy -- -D warnings` to enforce code quality.
 - **Security Auditing**: `cargo audit` for dependency vulnerability tracking.

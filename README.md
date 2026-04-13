@@ -5,7 +5,11 @@
 [![React](https://img.shields.io/badge/frontend-React-61DAFB?logo=react)](https://reactjs.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Echo is a cross-platform system for real-time clipboard synchronization across Desktop and Mobile devices. The architecture is optimized for sub-100ms latency and implements client-side end-to-end encryption (E2EE) as a core primitive.
+Copy on your laptop. Paste on your phone. Real-time clipboard sync across desktop and mobile, under 100ms — end-to-end encrypted. The server never sees your data. It receives ciphertext, stores ciphertext, forwards ciphertext. A blind relay.
+
+![Echo dashboard — desktop and mobile in sync](assets/screenshot-dashboard.png)
+
+![Echo login — desktop and mobile](assets/screenshot-login.png)
 
 ## ⚙️ System Specifications
 
@@ -20,21 +24,19 @@ The system is designed around several key technical constraints:
 The following diagram illustrates the lifecycle of a clipboard event across the sharded synchronization pipeline:
 
 ```text
- User A (Device 1)        Echo Server (Rust)        User B (Device 2)
-  |                         |                         |
-  |-- Local Copy Event      |                         |
-  |                         |                         |
-  |-- Encrypt Payloads ---->|                         |
-  |   (XChaCha20-Poly1305)  |                         |
-  |                         |-- Hub Routing --------->|
-  |                         |   (DashMap Look-up)     |
-  |                         |                         |
-  |                         |-- Broadcast Message --->|
-  |                         |                         |
-  |                         |<-- Decrypt Payloads ----|
-  |                         |    (XChaCha20-Poly1305) |
-  |                         |                         |
-  |                         |-- OS Clipboard Write ---|
+  User A (Device 1)        Echo Server (Rust)        User B (Device 2)
+        |                         |                         |
+  [Copy Event]                    |                         |
+        |                         |                         |
+  [Encrypt: XChaCha20]            |                         |
+  [ciphertext + nonce]            |                         |
+        |---- ciphertext -------->|                         |
+        |                  [DashMap look-up]                |
+        |                  [Broadcast fan-out]              |
+        |                         |---- ciphertext -------->|
+        |                         |                  [Decrypt: XChaCha20]
+        |                         |                  [OS Clipboard Write]
+        |                         |                         |
 ```
 
 ## 🏗️ Technical Architecture
@@ -66,7 +68,6 @@ Encryption is strictly decoupled from the transport layer:
 ├── desktop/           # Tauri workspace
 │   ├── src/           # React frontend + Crypto primitives
 │   └── src-tauri/     # Rust-side Core & Native plugins
-└── CHANGELOG.md       # Version history
 ```
 
 ## 🚦 Deployment & Environment
@@ -93,13 +94,8 @@ npm run tauri dev
 
 ## 📈 Engineering Standards
 
-We maintain system integrity through automated workflows:
+Quality gates run on every change:
 - **Static Analysis**: `cargo clippy`, `cargo fmt`, and `eslint`.
 - **Benchmarking**: Performance regression testing via `criterion` in `backend/benches`.
 - **Security Auditing**: Mandatory `cargo audit` for dependency vulnerability tracking.
 
----
-
-## 📄 Documentation 
-
-- [Backend Architecture](backend/ARCHITECTURE.md) - Detailed backend design decisions
