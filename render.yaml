@@ -3,7 +3,7 @@ services:
     name: echo-backend
     runtime: docker
     dockerfilePath: backend/Dockerfile
-    dockerContext: .
+    dockerContext: backend
     envVars:
       - key: DATABASE_URL
         sync: false
