@@ -1,4 +1,6 @@
 # Builder stage
+# Build context: workspace root
+# Usage: docker build -f backend/Dockerfile .
 FROM rust:1.91-slim-bookworm AS builder
 
 WORKDIR /app
@@ -61,16 +63,13 @@ RUN apt-get update && \
 
 USER appuser
 
-# Copy the binary from the builder
 COPY --from=builder /app/target/release/backend ./backend
 COPY --from=builder /app/backend/migrations ./migrations
 
-# Expose the port
 ENV PORT=3000
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Run the binary
 CMD ["./backend"]
