@@ -31,13 +31,9 @@ jobs:
           components: clippy, rustfmt
 
       - name: Cache dependencies
-        uses: actions/cache@v3
+        uses: Swatinem/rust-cache@v2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            backend/target
-          key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+          workspaces: backend
 
       - name: Check formatting
         run: cargo fmt -- --check
