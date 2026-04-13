@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: echo-backend
+    runtime: docker
+    dockerfilePath: backend/Dockerfile
+    dockerContext: .
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: PORT
+        value: 3000
+      - key: HOST
+        value: 0.0.0.0
+    healthCheckPath: /health
