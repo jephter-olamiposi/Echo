@@ -1,4 +1,4 @@
 <resources>
-    <string name="app_name">desktop</string>
-    <string name="main_activity_title">desktop</string>
+    <string name="app_name">EchoSync</string>
+    <string name="main_activity_title">EchoSync</string>
 </resources>

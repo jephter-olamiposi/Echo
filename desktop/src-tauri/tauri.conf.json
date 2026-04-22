@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "desktop",
+  "productName": "EchoSync",
   "version": "0.1.0",
-  "identifier": "com.mac.desktop",
+  "identifier": "com.echosync.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Echo",
+        "title": "EchoSync",
         "width": 1200,
         "height": 800,
         "minWidth": 900,
@@ -24,7 +24,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' http://localhost:* ws://localhost:* https://echo-backend-bkbw.onrender.com wss://echo-backend-bkbw.onrender.com https://api.qrserver.com http://10.0.2.2:* http://10.0.3.2:*; img-src 'self' data: https://api.qrserver.com"
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://echo-backend-bkbw.onrender.com wss://echo-backend-bkbw.onrender.com https://api.qrserver.com; img-src 'self' data: https://api.qrserver.com"
     }
   },
   "bundle": {

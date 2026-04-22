@@ -18,9 +18,9 @@
 
 # AI / personal
 CLAUDE.md
-rust.md
-linkedin.md
 .claude/
+AGENTS.md
+.agent/
 
 # Sensitive credentials
 firebase-service-account.json

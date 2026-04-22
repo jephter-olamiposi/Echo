@@ -3,6 +3,7 @@ mod clipboard;
 use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(target_os = "macos")]
 use tauri::ActivationPolicy;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
 use tauri::Manager;
 
 static BACKGROUND_MODE: AtomicBool = AtomicBool::new(false);

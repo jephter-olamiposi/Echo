@@ -7,9 +7,9 @@
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:1076292604622:android:a9d8684055fb334038f69f",
+        "mobilesdk_app_id": "1:1076292604622:android:8b5ab27ecd3eea4238f69f",
         "android_client_info": {
-          "package_name": "com.mac.desktop"
+          "package_name": "com.echosync.app"
         }
       },
       "oauth_client": [],
