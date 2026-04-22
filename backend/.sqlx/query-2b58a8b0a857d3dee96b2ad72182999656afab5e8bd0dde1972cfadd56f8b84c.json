@@ -1,0 +1,16 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            INSERT INTO push_tokens (user_id, device_id, token)\n            VALUES ($1, $2, $3)\n            ON CONFLICT (user_id, device_id)\n            DO UPDATE SET token = EXCLUDED.token, updated_at = NOW()\n            ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Text",
+        "Text"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "2b58a8b0a857d3dee96b2ad72182999656afab5e8bd0dde1972cfadd56f8b84c"
+}

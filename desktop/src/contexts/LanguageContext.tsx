@@ -9,11 +9,17 @@ interface LanguageContextType {
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
 
+function isLanguage(value: string | null): value is Language {
+  return (
+    value !== null &&
+    Object.prototype.hasOwnProperty.call(translations, value)
+  );
+}
+
 export function LanguageProvider({ children }: { children: React.ReactNode }) {
   const [language, setLanguageState] = useState<Language>(() => {
     const saved = localStorage.getItem('echo_language');
-    // Default to strict 'English' if saved value is invalid or missing
-    return (saved && saved in translations) ? (saved as Language) : 'English';
+    return isLanguage(saved) ? saved : 'English';
   });
 
   useEffect(() => {

@@ -1,28 +1,21 @@
 import { useRef, useCallback, useEffect, useState } from "react";
 import { config } from "../config";
 import { ClipboardEntry, LinkedDevice } from "../types";
-import { encrypt, decrypt } from "../crypto";
+import { decrypt, encrypt } from "../crypto";
+import {
+  createClipboardMessage,
+  createHandshake,
+  isClipboardMessage,
+  isPresenceMessage,
+  isProtocolErrorMessage,
+  type ServerMessage,
+} from "../protocol";
 import { detectContentType } from "../utils";
-
-const MSG_HANDSHAKE = "handshake";
-const MSG_PRESENCE_JOIN = "__JOIN__";
-const MSG_PRESENCE_LEAVE = "__LEAVE__";
-
 
 const BASE_DELAY_MS = 500;
 const MAX_DELAY_MS = 10000;
 const PING_INTERVAL_MS = 20000;
 const MAX_QUEUE = 200;
-
-interface ServerMessage {
-  device_id: string;
-  device_name?: string;
-  content: string;
-  nonce?: string;
-  encrypted?: boolean;
-  timestamp: number;
-  is_history?: boolean;
-}
 
 export interface UseWebSocketOptions {
   token: string | null;
@@ -62,9 +55,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
   const [queuedCount, setQueuedCount] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
   const retriesRef = useRef(0);
-  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const intentionalCloseRef = useRef(false);
 
@@ -99,7 +90,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     }
   }, []);
 
-  const connectRef = useRef<() => void>(() => { });
+  const connectRef = useRef<() => void>(() => {});
   const messageQueueRef = useRef<string[]>([]);
   const sendRef = useRef<((content: string) => void) | null>(null);
 
@@ -109,13 +100,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
   }, []);
 
   const scheduleReconnect = useCallback(() => {
-    if (intentionalCloseRef.current) {
-      return;
-    }
-
-    // Checking navigator.onLine prevents rapid retry loops when completely offline
-    // We rely on window 'online' event to trigger immediate retry
-    if (!navigator.onLine) {
+    if (intentionalCloseRef.current || !navigator.onLine) {
       return;
     }
 
@@ -125,8 +110,6 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     );
     const jittered = baseDelay * (0.85 + Math.random() * 0.3);
     const delay = Math.floor(jittered);
-
-
 
     reconnectTimeoutRef.current = setTimeout(() => {
       retriesRef.current++;
@@ -140,38 +123,39 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       wsRef.current?.send("pong");
       return;
     }
-
     if (text === "pong") return;
 
     try {
-      const msg: ServerMessage = JSON.parse(text);
+      const msg = JSON.parse(text) as ServerMessage;
+
+      if (isProtocolErrorMessage(msg)) {
+        onErrorRef.current?.(msg.error);
+        return;
+      }
+
+      if (isPresenceMessage(msg)) {
+        if (msg.device_id === deviceIdRef.current) return;
+
+        if (msg.event === "join") {
+          onDeviceJoinRef.current({
+            id: msg.device_id,
+            name: msg.device_name || "Unknown",
+            lastSeen: Date.now(),
+            isCurrentDevice: false,
+          });
+        } else {
+          onDeviceLeaveRef.current(msg.device_id);
+        }
+        return;
+      }
+
+      if (!isClipboardMessage(msg)) {
+        console.warn("[ws] Unknown protocol message:", msg);
+        return;
+      }
 
       if (msg.device_id === deviceIdRef.current) return;
 
-      if (msg.content === MSG_PRESENCE_JOIN) {
-        onDeviceJoinRef.current({
-          id: msg.device_id,
-          name: msg.device_name || "Unknown",
-          lastSeen: Date.now(),
-          isCurrentDevice: false,
-        });
-        return;
-      }
-
-      if (msg.content === MSG_PRESENCE_LEAVE) {
-        onDeviceLeaveRef.current(msg.device_id);
-        return;
-      }
-
-      if (msg.content === MSG_HANDSHAKE) return;
-
-      if (!msg.encrypted || !msg.nonce) {
-        console.warn("[ws] Rejected unencrypted message");
-        onErrorRef.current?.(
-          "Received unencrypted message. Please ensure all devices have encryption enabled."
-        );
-        return;
-      }
       if (!encryptionKeyRef.current) {
         onErrorRef.current?.(
           "Encryption key required to receive messages. Please set up encryption in settings."
@@ -182,10 +166,8 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       let content: string;
       try {
         content = decrypt(msg.content, msg.nonce, encryptionKeyRef.current);
-      } catch (e) {
-        console.error("[ws] Decryption failed:", e);
-        // Only alert for live messages. History items encrypted with a previous
-        // key are expected to fail after re-keying — no need to alarm the user.
+      } catch (error) {
+        console.error("[ws] Decryption failed:", error);
         if (!msg.is_history) {
           onErrorRef.current?.(
             "Failed to decrypt a message. Make sure both devices are using the same encryption key."
@@ -204,8 +186,8 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       };
 
       onIncomingCopyRef.current(entry, msg.is_history);
-    } catch (e) {
-      console.error("[ws] Failed to parse message:", e);
+    } catch (error) {
+      console.error("[ws] Failed to parse message:", error);
     }
   }, []);
 
@@ -228,25 +210,20 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
 
     cleanup();
     intentionalCloseRef.current = false;
-    retriesRef.current = 0; // Reset retries on manual connect (e.g. pull-to-refresh)
+    retriesRef.current = 0;
 
     const wsUrl = `${config.wsUrl}?token=${encodeURIComponent(token)}`;
-
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
     ws.onopen = () => {
       retriesRef.current = 0;
       updateConnectionState(true);
-
-      const handshake = {
-        device_id: deviceIdRef.current,
-        device_name: deviceNameRef.current,
-        content: MSG_HANDSHAKE,
-        timestamp: Date.now(),
-        encrypted: false,
-      };
-      ws.send(JSON.stringify(handshake));
+      ws.send(
+        JSON.stringify(
+          createHandshake(deviceIdRef.current, deviceNameRef.current)
+        )
+      );
 
       pingIntervalRef.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -255,20 +232,19 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
       }, PING_INTERVAL_MS);
 
       while (messageQueueRef.current.length > 0) {
-        const msg = messageQueueRef.current.shift();
-        if (msg) {
-          sendRef.current?.(msg);
+        const queued = messageQueueRef.current.shift();
+        if (queued) {
+          sendRef.current?.(queued);
         }
       }
-      setQueuedCount(0); // Clear queue count after flush
+      setQueuedCount(0);
     };
 
     ws.onmessage = handleMessage;
 
     ws.onclose = (event) => {
-      // Ignore stale close events from sockets that have already been replaced
-      // (e.g. old socket fires onclose after logout→login replaces it with a new one).
       if (wsRef.current !== ws) return;
+
       wsRef.current = null;
       cleanup();
       updateConnectionState(false);
@@ -295,8 +271,7 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
   useEffect(() => {
     const handleOnline = () => {
       const ws = wsRef.current;
-      const isAlive = ws && ws.readyState === WebSocket.OPEN;
-      if (isAlive) return;
+      if (ws && ws.readyState === WebSocket.OPEN) return;
       cleanup();
       retriesRef.current = 0;
       connect();
@@ -307,15 +282,15 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     };
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible" && navigator.onLine) {
-        const ws = wsRef.current;
-        const isConnected = ws && ws.readyState === WebSocket.OPEN;
+      if (document.visibilityState !== "visible" || !navigator.onLine) {
+        return;
+      }
 
-        if (!isConnected) {
-          cleanup();
-          retriesRef.current = 0;
-          connect();
-        }
+      const ws = wsRef.current;
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        cleanup();
+        retriesRef.current = 0;
+        connect();
       }
     };
 
@@ -360,14 +335,12 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
     }
 
     const { ciphertext, nonce } = encrypt(content, key);
-    const payload: Record<string, unknown> = {
-      device_id: deviceIdRef.current,
-      device_name: deviceNameRef.current,
-      content: ciphertext,
-      nonce,
-      encrypted: true,
-      timestamp: Date.now(),
-    };
+    const payload = createClipboardMessage(
+      deviceIdRef.current,
+      deviceNameRef.current,
+      ciphertext,
+      nonce
+    );
     wsRef.current.send(JSON.stringify(payload));
   }, []);
 

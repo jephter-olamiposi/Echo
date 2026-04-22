@@ -16,7 +16,7 @@ const JWT_EXPIRY_HOURS: u64 = 48;
 // If token validation ever moves to a separate service or edge layer, migrate to
 // RS256 so the signing key stays on the issuer and verifiers only need the public key.
 
-pub(crate) fn hash_password(password: String) -> Result<String, AppError> {
+pub(crate) fn hash_password(password: &str) -> Result<String, AppError> {
     let salt = SaltString::generate(&mut OsRng);
     Argon2::default()
         .hash_password(password.as_bytes(), &salt)
@@ -24,15 +24,13 @@ pub(crate) fn hash_password(password: String) -> Result<String, AppError> {
         .map_err(|e| AppError::Internal(format!("Hash failed: {e}")))
 }
 
-pub(crate) fn verify_password(password: String, hash: String) -> Result<bool, AppError> {
-    Ok(PasswordHash::new(&hash)
-        .ok()
-        .map(|h| {
-            Argon2::default()
-                .verify_password(password.as_bytes(), &h)
-                .is_ok()
-        })
-        .unwrap_or(false))
+pub(crate) fn verify_password(password: &str, hash: &str) -> Result<bool, AppError> {
+    let parsed_hash = PasswordHash::new(hash)
+        .map_err(|e| AppError::Internal(format!("Stored password hash is invalid: {e}")))?;
+
+    Ok(Argon2::default()
+        .verify_password(password.as_bytes(), &parsed_hash)
+        .is_ok())
 }
 
 pub(crate) fn generate_jwt(user_id: Uuid, secret: &str) -> Result<String, AppError> {

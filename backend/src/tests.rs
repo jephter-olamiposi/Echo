@@ -70,13 +70,17 @@ mod history_tests {
     use crate::state::TestFixture;
     use uuid::Uuid;
 
+    fn clipboard(device_id: &str, content: impl Into<String>) -> ClipboardMessage {
+        ClipboardMessage::new(device_id, None, content, "nonce")
+    }
+
     #[test]
     fn adds_to_history() {
         let f = TestFixture::default();
         let user_id = Uuid::new_v4();
 
         f.sync
-            .add_to_history(user_id, ClipboardMessage::new("device_1", "Hello"));
+            .add_to_history(user_id, clipboard("device_1", "Hello"));
 
         let history = f.sync.get_history(&user_id);
         assert_eq!(history.len(), 1);
@@ -88,12 +92,9 @@ mod history_tests {
         let f = TestFixture::default();
         let user_id = Uuid::new_v4();
 
-        f.sync
-            .add_to_history(user_id, ClipboardMessage::new("d1", "First"));
-        f.sync
-            .add_to_history(user_id, ClipboardMessage::new("d1", "Second"));
-        f.sync
-            .add_to_history(user_id, ClipboardMessage::new("d1", "Third"));
+        f.sync.add_to_history(user_id, clipboard("d1", "First"));
+        f.sync.add_to_history(user_id, clipboard("d1", "Second"));
+        f.sync.add_to_history(user_id, clipboard("d1", "Third"));
 
         let history = f.sync.get_history(&user_id);
         assert_eq!(history.len(), 3);
@@ -109,7 +110,7 @@ mod history_tests {
 
         for i in 0..60 {
             f.sync
-                .add_to_history(user_id, ClipboardMessage::new("d1", format!("msg_{}", i)));
+                .add_to_history(user_id, clipboard("d1", format!("msg_{}", i)));
         }
 
         let history = f.sync.get_history(&user_id);
@@ -131,9 +132,9 @@ mod history_tests {
         let user_b = Uuid::new_v4();
 
         f.sync
-            .add_to_history(user_a, ClipboardMessage::new("d1", "User A message"));
+            .add_to_history(user_a, clipboard("d1", "User A message"));
         f.sync
-            .add_to_history(user_b, ClipboardMessage::new("d2", "User B message"));
+            .add_to_history(user_b, clipboard("d2", "User B message"));
 
         let history_a = f.sync.get_history(&user_a);
         let history_b = f.sync.get_history(&user_b);
@@ -147,26 +148,55 @@ mod history_tests {
 
 #[cfg(test)]
 mod models_tests {
-    use crate::protocol::ClipboardMessage;
+    use crate::protocol::{ClipboardFrame, ClipboardMessage, HandshakeMessage, ServerMessage};
 
     #[test]
     fn clipboard_message_new_sets_defaults() {
-        let msg = ClipboardMessage::new("device_123", "test content");
+        let msg = ClipboardMessage::new("device_123", None, "test content", "nonce_123");
 
         assert_eq!(msg.device_id, "device_123");
         assert_eq!(msg.content, "test content");
-        assert!(!msg.encrypted);
-        assert!(msg.nonce.is_none());
+        assert_eq!(msg.nonce, "nonce_123");
         assert!(msg.timestamp > 0);
     }
 
     #[test]
     fn clipboard_message_accepts_string_and_str() {
-        let msg1 = ClipboardMessage::new("device", "content");
-        let msg2 = ClipboardMessage::new(String::from("device"), String::from("content"));
+        let msg1 = ClipboardMessage::new("device", None, "content", "nonce");
+        let msg2 = ClipboardMessage::new(
+            String::from("device"),
+            None,
+            String::from("content"),
+            String::from("nonce"),
+        );
 
         assert_eq!(msg1.device_id, msg2.device_id);
         assert_eq!(msg1.content, msg2.content);
+    }
+
+    #[test]
+    fn typed_protocol_serializes_clipboard_frame() {
+        let frame = ServerMessage::Clipboard(ClipboardFrame::history(ClipboardMessage::new(
+            "device",
+            Some("Laptop".into()),
+            "ciphertext",
+            "nonce",
+        )));
+
+        let json = serde_json::to_string(&frame).unwrap();
+        assert!(json.contains("\"type\":\"clipboard\""));
+        assert!(json.contains("\"is_history\":true"));
+    }
+
+    #[test]
+    fn typed_protocol_serializes_handshake_variant() {
+        let handshake = serde_json::to_value(crate::protocol::ClientMessage::Handshake(
+            HandshakeMessage::new("device", Some("Phone".into())),
+        ))
+        .unwrap();
+
+        assert_eq!(handshake["type"], "handshake");
+        assert_eq!(handshake["device_id"], "device");
     }
 }
 

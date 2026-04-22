@@ -44,17 +44,22 @@ impl AsRef<str> for DeviceId {
 
 const MAX_DEVICE_NAME_BYTES: usize = 256;
 
-/// A device display name, at most 256 bytes (may be empty; defaults to "Unknown").
+/// A normalized device display name, at most 256 bytes.
+/// Blank or whitespace-only values collapse to the default `"Unknown"`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub(crate) struct DeviceName(String);
 
 impl DeviceName {
     pub(crate) fn parse(raw: &str) -> Result<Self, AppError> {
-        if raw.len() > MAX_DEVICE_NAME_BYTES {
+        let trimmed = raw.trim();
+        if trimmed.len() > MAX_DEVICE_NAME_BYTES {
             return Err(AppError::BadRequest("Device name too long".into()));
         }
-        Ok(Self(raw.to_owned()))
+        if trimmed.is_empty() {
+            return Ok(Self::default());
+        }
+        Ok(Self(trimmed.to_owned()))
     }
 
     pub(crate) fn as_str(&self) -> &str {

@@ -20,7 +20,8 @@ export const Input: React.FC<InputProps> = ({
   id,
   ...props
 }) => {
-  const inputId = id || `input-${Math.random().toString(36).slice(2, 9)}`;
+  const generatedId = React.useId();
+  const inputId = id || generatedId;
 
   return (
     <div className={`flex flex-col gap-1.5 ${fullWidth ? 'w-full' : ''}`}>

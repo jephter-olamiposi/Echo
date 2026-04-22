@@ -7,8 +7,16 @@ import { Settings } from './Settings';
 import { DetailModal } from './DetailModal';
 import { MobileView, ClipboardEntry, ContentType, LinkedDevice } from '../../types';
 import { useLanguage } from '../../contexts/LanguageContext';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme, type Theme } from '../../contexts/ThemeContext';
+import type { Language } from '../../i18n/translations';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
+
+const LANGUAGE_OPTIONS: Language[] = ['English', 'Spanish', 'French', 'German', 'Chinese'];
+const THEME_OPTIONS: Array<{ id: Theme; label: string; icon: React.ReactNode }> = [
+  { id: 'light', label: 'Light', icon: Icons.sun },
+  { id: 'dark', label: 'Dark', icon: Icons.moon },
+  { id: 'system', label: 'System', icon: Icons.settings },
+];
 
 interface MobileLayoutProps {
   history: ClipboardEntry[];
@@ -77,10 +85,8 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
   const { theme, setTheme } = useTheme();
   const [showTheme, setShowTheme] = React.useState(false);
 
-  const handleLanguageSelect = (lang: string) => {
-    if (['English', 'Spanish', 'French', 'German', 'Chinese'].includes(lang)) {
-      setLanguage(lang as any);
-    }
+  const handleLanguageSelect = (lang: Language) => {
+    setLanguage(lang);
     setShowLanguage(false);
   };
 
@@ -221,7 +227,7 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
           <div className="w-full max-w-xs bg-(--color-glass-surface) backdrop-blur-3xl rounded-3xl border border-(--color-glass-border) p-4 shadow-2xl animate-in zoom-in-95 duration-200">
             <h3 className="text-center font-bold text-(--color-glass-text) mb-4 pt-2">Language</h3>
             <div className="flex flex-col gap-1">
-              {['English', 'Spanish', 'French', 'German', 'Chinese'].map((lang) => (
+              {LANGUAGE_OPTIONS.map((lang) => (
                 <button
                   key={lang}
                   className={`px-6 py-4 rounded-2xl text-left transition-all active:scale-[0.98] ${language === lang ? 'bg-purple-500 text-white shadow-lg' : 'text-(--color-glass-text) active:bg-(--color-highlight)'
@@ -247,16 +253,12 @@ export const MobileLayout: React.FC<MobileLayoutProps> = ({
           <div className="w-full max-w-xs bg-(--color-glass-surface) backdrop-blur-3xl rounded-3xl border border-(--color-glass-border) p-4 shadow-2xl animate-in zoom-in-95 duration-200">
             <h3 className="text-center font-bold text-(--color-glass-text) mb-4 pt-2">Appearance</h3>
             <div className="flex flex-col gap-2">
-              {[
-                { id: 'light', label: 'Light', icon: Icons.sun },
-                { id: 'dark', label: 'Dark', icon: Icons.moon },
-                { id: 'system', label: 'System', icon: Icons.settings }
-              ].map((t) => (
+              {THEME_OPTIONS.map((t) => (
                 <button
                   key={t.id}
                   className={`flex items-center gap-3 px-6 py-4 rounded-2xl transition-all active:scale-[0.98] ${theme === t.id ? 'bg-purple-500 text-white shadow-lg' : 'text-(--color-glass-text) bg-(--color-highlight) active:bg-(--color-glass-surface)'
                     }`}
-                  onClick={() => handleThemeSelect(t.id as any)}
+                  onClick={() => handleThemeSelect(t.id)}
                 >
                   <div className="w-5 h-5">{t.icon}</div>
                   <span className="font-semibold">{t.label}</span>

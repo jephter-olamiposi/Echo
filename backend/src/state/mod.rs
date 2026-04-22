@@ -5,9 +5,9 @@ pub(crate) mod push_manager;
 pub(crate) mod rate_limit;
 pub(crate) mod sync;
 
-use crate::db::{ClipboardHistoryRepository, UserRepository};
+use crate::db::{ClipboardHistoryRepository, PushTokenRepository};
 use crate::error::AppError;
-use crate::protocol::ClipboardMessage;
+use crate::protocol::{ClipboardMessage, ServerMessage};
 use crate::types::{DeviceId, DeviceName, PushToken};
 use push_manager::PushManager;
 use rate_limit::RateLimiter;
@@ -85,17 +85,14 @@ impl AppState {
 
     // --- Broadcast channels (delegates to SyncState) ---
 
-    pub(crate) fn get_or_create_channel(
-        &self,
-        user_id: Uuid,
-    ) -> broadcast::Sender<ClipboardMessage> {
+    pub(crate) fn get_or_create_channel(&self, user_id: Uuid) -> broadcast::Sender<ServerMessage> {
         self.sync.get_or_create_channel(user_id)
     }
 
     pub(crate) fn cleanup_channel_if_empty(
         &self,
         user_id: &Uuid,
-        tx: &broadcast::Sender<ClipboardMessage>,
+        tx: &broadcast::Sender<ServerMessage>,
     ) {
         self.sync.cleanup_channel_if_empty(user_id, tx);
     }
@@ -136,7 +133,7 @@ impl AppState {
     }
 
     pub(crate) async fn clear_history(&self, user_id: Uuid) -> Result<(), AppError> {
-        self.sync.clear_history_memory(&user_id)?;
+        self.sync.clear_history_memory(&user_id);
         ClipboardHistoryRepository::new(self.pool.clone())
             .clear(&user_id)
             .await
@@ -146,7 +143,15 @@ impl AppState {
 
     pub(crate) fn store_push_token(&self, user_id: Uuid, device_id: &DeviceId, token: &PushToken) {
         self.push.store(user_id, device_id.as_str(), token.as_str());
-        self.persist_push_tokens(user_id);
+        let pool = self.pool.clone();
+        let device_id = device_id.as_str().to_owned();
+        let token = token.as_str().to_owned();
+        tokio::spawn(async move {
+            let repo = PushTokenRepository::new(pool);
+            if let Err(e) = repo.upsert(user_id, &device_id, &token).await {
+                tracing::warn!(user = %user_id, error = %e, "failed to persist push token");
+            }
+        });
     }
 
     pub(crate) fn get_offline_push_tokens(
@@ -161,23 +166,20 @@ impl AppState {
 
     pub(crate) fn remove_push_token_by_value(&self, user_id: &Uuid, token_value: &str) {
         self.push.remove_by_value(user_id, token_value);
-        self.persist_push_tokens(*user_id);
-    }
-
-    fn persist_push_tokens(&self, user_id: Uuid) {
         let pool = self.pool.clone();
-        let snapshot = self.push.snapshot(&user_id);
+        let user_id = *user_id;
+        let token_value = token_value.to_owned();
         tokio::spawn(async move {
-            let repo = UserRepository::new(pool);
-            if let Err(e) = repo.update_push_tokens(user_id, snapshot).await {
-                tracing::warn!(user = %user_id, error = %e, "failed to persist push tokens");
+            let repo = PushTokenRepository::new(pool);
+            if let Err(e) = repo.delete_by_value(user_id, &token_value).await {
+                tracing::warn!(user = %user_id, error = %e, "failed to remove invalid push token");
             }
         });
     }
 
     pub(crate) async fn load_push_tokens_from_db(&self, user_id: Uuid) {
-        let repo = UserRepository::new(self.pool.clone());
-        match repo.get_push_tokens(user_id).await {
+        let repo = PushTokenRepository::new(self.pool.clone());
+        match repo.list_by_user(user_id).await {
             Ok(entries) => {
                 let count = entries.len();
                 self.push.load_from_snapshot(user_id, entries);

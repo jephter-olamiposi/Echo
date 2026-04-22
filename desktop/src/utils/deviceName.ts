@@ -19,9 +19,7 @@ export async function getDeviceName(): Promise<string> {
                     if (window.EchoBridge?.getDeviceModel) {
                         const model = window.EchoBridge.getDeviceModel();
                         if (model && model.trim()) {
-                            if (model && model.trim()) {
-                                return model;
-                            }
+                            return model;
                         }
                     }
                 } catch (e) {

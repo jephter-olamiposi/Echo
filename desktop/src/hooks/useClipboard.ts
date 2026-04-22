@@ -55,12 +55,9 @@ export function useClipboard() {
       source: "local" | "remote" = "local",
       deviceName?: string
     ) => {
-      const systemMessages = ["ping", "handshake", "__JOIN__", "__LEAVE__"];
-      if (systemMessages.includes(text) || systemMessages.includes(text.trim()))
-        return;
-
       const normalize = (s: string) => s.replace(/\r\n/g, "\n").trim();
       const normalizedText = normalize(text);
+      if (!normalizedText) return false;
 
       // Deduplicate outgoing sends: only block if the same text was sent within the last 5s.
       const now = Date.now();

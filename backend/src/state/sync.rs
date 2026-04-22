@@ -1,8 +1,7 @@
 //! Per-user broadcast channels, clipboard history, and device session tracking.
 //! All operations are pure in-memory. DB persistence is coordinated by AppState.
 
-use crate::error::AppError;
-use crate::protocol::ClipboardMessage;
+use crate::protocol::{ClipboardMessage, ServerMessage};
 use crate::types::{DeviceId, DeviceName};
 use dashmap::DashMap;
 use std::collections::{HashMap, VecDeque};
@@ -17,7 +16,7 @@ const CAPACITY_PER_DEVICE: usize = 25;
 
 #[derive(Clone, Default)]
 pub(crate) struct SyncState {
-    hub: Arc<DashMap<Uuid, broadcast::Sender<ClipboardMessage>>>,
+    hub: Arc<DashMap<Uuid, broadcast::Sender<ServerMessage>>>,
     history: Arc<DashMap<Uuid, VecDeque<ClipboardMessage>>>,
     sessions: Arc<DashMap<Uuid, HashMap<String, String>>>,
 }
@@ -25,10 +24,7 @@ pub(crate) struct SyncState {
 impl SyncState {
     // --- Broadcast channels ---
 
-    pub(crate) fn get_or_create_channel(
-        &self,
-        user_id: Uuid,
-    ) -> broadcast::Sender<ClipboardMessage> {
+    pub(crate) fn get_or_create_channel(&self, user_id: Uuid) -> broadcast::Sender<ServerMessage> {
         self.hub
             .entry(user_id)
             .or_insert_with(|| {
@@ -44,7 +40,7 @@ impl SyncState {
     pub(crate) fn cleanup_channel_if_empty(
         &self,
         user_id: &Uuid,
-        tx: &broadcast::Sender<ClipboardMessage>,
+        tx: &broadcast::Sender<ServerMessage>,
     ) {
         if tx.receiver_count() == 0 {
             self.hub.remove(user_id);
@@ -71,6 +67,11 @@ impl SyncState {
     pub(crate) fn remove_session(&self, user_id: Uuid, device_id: &DeviceId) {
         if let Some(mut sessions) = self.sessions.get_mut(&user_id) {
             sessions.remove(device_id.as_str());
+            let should_remove_user = sessions.is_empty();
+            drop(sessions);
+            if should_remove_user {
+                self.sessions.remove(&user_id);
+            }
         }
     }
 
@@ -119,9 +120,8 @@ impl SyncState {
         self.history.contains_key(user_id)
     }
 
-    pub(crate) fn clear_history_memory(&self, user_id: &Uuid) -> Result<(), AppError> {
+    pub(crate) fn clear_history_memory(&self, user_id: &Uuid) {
         self.history.remove(user_id);
-        Ok(())
     }
 
     // --- Test introspection (not available in production builds) ---

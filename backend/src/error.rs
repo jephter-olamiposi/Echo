@@ -30,6 +30,10 @@ pub(crate) enum AppError {
     #[error("Bad request: {0}")]
     BadRequest(String),
 
+    /// Request exceeded an explicit rate limit (429 Too Many Requests)
+    #[error("Rate limited: {0}")]
+    RateLimited(String),
+
     /// JWT token error (500 Internal Server Error)
     #[error("Token error: {0}")]
     Token(#[from] jsonwebtoken::errors::Error),
@@ -68,6 +72,11 @@ impl IntoResponse for AppError {
             }
             Self::Conflict(msg) => (StatusCode::CONFLICT, msg.clone(), Some("CONFLICT")),
             Self::BadRequest(msg) => (StatusCode::BAD_REQUEST, msg.clone(), Some("BAD_REQUEST")),
+            Self::RateLimited(msg) => (
+                StatusCode::TOO_MANY_REQUESTS,
+                msg.clone(),
+                Some("RATE_LIMIT"),
+            ),
             Self::Token(e) => {
                 tracing::error!(error = %e, "Token error");
                 (

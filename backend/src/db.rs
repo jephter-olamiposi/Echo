@@ -53,51 +53,67 @@ impl UserRepository {
 
         Ok(user.map(|u| (u.id, u.password_hash)))
     }
+}
 
-    /// Overwrites the `push_tokens` JSONB column for the given user.
-    pub(crate) async fn update_push_tokens(
+pub(crate) struct PushTokenRepository {
+    pool: PgPool,
+}
+
+impl PushTokenRepository {
+    pub(crate) fn new(pool: PgPool) -> Self {
+        Self { pool }
+    }
+
+    pub(crate) async fn upsert(
         &self,
         user_id: Uuid,
-        tokens: Vec<(String, String)>,
+        device_id: &str,
+        token: &str,
     ) -> Result<(), AppError> {
-        let json = serde_json::Value::Array(
-            tokens
-                .into_iter()
-                .map(|(dev, tok)| serde_json::json!({"device_id": dev, "token": tok}))
-                .collect(),
-        );
         sqlx::query!(
-            "UPDATE users SET push_tokens = $1 WHERE id = $2",
-            json,
-            user_id
+            r#"
+            INSERT INTO push_tokens (user_id, device_id, token)
+            VALUES ($1, $2, $3)
+            ON CONFLICT (user_id, device_id)
+            DO UPDATE SET token = EXCLUDED.token, updated_at = NOW()
+            "#,
+            user_id,
+            device_id,
+            token
         )
         .execute(&self.pool)
         .await?;
+
         Ok(())
     }
 
-    /// Loads push tokens for the given user from the database.
-    pub(crate) async fn get_push_tokens(
+    pub(crate) async fn list_by_user(
         &self,
         user_id: Uuid,
     ) -> Result<Vec<(String, String)>, AppError> {
-        let row = sqlx::query!("SELECT push_tokens FROM users WHERE id = $1", user_id)
-            .fetch_optional(&self.pool)
-            .await?;
+        let rows = sqlx::query!(
+            "SELECT device_id, token FROM push_tokens WHERE user_id = $1",
+            user_id
+        )
+        .fetch_all(&self.pool)
+        .await?;
 
-        let tokens = row
-            .and_then(|r| r.push_tokens)
-            .and_then(|v| v.as_array().cloned())
-            .unwrap_or_default()
+        Ok(rows
             .into_iter()
-            .filter_map(|item| {
-                let dev = item.get("device_id")?.as_str()?.to_owned();
-                let tok = item.get("token")?.as_str()?.to_owned();
-                Some((dev, tok))
-            })
-            .collect();
+            .map(|row| (row.device_id, row.token))
+            .collect())
+    }
 
-        Ok(tokens)
+    pub(crate) async fn delete_by_value(&self, user_id: Uuid, token: &str) -> Result<(), AppError> {
+        sqlx::query!(
+            "DELETE FROM push_tokens WHERE user_id = $1 AND token = $2",
+            user_id,
+            token
+        )
+        .execute(&self.pool)
+        .await?;
+
+        Ok(())
     }
 }
 
@@ -123,7 +139,7 @@ impl ClipboardHistoryRepository {
             msg.device_name,
             msg.content,
             msg.nonce,
-            msg.encrypted,
+            true,
             msg.timestamp as i64
         )
         .execute(&mut *tx)
@@ -156,9 +172,16 @@ impl ClipboardHistoryRepository {
     ) -> Result<Vec<ClipboardMessage>, AppError> {
         let rows = sqlx::query!(
             r#"
-            SELECT device_id, device_name, content, nonce, encrypted, timestamp
+            SELECT
+                device_id AS "device_id!",
+                device_name,
+                content AS "content!",
+                nonce AS "nonce!",
+                timestamp AS "timestamp!"
             FROM clipboard_history
             WHERE user_id = $1
+            AND COALESCE(encrypted, TRUE) = TRUE
+            AND nonce IS NOT NULL
             ORDER BY timestamp DESC
             LIMIT $2
             "#,
@@ -175,9 +198,7 @@ impl ClipboardHistoryRepository {
                 device_name: r.device_name,
                 content: r.content,
                 nonce: r.nonce,
-                encrypted: r.encrypted.unwrap_or(true),
                 timestamp: r.timestamp as u64,
-                is_history: true,
             })
             .collect())
     }

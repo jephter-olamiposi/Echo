@@ -4,11 +4,9 @@ interface Window {
     EchoBridge?: {
         getDeviceModel?: () => string;
         getFcmToken?: () => string | null;
-        wasOpenedFromPush?: () => boolean;
-        clearOpenedFromPush?: () => void;
+        consumeOpenedFromPush?: () => boolean;
         getLastClipboardContent?: () => string | null;
         saveAuthToken?: (token: string) => void;
         clearAuthToken?: () => void;
     };
 }
-

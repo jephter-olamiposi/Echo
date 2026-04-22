@@ -21,6 +21,7 @@ CLAUDE.md
 .claude/
 AGENTS.md
 .agent/
+article.md
 
 # Sensitive credentials
 firebase-service-account.json

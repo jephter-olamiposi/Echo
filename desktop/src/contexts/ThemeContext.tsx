@@ -1,6 +1,12 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'dark' | 'light' | 'system';
+export type Theme = 'dark' | 'light' | 'system';
+
+const VALID_THEMES: Theme[] = ['dark', 'light', 'system'];
+
+function isTheme(value: string | null): value is Theme {
+  return value !== null && VALID_THEMES.includes(value as Theme);
+}
 
 interface ThemeContextType {
   theme: Theme;
@@ -12,7 +18,8 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<Theme>(() => {
-    return (localStorage.getItem('theme') as Theme) || 'dark';
+    const savedTheme = localStorage.getItem('theme');
+    return isTheme(savedTheme) ? savedTheme : 'dark';
   });
 
   const isDark = 

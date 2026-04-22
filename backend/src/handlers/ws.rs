@@ -9,9 +9,8 @@
 
 use crate::{
     auth,
-    protocol::{
-        ClipboardMessage, MSG_HANDSHAKE, MSG_PRESENCE, MSG_PRESENCE_JOIN, MSG_PRESENCE_LEAVE,
-    },
+    dto::WsQuery,
+    protocol::{ClientMessage, ServerMessage},
     push::PushError,
     state::AppState,
     types::{DeviceId, DeviceName},
@@ -26,14 +25,12 @@ use axum::{
 };
 use futures::{SinkExt, StreamExt};
 use std::time::Duration;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 
 const PING_INTERVAL_SECS: u64 = 15;
 const HANDSHAKE_TIMEOUT_SECS: u64 = 10;
 const MAX_CLIPBOARD_SIZE: usize = 10 * 1024 * 1024; // 10 MB
 const WRITER_CHANNEL_CAPACITY: usize = 64;
-
-use crate::dto::WsQuery;
 
 pub(crate) async fn ws_handler(
     ws: WebSocketUpgrade,
@@ -56,19 +53,18 @@ pub(crate) async fn ws_handler(
 async fn handle_socket(socket: WebSocket, state: AppState, user_id: uuid::Uuid) {
     let (sink, mut stream) = socket.split();
 
-    // Dedicated writer task: owns the sink exclusively — no mutex needed.
+    // Dedicated writer task: owns the sink exclusively - no mutex needed.
     let (write_tx, write_rx) = mpsc::channel::<Message>(WRITER_CHANNEL_CAPACITY);
-    let writer_task = tokio::spawn(run_writer(sink, write_rx));
+    let mut writer_task = tokio::spawn(run_writer(sink, write_rx));
 
-    // --- Handshake (with timeout) ---
     let handshake = tokio::time::timeout(
         Duration::from_secs(HANDSHAKE_TIMEOUT_SECS),
         async {
             loop {
                 match stream.next().await {
                     Some(Ok(Message::Text(text))) if text != "ping" => {
-                        if let Ok(msg) = serde_json::from_str::<ClipboardMessage>(&text) {
-                            if msg.content == MSG_HANDSHAKE {
+                        match serde_json::from_str::<ClientMessage>(&text) {
+                            Ok(ClientMessage::Handshake(msg)) => {
                                 let id = match DeviceId::parse(&msg.device_id) {
                                     Ok(id) => id,
                                     Err(_) => {
@@ -86,11 +82,16 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: uuid::Uuid) 
                                 tracing::info!(user = %user_id, device = %id, "handshake completed");
                                 return Some((id, name));
                             }
-                            tracing::warn!(
-                                user = %user_id,
-                                device = %msg.device_id,
-                                "rejected non-handshake message during connection"
-                            );
+                            Ok(ClientMessage::Clipboard(msg)) => {
+                                tracing::warn!(
+                                    user = %user_id,
+                                    device = %msg.device_id,
+                                    "rejected clipboard payload before handshake"
+                                );
+                            }
+                            Err(e) => {
+                                tracing::warn!(user = %user_id, error = %e, "failed to parse client message during handshake");
+                            }
                         }
                     }
                     Some(Ok(Message::Close(_))) | None => return None,
@@ -110,7 +111,6 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: uuid::Uuid) 
         }
     };
 
-    // --- Session registration and presence ---
     state.add_session(user_id, &device_id, &device_name);
 
     let tx = state.get_or_create_channel(user_id);
@@ -119,49 +119,52 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: uuid::Uuid) 
     // the (async) DB load are buffered in rx rather than silently dropped.
     let mut rx = tx.subscribe();
 
-    let mut join_msg = ClipboardMessage::new(device_id.as_str(), MSG_PRESENCE_JOIN);
-    join_msg.device_name = Some(device_name.as_str().to_owned());
-    let _ = tx.send(join_msg);
+    let _ = tx.send(ServerMessage::presence_join(
+        device_id.as_str(),
+        Some(device_name.as_str().to_owned()),
+    ));
 
-    // Notify connecting device of already-online peers.
-    for (dev_id, dev_name) in state.get_sessions(&user_id) {
-        if dev_id != device_id.as_str() {
-            let mut msg = ClipboardMessage::new(dev_id, MSG_PRESENCE_JOIN);
-            msg.device_name = Some(dev_name);
-            if let Ok(json) = serde_json::to_string(&msg) {
-                let _ = write_tx.send(Message::Text(json.into())).await;
-            }
+    for (peer_id, peer_name) in state.get_sessions(&user_id) {
+        if peer_id != device_id.as_str()
+            && enqueue_server_message(
+                &write_tx,
+                ServerMessage::presence_join(peer_id, Some(peer_name)),
+            )
+            .await
+            .is_err()
+        {
+            drop(rx);
+            writer_task.abort();
+            let _ = writer_task.await;
+            cleanup_connection(&state, user_id, &device_id, &tx);
+            return;
         }
     }
 
-    // --- History replay ---
     state.load_history_from_db(user_id).await;
     state.load_push_tokens_from_db(user_id).await;
 
-    for mut msg in state.get_history(&user_id) {
+    for msg in state.get_history(&user_id).into_iter().rev() {
         if msg.device_id == device_id.as_str() {
             continue;
         }
-        if matches!(
-            msg.content.as_str(),
-            c if c == MSG_PRESENCE || c == MSG_HANDSHAKE || c == "ping"
-        ) {
-            continue;
-        }
-        msg.is_history = true;
-        if let Ok(json) = serde_json::to_string(&msg) {
-            if write_tx.send(Message::Text(json.into())).await.is_err() {
-                tracing::warn!(user = %user_id, "client disconnected during history replay");
-                state.remove_session(user_id, &device_id);
-                return;
-            }
+
+        if enqueue_server_message(&write_tx, ServerMessage::history(msg))
+            .await
+            .is_err()
+        {
+            tracing::warn!(user = %user_id, "client disconnected during history replay");
+            drop(rx);
+            writer_task.abort();
+            let _ = writer_task.await;
+            cleanup_connection(&state, user_id, &device_id, &tx);
+            return;
         }
     }
     tracing::info!(user = %user_id, device = %device_id.as_str(), "history replay complete");
 
-    // --- Concurrent sync tasks ---
     let ping_tx = write_tx.clone();
-    let ping_task = tokio::spawn(async move {
+    let mut ping_task = tokio::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(PING_INTERVAL_SECS));
         loop {
             interval.tick().await;
@@ -173,48 +176,57 @@ async fn handle_socket(socket: WebSocket, state: AppState, user_id: uuid::Uuid) 
 
     let my_device = device_id.as_str().to_owned();
     let send_tx = write_tx.clone();
-    let send_task = tokio::spawn(async move {
+    let mut send_task = tokio::spawn(async move {
         loop {
             match rx.recv().await {
                 Ok(msg) => {
-                    if msg.device_id == my_device {
+                    if msg
+                        .origin_device_id()
+                        .is_some_and(|origin| origin == my_device)
+                    {
                         continue;
                     }
-                    if let Ok(json) = serde_json::to_string(&msg) {
-                        if send_tx.send(Message::Text(json.into())).await.is_err() {
-                            break;
-                        }
+
+                    if enqueue_server_message(&send_tx, msg).await.is_err() {
+                        break;
                     }
                 }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                Err(broadcast::error::RecvError::Lagged(n)) => {
                     tracing::warn!(skipped = n, "client lagged on broadcast channel");
                 }
-                Err(tokio::sync::broadcast::error::RecvError::Closed) => break,
+                Err(broadcast::error::RecvError::Closed) => break,
             }
         }
     });
 
-    let recv_task = tokio::spawn(handle_incoming(
+    let mut recv_task = tokio::spawn(handle_incoming(
         stream,
         tx.clone(),
         write_tx.clone(),
         device_id.clone(),
+        device_name.clone(),
         state.clone(),
         user_id,
     ));
 
     tokio::select! {
-        _ = send_task  => {},
-        _ = recv_task  => {},
-        _ = ping_task  => {},
-        _ = writer_task => {},
+        _ = &mut send_task => {},
+        _ = &mut recv_task => {},
+        _ = &mut ping_task => {},
+        _ = &mut writer_task => {},
     }
 
-    // --- Cleanup ---
-    state.remove_session(user_id, &device_id);
-    let leave_msg = ClipboardMessage::new(device_id.as_str(), MSG_PRESENCE_LEAVE);
-    let _ = tx.send(leave_msg);
-    state.cleanup_channel_if_empty(&user_id, &tx);
+    send_task.abort();
+    recv_task.abort();
+    ping_task.abort();
+    writer_task.abort();
+
+    let _ = send_task.await;
+    let _ = recv_task.await;
+    let _ = ping_task.await;
+    let _ = writer_task.await;
+
+    cleanup_connection(&state, user_id, &device_id, &tx);
 }
 
 /// Dedicated sink writer. Owns the WebSocket sink exclusively.
@@ -232,9 +244,10 @@ async fn run_writer(
 
 async fn handle_incoming(
     mut stream: futures::stream::SplitStream<WebSocket>,
-    tx: tokio::sync::broadcast::Sender<ClipboardMessage>,
+    tx: broadcast::Sender<ServerMessage>,
     write_tx: mpsc::Sender<Message>,
     device_id: DeviceId,
+    device_name: DeviceName,
     state: AppState,
     user_id: uuid::Uuid,
 ) {
@@ -245,21 +258,27 @@ async fn handle_incoming(
                     continue;
                 }
 
-                let mut clipboard_msg = match serde_json::from_str::<ClipboardMessage>(&text) {
-                    Ok(msg) => msg,
+                let mut clipboard_msg = match serde_json::from_str::<ClientMessage>(&text) {
+                    Ok(ClientMessage::Clipboard(msg)) => msg,
+                    Ok(ClientMessage::Handshake(_)) => {
+                        tracing::warn!(user = %user_id, device = %device_id, "ignored duplicate handshake");
+                        continue;
+                    }
                     Err(e) => {
                         tracing::warn!(
                             user = %user_id,
                             device = %device_id,
                             error = %e,
-                            "failed to parse clipboard message"
+                            "failed to parse client message"
                         );
                         continue;
                     }
                 };
-                // INVARIANT: always use the server-validated device_id from the handshake.
+
+                // INVARIANT: always use the server-validated identity from the handshake.
                 // Clients must not be able to spoof a different device identity mid-session.
                 clipboard_msg.device_id = device_id.as_str().to_owned();
+                clipboard_msg.device_name = Some(device_name.as_str().to_owned());
 
                 if clipboard_msg.content.len() > MAX_CLIPBOARD_SIZE {
                     tracing::warn!(
@@ -271,44 +290,46 @@ async fn handle_incoming(
                     continue;
                 }
 
-                if let Some(ref name) = clipboard_msg.device_name {
-                    if DeviceName::parse(name).is_err() {
-                        tracing::warn!(user = %user_id, device = %device_id, "device name too long, dropping");
-                        continue;
-                    }
+                if clipboard_msg.nonce.is_empty() {
+                    tracing::warn!(user = %user_id, device = %device_id, "missing nonce, dropping");
+                    continue;
                 }
 
                 if !state.check_rate_limit(device_id.as_str()) {
                     tracing::warn!(device = %device_id, "rate limited");
-                    let _ = write_tx
-                        .send(Message::Text(
-                            r#"{"error":"rate_limited","code":"RATE_LIMIT"}"#.into(),
-                        ))
-                        .await;
+                    let _ = enqueue_server_message(
+                        &write_tx,
+                        ServerMessage::error(
+                            "Too many clipboard updates. Slow down.",
+                            "RATE_LIMIT",
+                        ),
+                    )
+                    .await;
                     continue;
                 }
 
                 state.add_to_history(user_id, clipboard_msg.clone());
-                let _ = tx.send(clipboard_msg.clone());
+                let _ = tx.send(ServerMessage::live_clipboard(clipboard_msg.clone()));
 
                 let offline_tokens = state.get_offline_push_tokens(&user_id, &device_id);
                 if !offline_tokens.is_empty() {
                     if let Some(client) = state.push.client.clone() {
                         let semaphore = state.push.semaphore.clone();
                         let state_clone = state.clone();
-                        let device_name =
-                            clipboard_msg.device_name.unwrap_or_else(|| "device".into());
+                        let device_name = clipboard_msg
+                            .device_name
+                            .clone()
+                            .unwrap_or_else(|| "device".into());
                         tokio::spawn(async move {
                             let _permit = semaphore.acquire().await.ok();
                             for token in offline_tokens {
                                 match client.notify_sync(&token, &device_name).await {
-                                    Ok(_) => {}
+                                    Ok(()) => {}
                                     Err(PushError::InvalidToken) => {
-                                        // Remove the stale token and persist the change.
                                         state_clone.remove_push_token_by_value(&user_id, &token);
                                     }
-                                    Err(PushError::Other(e)) => {
-                                        tracing::warn!(error = %e, "push notification failed");
+                                    Err(e) => {
+                                        tracing::warn!(user = %user_id, error = %e, "push notification failed");
                                     }
                                 }
                             }
@@ -316,9 +337,35 @@ async fn handle_incoming(
                     }
                 }
             }
-            Message::Pong(_) => tracing::trace!(device = %device_id, "pong received"),
+            Message::Ping(_) | Message::Pong(_) => {}
             Message::Close(_) => break,
             _ => {}
         }
     }
+}
+
+async fn enqueue_server_message(
+    write_tx: &mpsc::Sender<Message>,
+    message: ServerMessage,
+) -> Result<(), ()> {
+    let json = serde_json::to_string(&message).map_err(|e| {
+        tracing::warn!(error = %e, "failed to serialize server message");
+    })?;
+
+    write_tx
+        .send(Message::Text(json.into()))
+        .await
+        .map_err(|_| ())
+}
+
+fn cleanup_connection(
+    state: &AppState,
+    user_id: uuid::Uuid,
+    device_id: &DeviceId,
+    tx: &broadcast::Sender<ServerMessage>,
+) {
+    state.remove_session(user_id, device_id);
+    let leave_msg = ServerMessage::presence_leave(device_id.as_str(), None);
+    let _ = tx.send(leave_msg);
+    state.cleanup_channel_if_empty(&user_id, tx);
 }

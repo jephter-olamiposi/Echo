@@ -4,6 +4,7 @@ import {
   saveEncryptionKey,
   loadEncryptionKey,
   clearEncryptionKey,
+  getKeyFingerprint,
 } from "../crypto";
 
 export function useKeys() {
@@ -13,16 +14,7 @@ export function useKeys() {
   const [needsKeySetup, setNeedsKeySetup] = useState(false);
 
   const generateFingerprint = async (key: Uint8Array) => {
-    const buf = await crypto.subtle.digest(
-      "SHA-256",
-      new Uint8Array(key).buffer as ArrayBuffer
-    );
-    const hex = Array.from(new Uint8Array(buf))
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("")
-      .slice(0, 8)
-      .toUpperCase();
-    setFingerprint(hex);
+    setFingerprint(await getKeyFingerprint(key));
   };
 
   const saveKey = useCallback(async (key: Uint8Array) => {

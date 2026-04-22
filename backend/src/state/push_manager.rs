@@ -72,6 +72,8 @@ impl PushManager {
                         *dev_id != exclude_device && !online_devices.contains(*dev_id)
                     })
                     .map(|(_, token)| token.clone())
+                    .collect::<HashSet<_>>()
+                    .into_iter()
                     .collect()
             })
             .unwrap_or_default()
@@ -80,25 +82,22 @@ impl PushManager {
     pub(crate) fn remove_by_value(&self, user_id: &Uuid, token_value: &str) {
         if let Some(mut tokens) = self.tokens.get_mut(user_id) {
             tokens.retain(|_, token| token != token_value);
+            let should_remove_user = tokens.is_empty();
+            drop(tokens);
+            if should_remove_user {
+                self.tokens.remove(user_id);
+            }
             tracing::info!(user = %user_id, "removed invalid push token");
         }
     }
 
-    pub(crate) fn snapshot(&self, user_id: &Uuid) -> Vec<(String, String)> {
-        self.tokens
-            .get(user_id)
-            .map(|t| {
-                t.iter()
-                    .map(|(dev, tok)| (dev.clone(), tok.clone()))
-                    .collect()
-            })
-            .unwrap_or_default()
-    }
-
     pub(crate) fn load_from_snapshot(&self, user_id: Uuid, entries: Vec<(String, String)>) {
-        let mut map = self.tokens.entry(user_id).or_default();
-        for (dev, tok) in entries {
-            map.insert(dev, tok);
+        if entries.is_empty() {
+            self.tokens.remove(&user_id);
+            return;
         }
+
+        let snapshot = entries.into_iter().collect();
+        self.tokens.insert(user_id, snapshot);
     }
 }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { apiFetch } from '../../api';
+import { AppError, ErrorType } from '../../utils/AppError';
 import { Icons } from '../Icons';
 
 interface LoginProps {
@@ -26,7 +27,7 @@ export const Login: React.FC<LoginProps> = ({ initialEmail = '', onSuccess, onSw
       });
       onSuccess(data.token, email);
     } catch (err: any) {
-      if (err.message === "Network error") {
+      if (err instanceof AppError && err.type === ErrorType.NETWORK) {
         setError("Network error. Open Settings → Server Config and set the server to your machine IP (e.g. http://10.0.2.2:3000 for Android emulator, or http://192.168.x.x:3000 for a physical device).");
       } else {
         setError(err.message);

@@ -1,6 +1,7 @@
 import { config } from "./config";
 import { Store } from "@tauri-apps/plugin-store";
 import { fetch } from "@tauri-apps/plugin-http";
+import type { ClipboardMessage } from "./protocol";
 import { AppError, ErrorType } from "./utils/AppError";
 
 
@@ -119,7 +120,7 @@ export async function apiFetch(path: string, options: RequestInit = {}) {
 }
 
 
-export async function fetchClipboardHistory(): Promise<any[]> {
+export async function fetchClipboardHistory(): Promise<ClipboardMessage[]> {
   return apiFetch("/history", { method: "GET" });
 }
 

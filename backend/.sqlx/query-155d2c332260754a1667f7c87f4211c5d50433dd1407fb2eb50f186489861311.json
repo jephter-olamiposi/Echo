@@ -1,0 +1,47 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n            SELECT\n                device_id AS \"device_id!\",\n                device_name,\n                content AS \"content!\",\n                nonce AS \"nonce!\",\n                timestamp AS \"timestamp!\"\n            FROM clipboard_history\n            WHERE user_id = $1\n            AND COALESCE(encrypted, TRUE) = TRUE\n            AND nonce IS NOT NULL\n            ORDER BY timestamp DESC\n            LIMIT $2\n            ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "device_id!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "device_name",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "content!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "nonce!",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 4,
+        "name": "timestamp!",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Uuid",
+        "Int8"
+      ]
+    },
+    "nullable": [
+      false,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "155d2c332260754a1667f7c87f4211c5d50433dd1407fb2eb50f186489861311"
+}

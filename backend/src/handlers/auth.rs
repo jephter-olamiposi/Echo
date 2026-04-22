@@ -21,13 +21,13 @@ pub(crate) async fn register(
     Json(payload): Json<RegisterRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     if !state.check_rate_limit_custom(&format!("register:{}", addr.ip()), 3, 3600) {
-        return Err(AppError::Auth(
+        return Err(AppError::RateLimited(
             "Too many account creations. Please try again later.".into(),
         ));
     }
 
     let password = payload.password;
-    let hash = tokio::task::spawn_blocking(move || auth::hash_password(password)).await??;
+    let hash = tokio::task::spawn_blocking(move || auth::hash_password(&password)).await??;
 
     let repo = UserRepository::new(state.pool.clone());
     let user_id = repo
@@ -49,7 +49,7 @@ pub(crate) async fn login(
     Json(payload): Json<LoginRequest>,
 ) -> Result<impl IntoResponse, AppError> {
     if !state.check_rate_limit_custom(&format!("login:{}", addr.ip()), 5, 900) {
-        return Err(AppError::Auth(
+        return Err(AppError::RateLimited(
             "Too many attempts. Please try again later.".into(),
         ));
     }
@@ -62,8 +62,7 @@ pub(crate) async fn login(
 
     let password = payload.password;
     let valid =
-        tokio::task::spawn_blocking(move || auth::verify_password(password, hash).unwrap_or(false))
-            .await?;
+        tokio::task::spawn_blocking(move || auth::verify_password(&password, &hash)).await??;
 
     if !valid {
         return Err(AppError::Auth("Invalid credentials".into()));
